@@ -1,0 +1,11 @@
+{
+  "name": "aether",
+  "description": "Aether 基础设施部署插件 - 项目接入、集群状态、生产部署与回滚",
+  "version": "0.1.0",
+  "author": {
+    "name": "10CG"
+  },
+  "license": "MIT",
+  "homepage": "https://forgejo.10cg.pub/10CG/aether-plugin",
+  "repository": "ssh://forgejo@forgejo.10cg.pub/10CG/aether-plugin.git"
+}
