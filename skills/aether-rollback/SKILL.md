@@ -118,9 +118,25 @@ curl -s "${CONSUL_HTTP_ADDR}/v1/health/service/my-project?passing" | jq 'length'
 3. 使用 `/aether:status my-project` 查看详细状态
 4. 使用 `deploy-doctor` agent 诊断问题
 
-## 环境变量
+## 前置条件：集群配置
+
+执行前需要配置 Aether 集群入口，参考 `/aether:setup`。
+
+### 配置读取
 
 ```bash
-export NOMAD_ADDR=http://192.168.69.70:4646
-export CONSUL_HTTP_ADDR=http://192.168.69.70:8500
+# 1. 检查项目 .env
+if [ -f ".env" ]; then source .env; fi
+
+# 2. 检查全局配置
+if [ -z "$NOMAD_ADDR" ] && [ -f "$HOME/.aether/config.yaml" ]; then
+  NOMAD_ADDR=$(yq '.endpoints.nomad' ~/.aether/config.yaml)
+  CONSUL_HTTP_ADDR=$(yq '.endpoints.consul' ~/.aether/config.yaml)
+fi
+
+# 3. 未配置则提示
+if [ -z "$NOMAD_ADDR" ]; then
+  echo "请先运行 /aether:setup 配置集群"
+  exit 1
+fi
 ```

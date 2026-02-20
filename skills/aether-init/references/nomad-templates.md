@@ -2,6 +2,17 @@
 
 模板按环境分为 dev 和 prod 两套，关键差异见末尾对照表。
 
+## 占位符说明
+
+| 占位符 | 说明 | 来源 |
+|--------|------|------|
+| `__PROJECT_NAME__` | 项目名称 | 当前目录名或用户输入 |
+| `__IMAGE__` | 容器镜像地址 | CI 流水线替换 |
+| `__PORT__` | 服务端口 | 项目分析或用户输入 |
+| `__REPLICAS__` | 副本数 (prod) | 默认 2，可调整 |
+| `__DOCKER_NODE_CLASS__` | Docker 节点类型 | 从 API 发现 |
+| `__EXEC_NODE_CLASS__` | exec 节点类型 | 从 API 发现 |
+
 ---
 
 ## Docker 服务 — dev
@@ -16,7 +27,7 @@ job "__PROJECT_NAME__" {
 
   constraint {
     attribute = "${node.class}"
-    value     = "heavy_workload"
+    value     = "__DOCKER_NODE_CLASS__"
   }
 
   group "app" {
@@ -69,7 +80,7 @@ job "__PROJECT_NAME__" {
 
   constraint {
     attribute = "${node.class}"
-    value     = "heavy_workload"
+    value     = "__DOCKER_NODE_CLASS__"
   }
 
   update {
@@ -133,7 +144,7 @@ job "__PROJECT_NAME__" {
 
   constraint {
     attribute = "${node.class}"
-    value     = "heavy_workload"
+    value     = "__DOCKER_NODE_CLASS__"
   }
 
   update {
@@ -202,7 +213,7 @@ job "__PROJECT_NAME__" {
 
   constraint {
     attribute = "${node.class}"
-    value     = "light_exec"
+    value     = "__EXEC_NODE_CLASS__"
   }
 
   group "worker" {
@@ -240,7 +251,7 @@ job "__PROJECT_NAME__" {
 
   constraint {
     attribute = "${node.class}"
-    value     = "light_exec"
+    value     = "__EXEC_NODE_CLASS__"
   }
 
   group "worker" {
@@ -293,7 +304,7 @@ job "__PROJECT_NAME__" {
 
   constraint {
     attribute = "${node.class}"
-    value     = "light_exec"
+    value     = "__EXEC_NODE_CLASS__"
   }
 
   group "task" {
@@ -327,12 +338,3 @@ job "__PROJECT_NAME__" {
 | Consul tags | `["dev", ...]` | `["prod", ...]` |
 | 健康检查 (exec) | 无 | script check |
 | APP_ENV | development | production |
-
-## 占位符说明
-
-| 占位符 | 说明 | 示例 |
-|--------|------|------|
-| `__PROJECT_NAME__` | 项目名称 | `my-api` |
-| `__IMAGE__` | 容器镜像地址 | `forgejo.10cg.pub/org/my-api:abc123` |
-| `__PORT__` | 服务端口 | `3000` |
-| `__REPLICAS__` | 副本数 (prod) | `2` |

@@ -240,9 +240,69 @@ Workflow 差异：
 
 参考 `references/nomad-templates.md`
 
-## 集群配置
+## 前置条件：集群配置
 
-- **Registry**: `forgejo.10cg.pub`
-- **Nomad**: `http://192.168.69.70:4646`
-- **Heavy 节点**: node_class = `heavy_workload` (Docker driver)
-- **Light 节点**: node_class = `light_exec` (exec driver)
+执行 `/aether:init` 前，需要先配置 Aether 集群入口。
+
+### 配置检查
+
+Skill 启动时自动检查配置：
+
+```bash
+# 1. 检查项目 .env
+# 2. 检查 ~/.aether/config.yaml
+# 3. 未找到 → 提示运行 /aether:setup
+```
+
+### 必需的配置项
+
+| 配置项 | 来源 | 用途 |
+|--------|------|------|
+| `NOMAD_ADDR` | 配置文件 | 查询节点信息、提交 Job |
+| `CONSUL_HTTP_ADDR` | 配置文件 | 服务发现（可选） |
+| `AETHER_REGISTRY` | 配置文件 | 生成镜像地址 |
+
+### 自动发现的信息
+
+以下信息从 Nomad API 自动发现，无需配置：
+
+```bash
+# 发现 Docker 节点的 node_class
+DOCKER_CLASS=$(curl -s "${NOMAD_ADDR}/v1/nodes" | jq -r '
+  [.[] | select(.Drivers.docker != null)] | .[0].NodeClass
+')
+
+# 发现 exec 节点的 node_class
+EXEC_CLASS=$(curl -s "${NOMAD_ADDR}/v1/nodes" | jq -r '
+  [.[] | select(.Drivers.exec != null and .Drivers.docker == null)] | .[0].NodeClass
+')
+
+# 发现节点数量
+DOCKER_COUNT=$(curl -s "${NOMAD_ADDR}/v1/nodes" | jq '[.[] | select(.Drivers.docker != null)] | length')
+EXEC_COUNT=$(curl -s "${NOMAD_ADDR}/v1/nodes" | jq '[.[] | select(.Drivers.exec != null and .Drivers.docker == null)] | length')
+```
+
+生成的配置文件使用发现的值：
+
+```hcl
+# deploy/nomad-prod.hcl 中的 constraint
+constraint {
+  attribute = "${node.class}"
+  value     = "${DOCKER_CLASS}"  # 从 API 发现，如 "heavy_workload"
+}
+```
+
+### 首次使用
+
+如果未配置，skill 会引导用户：
+
+```
+/aether:init
+
+未找到 Aether 集群配置。
+请先运行 /aether:setup 配置集群入口地址。
+
+或选择：
+  → 现在配置 (调用 /aether:setup)
+  → 取消
+```

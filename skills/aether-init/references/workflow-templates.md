@@ -1,20 +1,33 @@
 # Forgejo Actions Workflow 模板
 
-## Docker 项目 (heavy 节点)
+模板中使用占位符，由 `/aether:init` 根据配置替换为实际值。
+
+## 占位符说明
+
+| 占位符 | 说明 | 来源 |
+|--------|------|------|
+| `__REGISTRY__` | 容器镜像仓库地址 | `AETHER_REGISTRY` 配置 |
+| `__NOMAD_ADDR__` | Nomad API 地址 | `NOMAD_ADDR` 配置 |
+| `__PROJECT_NAME__` | 项目名称 | 当前目录名或用户输入 |
+| `__DEPLOY_HOST__` | exec 部署目标主机 | 从 API 发现的 light 节点 |
+
+---
+
+## Docker 项目 — dev
 
 `.forgejo/workflows/deploy.yaml`:
 
 ```yaml
-name: Deploy to Aether
+name: Deploy to Aether (dev)
 
 on:
   push:
     branches: [main]
 
 env:
-  REGISTRY: forgejo.10cg.pub
+  REGISTRY: __REGISTRY__
   IMAGE_NAME: ${{ github.repository }}
-  NOMAD_ADDR: http://192.168.69.70:4646
+  NOMAD_ADDR: __NOMAD_ADDR__
 
 jobs:
   build-and-deploy:
@@ -23,7 +36,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Login to Forgejo Registry
+      - name: Login to Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -39,57 +52,22 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
-      - name: Deploy to Nomad
+      - name: Deploy to Nomad (dev)
         run: |
           IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
-          sed -i "s|__IMAGE__|${IMAGE}|g" deploy/nomad.hcl
-          curl -s -X POST "${NOMAD_ADDR}/v1/jobs" \
-            -d @<(nomad job run -output deploy/nomad.hcl) \
-            | jq .
+          sed -i "s|__IMAGE__|${IMAGE}|g" deploy/nomad-dev.hcl
+          curl -s -X POST "${{ env.NOMAD_ADDR }}/v1/jobs" \
+            -H "Content-Type: application/json" \
+            -d "$(cat deploy/nomad-dev.hcl | nomad job run -output -)" \
+            | jq -r '.EvalID // .Errors'
 ```
 
-## exec 项目 (light 节点)
-
-`.forgejo/workflows/deploy.yaml`:
-
-```yaml
-name: Deploy to Aether (exec)
-
-on:
-  push:
-    branches: [main]
-
-env:
-  NOMAD_ADDR: http://192.168.69.70:4646
-  DEPLOY_PATH: /opt/apps/__PROJECT_NAME__
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Sync to NFS
-        run: |
-          rsync -avz --delete \
-            --exclude '.git' \
-            --exclude '.forgejo' \
-            ./ deployer@192.168.69.90:${{ env.DEPLOY_PATH }}/
-
-      - name: Deploy to Nomad
-        run: |
-          curl -s -X POST "${NOMAD_ADDR}/v1/jobs" \
-            -d @<(nomad job run -output deploy/nomad.hcl) \
-            | jq .
-```
-
-## 生产环境 (手动触发)
+## Docker 项目 — prod
 
 `.forgejo/workflows/deploy-prod.yaml`:
 
 ```yaml
-name: Deploy to Production
+name: Deploy to Aether (prod)
 
 on:
   workflow_dispatch:
@@ -100,9 +78,9 @@ on:
         type: string
 
 env:
-  REGISTRY: forgejo.10cg.pub
+  REGISTRY: __REGISTRY__
   IMAGE_NAME: ${{ github.repository }}
-  NOMAD_ADDR: http://192.168.69.70:4646
+  NOMAD_ADDR: __NOMAD_ADDR__
 
 jobs:
   deploy-prod:
@@ -117,11 +95,94 @@ jobs:
           IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.version }}"
           docker manifest inspect ${IMAGE} || exit 1
 
-      - name: Deploy to Nomad
+      - name: Deploy to Nomad (prod)
         run: |
           IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.version }}"
-          sed -i "s|__IMAGE__|${IMAGE}|g" deploy/nomad.hcl
-          curl -s -X POST "${NOMAD_ADDR}/v1/jobs" \
-            -d @<(nomad job run -output deploy/nomad.hcl) \
-            | jq .
+          sed -i "s|__IMAGE__|${IMAGE}|g" deploy/nomad-prod.hcl
+          curl -s -X POST "${{ env.NOMAD_ADDR }}/v1/jobs" \
+            -H "Content-Type: application/json" \
+            -d "$(cat deploy/nomad-prod.hcl | nomad job run -output -)" \
+            | jq -r '.EvalID // .Errors'
+```
+
+## exec 项目 — dev
+
+`.forgejo/workflows/deploy.yaml`:
+
+```yaml
+name: Deploy to Aether (exec, dev)
+
+on:
+  push:
+    branches: [main]
+
+env:
+  NOMAD_ADDR: __NOMAD_ADDR__
+  DEPLOY_HOST: __DEPLOY_HOST__
+  DEPLOY_PATH: /opt/apps/__PROJECT_NAME__
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Sync to NFS
+        run: |
+          rsync -avz --delete \
+            --exclude '.git' \
+            --exclude '.forgejo' \
+            ./ deployer@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/
+
+      - name: Deploy to Nomad (dev)
+        run: |
+          curl -s -X POST "${{ env.NOMAD_ADDR }}/v1/jobs" \
+            -H "Content-Type: application/json" \
+            -d "$(cat deploy/nomad-dev.hcl | nomad job run -output -)" \
+            | jq -r '.EvalID // .Errors'
+```
+
+## exec 项目 — prod
+
+`.forgejo/workflows/deploy-prod.yaml`:
+
+```yaml
+name: Deploy to Aether (exec, prod)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "deploy" to confirm'
+        required: true
+        type: string
+
+env:
+  NOMAD_ADDR: __NOMAD_ADDR__
+  DEPLOY_HOST: __DEPLOY_HOST__
+  DEPLOY_PATH: /opt/apps/__PROJECT_NAME__
+
+jobs:
+  deploy-prod:
+    runs-on: ubuntu-latest
+    environment: production
+    if: ${{ inputs.confirm == 'deploy' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Sync to NFS
+        run: |
+          rsync -avz --delete \
+            --exclude '.git' \
+            --exclude '.forgejo' \
+            ./ deployer@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/
+
+      - name: Deploy to Nomad (prod)
+        run: |
+          curl -s -X POST "${{ env.NOMAD_ADDR }}/v1/jobs" \
+            -H "Content-Type: application/json" \
+            -d "$(cat deploy/nomad-prod.hcl | nomad job run -output -)" \
+            | jq -r '.EvalID // .Errors'
 ```

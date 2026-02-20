@@ -185,16 +185,35 @@ for ALLOC in ${ALLOCS}; do
 done
 ```
 
-## 环境变量
+## 前置条件：集群配置
+
+执行前需要配置 Aether 集群入口，参考 `/aether:setup`。
+
+### 配置读取
 
 ```bash
-export NOMAD_ADDR=http://192.168.69.70:4646
-export CONSUL_HTTP_ADDR=http://192.168.69.70:8500
+# 1. 检查项目 .env
+if [ -f ".env" ]; then source .env; fi
+
+# 2. 检查全局配置
+if [ -z "$NOMAD_ADDR" ] && [ -f "$HOME/.aether/config.yaml" ]; then
+  NOMAD_ADDR=$(yq '.endpoints.nomad' ~/.aether/config.yaml)
+  CONSUL_HTTP_ADDR=$(yq '.endpoints.consul' ~/.aether/config.yaml)
+  AETHER_REGISTRY=$(yq '.endpoints.registry' ~/.aether/config.yaml)
+fi
+
+# 3. 未配置则提示
+if [ -z "$NOMAD_ADDR" ]; then
+  echo "请先运行 /aether:setup 配置集群"
+  exit 1
+fi
 ```
 
 ## 与其他 Skills 的关系
 
 ```
+/aether:setup   → 配置集群入口（首次使用）
+       ↓
 开发阶段                          生产阶段
 ─────────                        ─────────
 /aether:init    → 项目接入

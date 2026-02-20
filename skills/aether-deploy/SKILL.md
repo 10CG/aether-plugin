@@ -124,9 +124,26 @@ Consul DNS: my-project.service.consul
 4. **健康检查**: 部署后等待健康检查通过
 5. **自动回滚**: 如果健康检查失败，提示使用 `/aether:rollback`
 
-## 环境变量
+## 前置条件：集群配置
+
+执行前需要配置 Aether 集群入口，参考 `/aether:setup`。
+
+### 配置读取
 
 ```bash
-export NOMAD_ADDR=http://192.168.69.70:4646
-export CONSUL_HTTP_ADDR=http://192.168.69.70:8500
+# 1. 检查项目 .env
+if [ -f ".env" ]; then source .env; fi
+
+# 2. 检查全局配置
+if [ -z "$NOMAD_ADDR" ] && [ -f "$HOME/.aether/config.yaml" ]; then
+  NOMAD_ADDR=$(yq '.endpoints.nomad' ~/.aether/config.yaml)
+  CONSUL_HTTP_ADDR=$(yq '.endpoints.consul' ~/.aether/config.yaml)
+  AETHER_REGISTRY=$(yq '.endpoints.registry' ~/.aether/config.yaml)
+fi
+
+# 3. 未配置则提示
+if [ -z "$NOMAD_ADDR" ]; then
+  echo "请先运行 /aether:setup 配置集群"
+  exit 1
+fi
 ```

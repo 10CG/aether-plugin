@@ -1,8 +1,8 @@
 # Aether Plugin
 
-> **Version**: 0.1.0 | **Released**: 2026-02-19
+> **Version**: 0.2.0 | **Released**: 2026-02-19
 >
-> Aether 基础设施部署插件 - 5个 Skills + 2个 Agents
+> Aether 基础设施部署插件 - 6个 Skills + 2个 Agents
 
 ## 安装
 
@@ -14,13 +14,24 @@
 /plugin install aether@10CG-aether-plugin
 ```
 
+## 首次使用
+
+安装后，首先配置集群入口：
+
+```bash
+/aether:setup --global
+```
+
+这会创建 `~/.aether/config.yaml`，配置 Nomad、Consul、Registry 地址。配置一次后，所有项目共享。
+
 ## 包含内容
 
-### Skills (5个)
+### Skills (6个)
 
 | Skill | 用途 | 环境 |
 |-------|------|------|
-| `aether-init` | 新项目接入脚手架生成 | dev |
+| `aether-setup` | 配置集群入口地址 | 首次使用 |
+| `aether-init` | 新项目接入（两阶段：分析 → 生成） | dev + prod |
 | `aether-dev` | 开发测试部署、临时 Job、日志查看 | dev |
 | `aether-status` | 集群/服务状态查询 | dev + prod |
 | `aether-deploy` | 生产环境受控部署 | prod |
@@ -35,11 +46,25 @@
 
 ## 使用方式
 
+### 配置集群
+
+```bash
+# 全局配置（推荐，一次配置所有项目可用）
+/aether:setup --global
+
+# 项目级配置（仅当前项目）
+/aether:setup --project
+
+# 查看当前配置
+/aether:setup --show
+```
+
 ### 新项目接入
 
 ```bash
 /aether:init
-# 交互式生成 Dockerfile、workflow、nomad.hcl
+# Phase 1: 扫描项目 → 生成部署方案 → 确认
+# Phase 2: 生成 Dockerfile、workflow、nomad.hcl (dev + prod)
 ```
 
 ### 开发测试
@@ -82,21 +107,29 @@
 /aether:rollback my-project
 ```
 
-## 环境变量
+## 配置说明
 
-插件依赖以下环境变量（在 Aether 项目 `.env` 中配置）：
+### 配置层级（优先级从高到低）
 
-```bash
-NOMAD_ADDR=http://192.168.69.70:4646
-CONSUL_HTTP_ADDR=http://192.168.69.70:8500
-```
+1. **项目级 `.env`** — 当前项目目录下
+2. **用户级 `~/.aether/config.yaml`** — 全局配置
+3. **插件默认值** — 无（必须配置入口地址）
 
-## 集群信息
+### 必需配置项
 
-- Nomad Server: 192.168.69.70-72
-- Consul Server: 192.168.69.70-72
-- Heavy Nodes (Docker): 192.168.69.80-82, node_class=`heavy_workload`
-- Light Nodes (exec): 192.168.69.90-94, node_class=`light_exec`
+| 配置项 | 环境变量 | 说明 |
+|--------|---------|------|
+| Nomad 地址 | `NOMAD_ADDR` | Nomad API 入口 |
+| Consul 地址 | `CONSUL_HTTP_ADDR` | Consul API 入口 |
+| Registry 地址 | `AETHER_REGISTRY` | 容器镜像仓库 |
+
+### 自动发现
+
+以下信息从 Nomad API 自动发现，无需配置：
+
+- 节点类型 (node_class)
+- 可用 Driver (docker/exec)
+- 节点 IP 和状态
 
 ## 相关项目
 
