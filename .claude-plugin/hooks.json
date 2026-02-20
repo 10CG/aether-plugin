@@ -1,0 +1,18 @@
+{
+  "version": "0.2.0",
+  "description": "Aether 基础设施部署 Hooks 配置 - 6个 Skills + 2个 Agents",
+  "enabled": true,
+  "hooks": {
+    "SessionStart": {
+      "skill": "aether:aether-status",
+      "enabled": false,
+      "description": "会话开始时自动检查集群状态（默认禁用，按需启用）",
+      "timeout": 15
+    },
+    "PostToolUse": {
+      "enabled": false,
+      "description": "工具调用后检查（预留，未来可用于部署结果验证）"
+    }
+  },
+  "disable_with_env": "AETHER_HOOKS_DISABLED=true"
+}

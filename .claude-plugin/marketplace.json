@@ -1,0 +1,28 @@
+{
+  "name": "10CG-aether-plugin",
+  "version": "0.2.0",
+  "description": "Aether 基础设施部署自动化插件",
+  "owner": {
+    "name": "10CG",
+    "email": "forgejo@10cg.pub"
+  },
+  "homepage": "https://forgejo.10cg.pub/10CG/aether-plugin",
+  "repository": "ssh://forgejo@forgejo.10cg.pub/10CG/aether-plugin.git",
+  "license": "MIT",
+  "plugins": [
+    {
+      "name": "aether",
+      "description": "Aether 基础设施部署插件 - 6个 Skills + 2个 Agents (配置发现/项目接入/开发测试/生产部署/故障诊断)",
+      "version": "0.2.0",
+      "author": {
+        "name": "10CG"
+      },
+      "source": {
+        "source": "url",
+        "url": "ssh://forgejo@forgejo.10cg.pub/10CG/aether-plugin.git"
+      },
+      "category": "infrastructure",
+      "keywords": ["aether", "nomad", "consul", "deployment", "infrastructure", "devops"]
+    }
+  ]
+}
