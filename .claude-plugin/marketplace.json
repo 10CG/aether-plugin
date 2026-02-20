@@ -6,8 +6,8 @@
     "name": "10CG",
     "email": "forgejo@10cg.pub"
   },
-  "homepage": "https://forgejo.10cg.pub/10CG/aether-plugin",
-  "repository": "ssh://forgejo@forgejo.10cg.pub/10CG/aether-plugin.git",
+  "homepage": "https://github.com/10CG/aether-plugin",
+  "repository": "https://github.com/10CG/aether-plugin.git",
   "license": "MIT",
   "plugins": [
     {
@@ -19,7 +19,7 @@
       },
       "source": {
         "source": "url",
-        "url": "ssh://forgejo@forgejo.10cg.pub/10CG/aether-plugin.git"
+        "url": "https://github.com/10CG/aether-plugin.git"
       },
       "category": "infrastructure",
       "keywords": ["aether", "nomad", "consul", "deployment", "infrastructure", "devops"]
