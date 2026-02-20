@@ -7,6 +7,7 @@ All notable changes to aether-plugin will be documented in this file.
 ### Added
 - Initial release
 - `aether-init` skill: Project scaffolding for Aether deployment
+- `aether-dev` skill: Dev environment deploy, test jobs, logs
 - `aether-status` skill: Cluster and service status query
 - `aether-deploy` skill: Production deployment with approval
 - `aether-rollback` skill: Production rollback

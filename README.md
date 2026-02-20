@@ -2,7 +2,7 @@
 
 > **Version**: 0.1.0 | **Released**: 2026-02-19
 >
-> Aether 基础设施部署插件 - 4个 Skills + 2个 Agents
+> Aether 基础设施部署插件 - 5个 Skills + 2个 Agents
 
 ## 安装
 
@@ -16,11 +16,12 @@
 
 ## 包含内容
 
-### Skills (4个)
+### Skills (5个)
 
 | Skill | 用途 | 环境 |
 |-------|------|------|
 | `aether-init` | 新项目接入脚手架生成 | dev |
+| `aether-dev` | 开发测试部署、临时 Job、日志查看 | dev |
 | `aether-status` | 集群/服务状态查询 | dev + prod |
 | `aether-deploy` | 生产环境受控部署 | prod |
 | `aether-rollback` | 生产环境快速回滚 | prod |
@@ -39,6 +40,22 @@
 ```bash
 /aether:init
 # 交互式生成 Dockerfile、workflow、nomad.hcl
+```
+
+### 开发测试
+
+```bash
+# 部署当前分支到 dev（不经过 CI）
+/aether:dev deploy
+
+# 运行临时测试 Job
+/aether:dev run --docker "nginx:alpine"
+
+# 查看 dev 服务日志
+/aether:dev logs my-project
+
+# 清理临时 Job
+/aether:dev clean
 ```
 
 ### 查看状态
