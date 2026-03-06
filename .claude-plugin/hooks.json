@@ -1,6 +1,6 @@
 {
-  "version": "0.5.0",
-  "description": "Aether 基础设施部署 Hooks 配置 - 6个 Skills + 2个 Agents",
+  "version": "0.6.0",
+  "description": "Aether 基础设施部署 Hooks 配置 - 7个 Skills + 2个 Agents",
   "enabled": true,
   "hooks": {
     "SessionStart": {

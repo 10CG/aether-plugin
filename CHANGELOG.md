@@ -2,6 +2,19 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [0.6.0] - 2026-03-07
+
+### Added
+- `aether-volume` skill: Host volume management guide
+  - Volume creation, listing, and deletion workflows
+  - SSH connection and remote execution guidance
+  - Dry-run preview and rollback mechanisms
+
+### Changed
+- `aether-init` skill: Added Step 2.3 Registry authentication configuration
+- Updated to support aether-cli v0.6.0 volume management features
+- Enhanced registry integration with platform-specific credentials
+
 ## [0.5.0] - 2026-03-06
 
 ### Changed
