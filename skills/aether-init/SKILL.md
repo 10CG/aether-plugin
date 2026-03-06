@@ -192,7 +192,125 @@ Workflow 差异：
 | 审批 | 无 | environment: production |
 | Job 文件 | deploy/nomad-dev.hcl | deploy/nomad-prod.hcl |
 
-### Step 2.2.5: 配置 Host Volume（如果需要）
+### Step 2.3: Registry 认证配置
+
+> **智能检测**: aether 自动检测 registry 类型并使用对应的环境变量
+
+#### 支持的 Registry 类型
+
+aether 会根据 `registry.url` 自动检测类型并生成对应的 CI 配置：
+
+| Registry 类型 | 检测规则 | 推荐环境变量 |
+|--------------|---------|-------------|
+| **Forgejo** | `*.forgejo.*` | `FORGEJO_USER`, `FORGEJO_TOKEN` |
+| **Gitea** | `*.gitea.*` | `GITEA_USER`, `GITEA_TOKEN` |
+| **GitHub** | `ghcr.io` | `GITHUB_ACTOR`, `GITHUB_TOKEN` |
+| **GitLab** | `registry.gitlab.com` | `CI_REGISTRY_USER`, `CI_REGISTRY_PASSWORD` |
+| **Docker Hub** | `docker.io` | `DOCKER_USERNAME`, `DOCKER_PASSWORD` |
+| **Generic** | 其他 | `REGISTRY_USERNAME`, `REGISTRY_PASSWORD` |
+
+#### 配置示例
+
+**Forgejo 环境**:
+```bash
+# 在 Forgejo 仓库的 Settings → Secrets 中配置
+FORGEJO_USER=myuser
+FORGEJO_TOKEN=xxx  # 从 Forgejo 用户设置中生成
+```
+
+**GitHub 环境**:
+```bash
+# 在 GitHub 仓库的 Settings → Secrets 中配置
+GITHUB_TOKEN=ghp_xxx  # 自动可用或手动生成
+```
+
+**GitLab 环境**:
+```bash
+# GitLab CI 自动提供这些变量
+CI_REGISTRY_USER=$CI_REGISTRY_USER
+CI_REGISTRY_PASSWORD=$CI_JOB_TOKEN
+```
+
+#### 验证配置
+
+```bash
+# 查看检测到的 registry 类型
+aether config list
+
+# 输出示例：
+# Registry Detection:
+#   URL: forgejo.10cg.pub
+#   Type: forgejo (Forgejo Container Registry)
+#   Username: FORGEJO_USER (from environment)
+#   Password: FORGEJO_TOKEN (from environment)
+#   Fallback chain: FORGEJO_TOKEN → GITEA_TOKEN → REGISTRY_PASSWORD
+```
+
+#### 生成的 CI 配置
+
+`aether init` 会根据检测到的 registry 类型生成对应的 workflow：
+
+```yaml
+# Forgejo registry 生成的配置
+- name: Login to registry
+  uses: docker/login-action@v3
+  with:
+    registry: ${{ env.REGISTRY }}
+    username: ${{ secrets.FORGEJO_USER || secrets.REGISTRY_USERNAME }}
+    password: ${{ secrets.FORGEJO_TOKEN || secrets.REGISTRY_PASSWORD }}
+
+# GitHub registry 生成的配置
+- name: Login to registry
+  uses: docker/login-action@v3
+  with:
+    registry: ${{ env.REGISTRY }}
+    username: ${{ secrets.GITHUB_ACTOR || github.actor }}
+    password: ${{ secrets.GITHUB_TOKEN || github.token }}
+```
+
+#### 凭据优先级
+
+每种 registry 类型都有自己的凭据回退链：
+
+- **Forgejo**: `FORGEJO_TOKEN` → `GITEA_TOKEN` → `REGISTRY_PASSWORD`
+- **GitHub**: `GITHUB_TOKEN` → `GH_TOKEN` → `REGISTRY_PASSWORD`
+- **GitLab**: `CI_REGISTRY_PASSWORD` → `CI_JOB_TOKEN` → `GITLAB_TOKEN`
+- **Generic**: `REGISTRY_PASSWORD` → `REGISTRY_TOKEN`
+
+这意味着你可以：
+1. 使用平台专属变量（推荐）
+2. 使用通用变量作为回退
+3. 无需配置多套凭据
+
+#### 故障排查
+
+**问题**: CI 构建时提示认证失败
+
+**解决**:
+```bash
+# 1. 检查 registry 检测是否正确
+aether config list
+
+# 2. 验证环境变量是否设置
+aether setup --check
+
+# 3. 确认 Secrets 配置
+# 在 Forgejo/GitHub 仓库的 Settings → Secrets 中检查
+```
+
+**问题**: 不确定应该设置哪个环境变量
+
+**解决**:
+```bash
+# 查看 fallback chain 了解所有可用选项
+aether config list
+
+# 输出会显示：
+# Fallback chain: FORGEJO_TOKEN → GITEA_TOKEN → REGISTRY_PASSWORD
+# 选择其中任意一个设置即可
+```
+
+### Step 2.4: 配置 Host Volume（如果需要）
 
 > **新功能**: 使用 `aether volume` 命令配置持久化存储
 
@@ -293,7 +411,7 @@ Host heavy-* light-*
 - [aether volume 使用指南](../../docs/guides/aether-volume-usage.md)
 - [aether volume 快速参考](../../docs/guides/aether-volume-quick-reference.md)
 
-### Step 2.3: 输出总结
+### Step 2.5: 输出总结
 
 ```
 ═══════════════════════════════════════
