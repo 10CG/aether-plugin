@@ -2,6 +2,13 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [0.5.0] - 2026-03-06
+
+### Changed
+- Updated to support aether-cli v0.5.0 registry auth detection
+- Skills now leverage CLI's intelligent credential mapping
+- Forgejo users can use `FORGEJO_TOKEN`/`FORGEJO_USER` directly
+
 ## [0.2.0] - 2026-02-19
 
 ### Added
