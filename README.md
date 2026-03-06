@@ -1,6 +1,6 @@
 # Aether Plugin
 
-> **Version**: 0.2.0 | **Released**: 2026-02-19
+> **Version**: 0.5.0 | **Released**: 2026-03-06
 >
 > Aether 基础设施部署插件 - 6个 Skills + 2个 Agents
 
@@ -122,6 +122,20 @@
 | Nomad 地址 | `NOMAD_ADDR` | Nomad API 入口 |
 | Consul 地址 | `CONSUL_HTTP_ADDR` | Consul API 入口 |
 | Registry 地址 | `AETHER_REGISTRY` | 容器镜像仓库 |
+
+### Registry 认证 (v0.5.0+)
+
+aether-cli 现在支持智能 Registry 认证检测，自动识别平台并使用对应的环境变量：
+
+| Registry 类型 | 优先级环境变量 |
+|--------------|---------------|
+| Forgejo | `FORGEJO_TOKEN` / `FORGEJO_USER` |
+| GitHub (ghcr.io) | `GITHUB_TOKEN` / `GH_TOKEN` |
+| GitLab | `GITLAB_TOKEN` / `CI_JOB_TOKEN` |
+| Docker Hub | `DOCKER_PASSWORD` / `DOCKER_TOKEN` |
+| Generic | `REGISTRY_PASSWORD` / `REGISTRY_TOKEN` |
+
+Forgejo CI/CD 会自动注入 `FORGEJO_TOKEN`，无需额外配置。
 
 ### 自动发现
 
