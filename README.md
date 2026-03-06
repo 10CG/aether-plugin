@@ -1,8 +1,8 @@
 # Aether Plugin
 
-> **Version**: 0.5.0 | **Released**: 2026-03-06
+> **Version**: 0.6.0 | **Released**: 2026-03-07
 >
-> Aether 基础设施部署插件 - 6个 Skills + 2个 Agents
+> Aether 基础设施部署插件 - 7个 Skills + 2个 Agents
 
 ## 安装
 
@@ -26,12 +26,13 @@
 
 ## 包含内容
 
-### Skills (6个)
+### Skills (7个)
 
 | Skill | 用途 | 环境 |
 |-------|------|------|
 | `aether-setup` | 配置集群入口地址 | 首次使用 |
 | `aether-init` | 新项目接入（两阶段：分析 → 生成） | dev + prod |
+| `aether-volume` | Nomad host volume 管理 | dev + prod |
 | `aether-dev` | 开发测试部署、临时 Job、日志查看 | dev |
 | `aether-status` | 集群/服务状态查询 | dev + prod |
 | `aether-deploy` | 生产环境受控部署 | prod |
