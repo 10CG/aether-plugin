@@ -192,6 +192,107 @@ Workflow 差异：
 | 审批 | 无 | environment: production |
 | Job 文件 | deploy/nomad-dev.hcl | deploy/nomad-prod.hcl |
 
+### Step 2.2.5: 配置 Host Volume（如果需要）
+
+> **新功能**: 使用 `aether volume` 命令配置持久化存储
+
+如果项目需要持久化存储（数据库文件、用户上传、日志等），使用以下命令配置 host volume：
+
+```bash
+# 创建 host volume
+aether volume create \
+  --node heavy-1 \
+  --project {{PROJECT_NAME}} \
+  --volumes data,logs
+```
+
+**说明**:
+- 自动创建目录: `/opt/aether-volumes/{{PROJECT_NAME}}/{data,logs}`
+- 自动配置 Nomad: 在 `client.hcl` 中添加 `host_volume` 块
+- 自动重启 Nomad 服务并验证
+- 失败时自动回滚配置
+
+**验证配置**:
+```bash
+aether volume list --node heavy-1
+```
+
+**在 Nomad Job 中使用**:
+
+生成的 `deploy/nomad-dev.hcl` 和 `deploy/nomad-prod.hcl` 中添加：
+
+```hcl
+job "{{PROJECT_NAME}}-dev" {
+  group "app" {
+    # 声明使用 host volume
+    volume "data" {
+      type      = "host"
+      source    = "{{PROJECT_NAME}}-data"
+      read_only = false
+    }
+
+    volume "logs" {
+      type      = "host"
+      source    = "{{PROJECT_NAME}}-logs"
+      read_only = false
+    }
+
+    task "app" {
+      # 挂载到容器内
+      volume_mount {
+        volume      = "data"
+        destination = "/app/data"
+        read_only   = false
+      }
+
+      volume_mount {
+        volume      = "logs"
+        destination = "/app/logs"
+        read_only   = false
+      }
+
+      # 应用配置
+      config {
+        image = "${var.image}"
+        ports = ["http"]
+      }
+    }
+  }
+}
+```
+
+**常见 volume 配置**:
+
+| 项目类型 | 推荐 volumes | 说明 |
+|---------|-------------|------|
+| 数据库 | `data` | 数据文件 |
+| Web 应用 | `data,logs,uploads` | 数据、日志、上传文件 |
+| 静态站点 | `logs` | 访问日志 |
+| API 服务 | `logs` | 应用日志 |
+
+**注意事项**:
+- ⚠️ 有状态服务建议使用单副本（避免数据冲突）
+- ⚠️ 生产环境建议定期备份 volume 数据
+- ⚠️ volume 删除会永久删除数据，请谨慎操作
+
+**SSH 认证配置**:
+
+volume 命令需要 SSH 访问节点。推荐配置 `~/.ssh/config`：
+
+```bash
+# ~/.ssh/config
+Host heavy-* light-*
+    User root
+    IdentityFile ~/.ssh/id_ed25519
+    StrictHostKeyChecking no
+```
+
+配置后无需每次指定 `--ssh-key` 参数。
+
+**参考文档**:
+- [aether volume 使用指南](../../docs/guides/aether-volume-usage.md)
+- [aether volume 快速参考](../../docs/guides/aether-volume-quick-reference.md)
+
 ### Step 2.3: 输出总结
 
 ```
