@@ -2,6 +2,24 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [0.7.0] - 2026-03-07
+
+### Added
+- `aether-doctor` skill: Environment diagnostics tool
+  - Check aether CLI installation and version
+  - Validate configuration file existence and format
+  - Test Nomad/Consul cluster connectivity
+  - Check SSH key configuration and permissions
+  - Test SSH connection to all cluster nodes
+  - Collect cluster overview (node types, counts, IPs)
+  - Update configuration cache with environment status
+  - Provide repair suggestions for common issues
+
+### Changed
+- Enhanced environment state caching in config.yaml
+- Skills can now read cached environment status before execution
+- Better error messages with diagnostic suggestions
+
 ## [0.6.0] - 2026-03-07
 
 ### Added

@@ -1,8 +1,8 @@
 # Aether Plugin
 
-> **Version**: 0.6.0 | **Released**: 2026-03-07
+> **Version**: 0.7.0 | **Released**: 2026-03-07
 >
-> Aether 基础设施部署插件 - 7个 Skills + 2个 Agents
+> Aether 基础设施部署插件 - 8个 Skills + 2个 Agents
 
 ## 安装
 
@@ -16,7 +16,15 @@
 
 ## 首次使用
 
-安装后，首先配置集群入口：
+安装后，首先运行环境诊断：
+
+```bash
+/aether:doctor
+```
+
+这会检查 aether CLI、配置文件、集群连接、SSH 配置等，并给出修复建议。
+
+或手动配置集群入口：
 
 ```bash
 /aether:setup --global
@@ -26,10 +34,11 @@
 
 ## 包含内容
 
-### Skills (7个)
+### Skills (8个)
 
 | Skill | 用途 | 环境 |
 |-------|------|------|
+| `aether-doctor` | 环境诊断（CLI/配置/连接/SSH） | 首次使用/故障排查 |
 | `aether-setup` | 配置集群入口地址 | 首次使用 |
 | `aether-init` | 新项目接入（两阶段：分析 → 生成） | dev + prod |
 | `aether-volume` | Nomad host volume 管理 | dev + prod |
