@@ -2,6 +2,30 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [0.8.0] - 2026-03-08
+
+### Added
+- **NEW Skill**: `aether-deploy-watch` - Post-deploy verification and diagnostics
+  - Automatically check Nomad allocation status after CI/CD deployment
+  - Collect failed allocation logs and error messages
+  - Pattern matching for common deployment failures (image pull, network, auth, etc.)
+  - Provide specific fix suggestions based on error patterns
+  - Support `--follow` mode for continuous monitoring
+  - Support `--timeout` parameter for custom timeout
+
+### Changed
+- `aether-doctor` skill: Added CI/CD configuration check (Step 8)
+  - Detect CI platform (Forgejo/GitHub/GitLab)
+  - Check workflow files for correct secrets usage
+  - Identify hardcoded values vs secrets references
+  - Provide fix suggestions for incorrect configurations
+- `aether-init` workflow templates: Updated to use correct Forgejo secrets
+  - Use `secrets.FORGEJO_TOKEN` instead of `secrets.REGISTRY_TOKEN`
+  - Use `secrets.FORGEJO_USER` instead of `secrets.REGISTRY_USERNAME`
+
+### Fixed
+- CI shows success but Nomad deployment fails - now caught by `aether-deploy-watch`
+
 ## [0.7.2] - 2026-03-08
 
 ### Added

@@ -1,8 +1,8 @@
 # Aether Plugin
 
-> **Version**: 0.7.2 | **Released**: 2026-03-08
+> **Version**: 0.8.0 | **Released**: 2026-03-08
 >
-> Aether 基础设施部署插件 - 8个 Skills + 2个 Agents
+> Aether 基础设施部署插件 - 9个 Skills + 2个 Agents
 
 ## 安装
 
@@ -22,7 +22,7 @@
 /aether:doctor
 ```
 
-这会检查 aether CLI、配置文件、集群连接、SSH 配置等，并给出修复建议。
+这会检查 aether CLI、配置文件、集群连接、SSH 配置、CI 配置等，并给出修复建议。
 
 或手动配置集群入口：
 
@@ -34,17 +34,18 @@
 
 ## 包含内容
 
-### Skills (8个)
+### Skills (9个)
 
 | Skill | 用途 | 环境 |
 |-------|------|------|
-| `aether-doctor` | 环境诊断（CLI/配置/连接/SSH） | 首次使用/故障排查 |
+| `aether-doctor` | 环境诊断（CLI/配置/连接/SSH/CI） | 首次使用/故障排查 |
 | `aether-setup` | 配置集群入口地址 | 首次使用 |
 | `aether-init` | 新项目接入（两阶段：分析 → 生成） | dev + prod |
 | `aether-volume` | Nomad host volume 管理 | dev + prod |
 | `aether-dev` | 开发测试部署、临时 Job、日志查看 | dev |
-| `aether-status` | 集群/服务状态查询 | dev + prod |
 | `aether-deploy` | 生产环境受控部署 | prod |
+| `aether-deploy-watch` | 部署后监控与诊断（自动检测失败） | dev + prod |
+| `aether-status` | 集群/服务状态查询 | dev + prod |
 | `aether-rollback` | 生产环境快速回滚 | prod |
 
 ### Agents (2个)
