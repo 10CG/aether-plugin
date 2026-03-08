@@ -2,6 +2,32 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [0.8.1] - 2026-03-08
+
+### Changed
+- **Refactored Skill Architecture**: Clear separation between base layer and composition layer
+  - `aether-status` (v1.0.0): Enhanced as **base layer** skill
+    - Added `--failed` flag: View failed allocations with details
+    - Added `--recent` flag: View recent deployments
+    - Added `--logs` flag: View allocation logs
+    - Added `--watch` flag: Continuous monitoring mode
+  - `aether-deploy-watch` (v1.1.0): Refactored as **composition layer** skill
+    - Now calls `aether-status` for status queries
+    - Focused on monitoring loop, error pattern matching, and fix suggestions
+    - Clear documentation of skill relationships
+
+### Architecture
+```
+aether-status (base layer)├── provides core status queries
+├── --failed, --recent, --logs, --watch
+│
+aether-deploy-watch (composition layer)
+├── calls aether-status for status
+├── monitoring loop
+├── error diagnosis
+└── fix suggestions
+```
+
 ## [0.8.0] - 2026-03-08
 
 ### Added
