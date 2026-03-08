@@ -2,6 +2,22 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [0.7.1] - 2026-03-08
+
+### Changed
+- `aether-doctor` skill: Major update v1.1.0
+  - **Fixed**: Configuration validation logic - no longer uses leader address for comparison
+  - **Added**: Complete cluster topology caching (all servers and clients)
+  - **Added**: Project-level environment cache (`./.aether/environment.yaml`)
+  - **Improved**: Configuration validation checks if address belongs to server list
+  - **Improved**: Caches all server nodes with roles (leader/follower)
+  - **Improved**: Caches all client nodes with classes and drivers
+  - **Improved**: SSH connection tests for all nodes (servers + clients)
+
+### Fixed
+- Configuration conflict between multiple projects using same global cache
+- Incorrect validation due to RPC port (4647) vs HTTP port (4646) mismatch
+
 ## [0.7.0] - 2026-03-07
 
 ### Added
