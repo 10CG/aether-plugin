@@ -1,10 +1,10 @@
 ---
 name: aether-doctor
 description: |
-  Aether 环境诊断工具。检查 CLI、配置、集群连接、SSH 等环境状态，更新配置缓存。
+  Aether 环境诊断工具。检查 CLI、配置、集群连接、SSH、CI/CD 配置等环境状态，更新配置缓存。
 
-  使用场景："诊断环境"、"检查配置"、"环境有问题"、"SSH 连接失败"、"首次使用"
-argument-hint: "[--ssh|--cluster|--refresh] [--fix]"
+  使用场景："诊断环境"、"检查配置"、"环境有问题"、"SSH 连接失败"、"CI 配置错误"、"首次使用"
+argument-hint: "[--ssh|--cluster|--ci|--refresh] [--fix]"
 disable-model-invocation: false
 user-invocable: true
 allowed-tools: Bash, Read, Write, AskUserQuestion
@@ -12,7 +12,7 @@ allowed-tools: Bash, Read, Write, AskUserQuestion
 
 # Aether 环境诊断 (aether-doctor)
 
-> **版本**: 1.1.0 | **优先级**: P0
+> **版本**: 1.2.0 | **优先级**: P0
 
 ## 快速开始
 
@@ -455,7 +455,138 @@ chmod 600 ~/.ssh/authorized_keys
 
 ---
 
-### Step 8: 更新环境缓存
+### Step 8: CI/CD 配置检查（可选）
+
+如果项目包含 CI 配置文件，检查其配置是否正确。
+
+#### 8.1 检测 CI 平台
+
+```bash
+# 检测 CI 平台类型
+if [ -d ".forgejo/workflows" ]; then
+  CI_PLATFORM="forgejo"
+  CI_WORKFLOW_DIR=".forgejo/workflows"
+elif [ -d ".github/workflows" ]; then
+  CI_PLATFORM="github"
+  CI_WORKFLOW_DIR=".github/workflows"
+elif [ -d ".gitlab-ci.yml" ]; then
+  CI_PLATFORM="gitlab"
+  CI_WORKFLOW_DIR=""
+else
+  CI_PLATFORM="none"
+  echo "未检测到 CI 配置，跳过此步骤"
+fi
+
+echo "检测到 CI 平台: $CI_PLATFORM"
+```
+
+#### 8.2 检查 Workflow 文件中的 Secrets 配置
+
+**Forgejo 环境**：
+
+```bash
+# 扫描 workflow 文件中的 secrets 引用
+grep -r "secrets\." .forgejo/workflows/ | grep -v "^#"
+
+# 检查是否使用了正确的 Forgejo secrets
+# Forgejo 自动注入: FORGEJO_USER, FORGEJO_TOKEN
+# 正确: secrets.FORGEJO_USER, secrets.FORGEJO_TOKEN
+# 错误: secrets.REGISTRY_USERNAME, secrets.REGISTRY_TOKEN (需要手动配置)
+```
+
+**常见配置问题**：
+
+| 问题 | 当前配置 | 正确配置 | 说明 |
+|------|---------|---------|------|
+| Registry 认证 | `secrets.REGISTRY_TOKEN` | `secrets.FORGEJO_TOKEN` | Forgejo 自动注入 |
+| Registry 用户 | `secrets.REGISTRY_USERNAME` | `secrets.FORGEJO_USER` | Forgejo 自动注入 |
+| Nomad 地址硬编码 | `http://192.168.69.70:4646` | `${{ secrets.NOMAD_ADDR }}` | 应从 secrets 读取 |
+
+#### 8.3 Secrets 配置规范
+
+**Forgejo 环境**：
+
+| Secret | 说明 | 是否自动注入 |
+|--------|------|-------------|
+| `FORGEJO_USER` | 当前用户名 | ✅ 自动 |
+| `FORGEJO_TOKEN` | 访问令牌 | ✅ 自动 |
+| `NOMAD_ADDR` | Nomad API 地址 | ❌ 需手动配置 |
+| `NOMAD_TOKEN` | Nomad 访问令牌 | ❌ 需手动配置 |
+
+**GitHub 环境**：
+
+| Secret | 说明 | 是否自动注入 |
+|--------|------|-------------|
+| `GITHUB_ACTOR` | 当前用户名 | ✅ 自动 |
+| `GITHUB_TOKEN` | 访问令牌 | ✅ 自动 |
+| `NOMAD_ADDR` | Nomad API 地址 | ❌ 需手动配置 |
+| `NOMAD_TOKEN` | Nomad 访问令牌 | ❌ 需手动配置 |
+
+#### 8.4 CI 配置检查输出示例
+
+```
+[✓] CI/CD 配置检查
+    平台: Forgejo
+    Workflow 文件: .forgejo/workflows/deploy.yaml
+
+    Secrets 引用分析:
+      ✓ NOMAD_ADDR: ${{ secrets.NOMAD_ADDR }}
+      ✓ NOMAD_TOKEN: ${{ secrets.NOMAD_TOKEN }}
+      ✓ Registry 认证: ${{ secrets.FORGEJO_TOKEN }}
+
+    状态: 配置正确
+```
+
+**发现问题时**：
+
+```
+[!] CI/CD 配置检查
+    平台: Forgejo
+    Workflow 文件: .forgejo/workflows/deploy.yaml
+
+    发现以下问题:
+
+    1. [WARNING] 使用了通用 secrets 名称
+       当前: secrets.REGISTRY_TOKEN
+       建议: secrets.FORGEJO_TOKEN (Forgejo 自动注入)
+
+       修复方法:
+       将 workflow 中的:
+         password: ${{ secrets.REGISTRY_TOKEN }}
+       改为:
+         password: ${{ secrets.FORGEJO_TOKEN }}
+
+    2. [WARNING] Nomad 地址硬编码
+       当前: http://192.168.69.70:4646
+       建议: ${{ secrets.NOMAD_ADDR }}
+
+       修复方法:
+       1. 在 Forgejo 仓库 Settings → Secrets 中添加 NOMAD_ADDR
+       2. 将 workflow 中的硬编码地址改为 ${{ secrets.NOMAD_ADDR }}
+
+    需要配置的 Secrets:
+      - NOMAD_ADDR: http://192.168.69.70:4646
+      - NOMAD_TOKEN: (从 Nomad ACL 生成)
+
+    状态: ⚠ 配置可优化
+```
+
+#### 8.5 自动修复建议
+
+如果发现配置问题，提供具体的修复命令：
+
+```bash
+# 查看需要修改的文件
+grep -n "REGISTRY_TOKEN\|REGISTRY_USERNAME\|hardcoded_addr" .forgejo/workflows/*.yaml
+
+# 建议的 sed 替换命令
+# sed -i 's/secrets\.REGISTRY_TOKEN/secrets.FORGEJO_TOKEN/g' .forgejo/workflows/deploy.yaml
+# sed -i 's/secrets\.REGISTRY_USERNAME/secrets.FORGEJO_USER/g' .forgejo/workflows/deploy.yaml
+```
+
+---
+
+### Step 9: 更新环境缓存
 
 诊断完成后，更新环境缓存文件。
 
@@ -636,6 +767,15 @@ Aether 环境诊断
       light-4 (192.168.69.93): ✓
       light-5 (192.168.69.94): ✓
 
+[✓] CI/CD 配置
+    平台: Forgejo
+    Workflow: .forgejo/workflows/deploy.yaml
+    Secrets 配置:
+      - NOMAD_ADDR: ✓
+      - NOMAD_TOKEN: ✓
+      - Registry 认证: ✓ (FORGEJO_TOKEN)
+    状态: 配置正确
+
 状态: ✓ 健康
 缓存已更新: ./.aether/environment.yaml
 ```
@@ -699,6 +839,58 @@ Aether 环境诊断
 缓存已更新
 
 是否需要详细的修复指南？ [Y/n]
+```
+
+### CI 配置问题
+
+```
+Aether 环境诊断
+===============
+
+[✓] aether CLI
+[✓] 配置验证
+[✓] 集群连接
+[✓] 集群拓扑
+[✓] SSH 配置
+[✓] SSH 连接测试
+
+[!] CI/CD 配置
+    平台: Forgejo
+    Workflow: .forgejo/workflows/deploy.yaml
+
+    发现以下问题:
+
+    1. [WARNING] 使用了错误的 secrets 名称
+       当前: secrets.REGISTRY_TOKEN
+       建议: secrets.FORGEJO_TOKEN
+
+       Forgejo 自动注入 FORGEJO_TOKEN，无需手动配置。
+       修复方法:
+         将 workflow 中的 secrets.REGISTRY_TOKEN 改为 secrets.FORGEJO_TOKEN
+
+    2. [WARNING] Nomad 地址硬编码
+       当前: NOMAD_ADDR: http://192.168.69.70:4646
+       建议: NOMAD_ADDR: ${{ secrets.NOMAD_ADDR }}
+
+       修复方法:
+       1. 在 Forgejo 仓库 Settings → Secrets 中添加:
+          - NOMAD_ADDR: http://192.168.69.70:4646
+          - NOMAD_TOKEN: (从 Nomad ACL 生成)
+       2. 修改 workflow 使用 ${{ secrets.NOMAD_ADDR }}
+
+    需要配置的 Secrets:
+      ┌───────────────┬─────────────────────────────┐
+      │    Secret     │            示例值            │
+      ├───────────────┼─────────────────────────────┤
+      │ NOMAD_ADDR    │ http://192.168.69.70:4646  │
+      │ NOMAD_TOKEN   │ your-nomad-token           │
+      └───────────────┴─────────────────────────────┘
+
+    注意: FORGEJO_USER 和 FORGEJO_TOKEN 由 Forgejo 自动注入
+
+状态: ⚠ 环境可用，CI 配置可优化
+
+是否自动生成修复脚本？ [Y/n]
 ```
 
 ### 严重问题

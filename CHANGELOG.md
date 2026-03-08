@@ -2,6 +2,23 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [0.7.2] - 2026-03-08
+
+### Added
+- `aether-doctor` skill: CI/CD configuration check (Step 8)
+  - Detect CI platform (Forgejo/GitHub/GitLab)
+  - Check workflow files for correct secrets usage
+  - Identify hardcoded values vs secrets references
+  - Provide fix suggestions for incorrect configurations
+  - Support `--ci` flag for CI-only check
+
+### Changed
+- `aether-init` workflow templates: Updated to use correct Forgejo secrets
+  - Use `secrets.FORGEJO_TOKEN` instead of `secrets.REGISTRY_TOKEN`
+  - Use `secrets.FORGEJO_USER` instead of `secrets.REGISTRY_USERNAME`
+  - Nomad address from `secrets.NOMAD_ADDR` instead of hardcoded
+  - Added documentation for Forgejo auto-injected secrets
+
 ## [0.7.1] - 2026-03-08
 
 ### Changed

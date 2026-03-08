@@ -1,7 +1,7 @@
 {
   "name": "aether",
   "description": "Aether 基础设施部署插件 - 8个 Skills + 2个 Agents (环境诊断/配置发现/项目接入/Volume管理/开发测试/生产部署/故障诊断)",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "author": {
     "name": "10CG"
   },
