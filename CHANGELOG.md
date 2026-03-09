@@ -2,6 +2,32 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [0.8.3] - 2026-03-09
+
+### Added
+- **CLI Version Compatibility**: Plugin now defines minimum CLI version requirement
+  - `plugin.json` includes `cli.minVersion` and `cli.recommendedVersion` fields
+  - `aether-doctor` (v1.3.0) checks CLI version compatibility
+
+### Changed
+- `aether-doctor` skill: Enhanced CLI installation support
+  - Added version compatibility check (Plugin v0.8.x requires CLI >= 0.7.0)
+  - Added automatic installation flow (方案A)
+  - Added manual installation commands (方案C)
+  - Interactive installation prompts when CLI not found or incompatible
+
+### Configuration
+```json
+// plugin.json
+{
+  "cli": {
+    "minVersion": "0.7.0",
+    "recommendedVersion": "0.7.0",
+    "downloadUrl": "https://forgejo.10cg.pub/api/v1/repos/10CG/aether-cli/releases/latest"
+  }
+}
+```
+
 ## [0.8.1] - 2026-03-08
 
 ### Changed
