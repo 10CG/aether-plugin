@@ -9,6 +9,8 @@ argument-hint: "[project-name]"
 disable-model-invocation: false
 user-invocable: true
 allowed-tools: Read, Write, Glob, Bash, AskUserQuestion, Grep
+dependencies:
+  cli: true
 ---
 
 # Aether 项目接入 (aether-init)

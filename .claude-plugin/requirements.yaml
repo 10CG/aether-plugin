@@ -1,0 +1,26 @@
+# Aether Plugin 依赖配置
+# 此文件是版本要求的单一事实来源 (Single Source of Truth)
+
+cli:
+  min_version: "0.7.0"
+  recommended_version: "0.7.0"
+  download_url: "https://forgejo.10cg.pub/api/v1/repos/10CG/aether-cli/releases/latest"
+  source_repo: "https://forgejo.10cg.pub/10CG/aether-cli.git"
+
+# 版本兼容性矩阵
+compatibility:
+  - plugin_version: "0.8.x"
+    cli_min: "0.7.0"
+    cli_recommended: "0.7.0"
+    notes: "故障转移支持、nomad_servers 配置"
+
+  - plugin_version: "0.9.x"
+    cli_min: "0.8.0"
+    cli_recommended: "0.8.0"
+    notes: "TBD"
+
+# 依赖 CLI 的 Skills
+dependent_skills:
+  - aether-doctor   # 环境诊断，负责版本检查
+  - aether-init     # 项目初始化
+  - aether-volume   # Volume 管理

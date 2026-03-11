@@ -8,6 +8,8 @@ argument-hint: "[create|list|delete] [options]"
 disable-model-invocation: false
 user-invocable: true
 allowed-tools: Bash, AskUserQuestion
+dependencies:
+  cli: true
 ---
 
 # Aether Volume 管理 (aether-volume)

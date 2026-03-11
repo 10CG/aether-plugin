@@ -8,6 +8,10 @@ argument-hint: "[--ssh|--cluster|--ci|--refresh] [--fix]"
 disable-model-invocation: false
 user-invocable: true
 allowed-tools: Bash, Read, Write, AskUserQuestion
+cli_requirements:
+  source: ".claude-plugin/requirements.yaml"
+  min_version: "0.7.0"
+  recommended_version: "0.7.0"
 ---
 
 # Aether 环境诊断 (aether-doctor)
