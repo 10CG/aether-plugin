@@ -16,7 +16,7 @@ cli_requirements:
 
 # Aether 环境诊断 (aether-doctor)
 
-> **版本**: 1.4.0 | **优先级**: P0
+> **版本**: 1.5.0 | **优先级**: P0
 
 ## 快速开始
 
@@ -133,22 +133,66 @@ echo "缓存位置: $CACHE_FILE"
 
 #### 1.2 检查 CLI 是否安装
 
+**多路径检测逻辑**（优先级从高到低）：
+
 ```bash
-# 检查命令是否存在
-which aether || where aether  # Linux/macOS 或 Windows
+# 检测 CLI 位置
+detect_aether_cli() {
+  # 1. 检查是否在 PATH 中
+  if command -v aether &> /dev/null; then
+    echo "aether"
+    return 0
+  fi
+
+  # 2. 检查 ~/.aether/ 目录 (推荐安装位置)
+  local cli="$HOME/.aether/aether"
+  if [ -f "$cli" ] && [ -x "$cli" ]; then
+    echo "$cli"
+    return 0
+  fi
+
+  # 3. Windows: 检查 .exe 后缀
+  if [ "$OSTYPE" = "msys" ] || [ "$OSTYPE" = "cygwin" ]; then
+    cli="$HOME/.aether/aether.exe"
+    if [ -f "$cli" ] && [ -x "$cli" ]; then
+      echo "$cli"
+      return 0
+    fi
+  fi
+
+  # 未找到
+  return 1
+}
+
+# 获取 CLI 路径
+AETHER_CLI=$(detect_aether_cli)
+if [ -z "$AETHER_CLI" ]; then
+  echo "✗ aether CLI 未安装"
+  # 执行安装流程
+fi
+
+echo "CLI 路径: $AETHER_CLI"
 ```
 
+**CLI 安装位置**:
+
+| 优先级 | 位置 | 说明 |
+|-------|------|------|
+| 1 | PATH 中 (`/usr/local/bin` 等) | 系统/包管理器安装 |
+| 2 | `~/.aether/aether` | 用户级安装（推荐） |
+
 **结果处理**:
-- 找到 → 继续 1.3 版本检查
+- 找到 → 设置 `AETHER_CLI` 变量，继续 1.3 版本检查
 - 未找到 → 执行 [CLI 安装流程](#cli-安装流程)
 
 #### 1.3 检查 CLI 版本兼容性
 
 ```bash
+# 使用检测到的 CLI 路径
 # 获取 CLI 版本
-CLI_VERSION=$(aether version --json 2>/dev/null | jq -r '.data.version' 2>/dev/null || aether version | awk '{print $2}')
+CLI_VERSION=$($AETHER_CLI version --json 2>/dev/null | jq -r '.data.version' 2>/dev/null || $AETHER_CLI version | awk '{print $2}')
 
-# 读取 Plugin 要求的最低版本 (从 plugin.json)
+# 读取 Plugin 要求的最低版本 (从 requirements.yaml)
 MIN_VERSION="0.7.0"  # 当前 Plugin 要求
 
 # 版本比较 (使用 sort -V)
@@ -164,14 +208,15 @@ fi
 
 | 错误 | 原因 | 解决方案 |
 |------|------|---------|
-| `command not found` | CLI 未安装或不在 PATH | 执行安装流程 |
-| `permission denied` | 执行权限问题 | `chmod +x /path/to/aether` |
+| `command not found` | CLI 未安装 | 执行安装流程 |
+| `permission denied` | 执行权限问题 | `chmod +x ~/.aether/aether` |
 | 版本过低 | CLI 需要更新 | 执行升级流程 |
 
 ---
 
 ### CLI 安装流程
 
+> **安装目录**: `~/.aether/` (与 config.yaml 同目录)
 > **发布源**: CLI 二进制通过主项目 Aether 的 releases 发布
 > **Tag 格式**: `aether-cli/v{VERSION}` (如 `aether-cli/v0.7.0`)
 > **下载 URL**: `https://forgejo.10cg.pub/api/v1/repos/10CG/Aether/releases/tags/aether-cli/v{VERSION}`
@@ -198,7 +243,10 @@ EXT=""
 # 2. 构建二进制名称
 BINARY_NAME="aether-${OS}-${ARCH}${EXT}"
 
-# 3. 获取最新版本信息
+# 3. 确保安装目录存在
+mkdir -p "$HOME/.aether"
+
+# 4. 获取最新版本信息
 # 方式1: 通过 latest API (推荐)
 RELEASE_API="https://forgejo.10cg.pub/api/v1/repos/10CG/Aether/releases/latest"
 
@@ -206,22 +254,32 @@ RELEASE_API="https://forgejo.10cg.pub/api/v1/repos/10CG/Aether/releases/latest"
 # VERSION="0.7.0"
 # RELEASE_API="https://forgejo.10cg.pub/api/v1/repos/10CG/Aether/releases/tags/aether-cli/v${VERSION}"
 
-# 4. 获取下载 URL
+# 5. 获取下载 URL
 DOWNLOAD_URL=$(curl -s "$RELEASE_API" | jq -r ".assets[] | select(.name == \"$BINARY_NAME\") | .browser_download_url" | head -n1)
 
 if [ -n "$DOWNLOAD_URL" ]; then
   echo "正在下载 aether CLI ($BINARY_NAME)..."
-  curl -sL "$DOWNLOAD_URL" -o /tmp/aether${EXT}
-  chmod +x /tmp/aether${EXT}
-
-  # 安装到 /usr/local/bin (需要 sudo)
-  sudo mv /tmp/aether${EXT} /usr/local/bin/aether${EXT}
+  curl -sL "$DOWNLOAD_URL" -o "$HOME/.aether/aether${EXT}"
+  chmod +x "$HOME/.aether/aether${EXT}"
 
   # 验证安装
-  if aether version 2>/dev/null; then
-    echo "✓ aether CLI 已安装到 /usr/local/bin/aether${EXT}"
+  if "$HOME/.aether/aether${EXT}" version 2>/dev/null; then
+    echo "✓ aether CLI 已安装到 ~/.aether/aether${EXT}"
   else
     echo "✗ 安装验证失败"
+    exit 1
+  fi
+else
+  echo "未找到预构建二进制: $BINARY_NAME"
+  echo "可用的二进制文件:"
+  curl -s "$RELEASE_API" | jq -r '.assets[].name'
+  echo ""
+  echo "将从源码构建..."
+  # 回退到方案 B
+fi
+```
+
+**安装后**: Skills 会自动检测 `~/.aether/aether` 路径，无需配置 PATH。
     exit 1
   fi
 else
@@ -239,6 +297,9 @@ fi
 如果预构建二进制不可用：
 
 ```bash
+# 确保安装目录存在
+mkdir -p "$HOME/.aether"
+
 # 克隆仓库
 git clone https://forgejo.10cg.pub/10CG/aether-cli.git /tmp/aether-cli
 cd /tmp/aether-cli
@@ -246,89 +307,113 @@ cd /tmp/aether-cli
 # 构建优化版本
 go build -ldflags="-s -w -X main.version=$(cat VERSION)" -o aether .
 
-# 安装
-sudo mv aether /usr/local/bin/aether
+# 安装到 ~/.aether/
+mv aether "$HOME/.aether/aether"
 rm -rf /tmp/aether-cli
 
 # 验证
-aether version
+"$HOME/.aether/aether" version
 ```
 
 #### 方案 C: 手动安装命令
 
 如果用户选择手动安装，提供详细命令：
 
+> **安装目录**: `~/.aether/` (无需 sudo 权限)
+
 **Linux (amd64)**:
 ```bash
+# 确保目录存在
+mkdir -p ~/.aether
+
 # 下载最新版本
 RELEASE_API="https://forgejo.10cg.pub/api/v1/repos/10CG/Aether/releases/latest"
 DOWNLOAD_URL=$(curl -s "$RELEASE_API" | jq -r '.assets[] | select(.name == "aether-linux-amd64") | .browser_download_url')
-curl -sL "$DOWNLOAD_URL" -o /usr/local/bin/aether
-chmod +x /usr/local/bin/aether
+curl -sL "$DOWNLOAD_URL" -o ~/.aether/aether
+chmod +x ~/.aether/aether
 
-# 或指定版本
-# curl -sL "https://forgejo.10cg.pub/api/v1/repos/10CG/Aether/releases/tags/aether-cli/v0.7.0" | \
-#   jq -r '.assets[] | select(.name == "aether-linux-amd64") | .browser_download_url' | \
-#   xargs curl -sL -o /usr/local/bin/aether
-# chmod +x /usr/local/bin/aether
+# 验证
+~/.aether/aether version
 ```
 
 **Linux (arm64)**:
 ```bash
+mkdir -p ~/.aether
 RELEASE_API="https://forgejo.10cg.pub/api/v1/repos/10CG/Aether/releases/latest"
 DOWNLOAD_URL=$(curl -s "$RELEASE_API" | jq -r '.assets[] | select(.name == "aether-linux-arm64") | .browser_download_url')
-curl -sL "$DOWNLOAD_URL" -o /usr/local/bin/aether
-chmod +x /usr/local/bin/aether
+curl -sL "$DOWNLOAD_URL" -o ~/.aether/aether
+chmod +x ~/.aether/aether
+~/.aether/aether version
 ```
 
 **macOS (amd64)**:
 ```bash
+mkdir -p ~/.aether
 RELEASE_API="https://forgejo.10cg.pub/api/v1/repos/10CG/Aether/releases/latest"
 DOWNLOAD_URL=$(curl -s "$RELEASE_API" | jq -r '.assets[] | select(.name == "aether-darwin-amd64") | .browser_download_url')
-curl -sL "$DOWNLOAD_URL" -o /usr/local/bin/aether
-chmod +x /usr/local/bin/aether
+curl -sL "$DOWNLOAD_URL" -o ~/.aether/aether
+chmod +x ~/.aether/aether
+~/.aether/aether version
 ```
 
 **macOS (arm64/Apple Silicon)**:
 ```bash
+mkdir -p ~/.aether
 RELEASE_API="https://forgejo.10cg.pub/api/v1/repos/10CG/Aether/releases/latest"
 DOWNLOAD_URL=$(curl -s "$RELEASE_API" | jq -r '.assets[] | select(.name == "aether-darwin-arm64") | .browser_download_url')
-curl -sL "$DOWNLOAD_URL" -o /usr/local/bin/aether
-chmod +x /usr/local/bin/aether
+curl -sL "$DOWNLOAD_URL" -o ~/.aether/aether
+chmod +x ~/.aether/aether
+~/.aether/aether version
 ```
 
 **Windows (PowerShell)**:
 ```powershell
-# 下载到用户目录
+# 确保目录存在
+$aetherDir = "$env:USERPROFILE\.aether"
+if (-not (Test-Path $aetherDir)) {
+    New-Item -ItemType Directory -Path $aetherDir | Out-Null
+}
+
+# 下载
 $releaseApi = "https://forgejo.10cg.pub/api/v1/repos/10CG/Aether/releases/latest"
 $response = Invoke-RestMethod -Uri $releaseApi
 $downloadUrl = $response.assets | Where-Object { $_.name -eq "aether-windows-amd64.exe" } | Select-Object -ExpandProperty browser_download_url
-$outputPath = "$env:USERPROFILE\aether.exe"
+$outputPath = "$aetherDir\aether.exe"
 Invoke-WebRequest -Uri $downloadUrl -OutFile $outputPath
 
 # 验证
-& "$env:USERPROFILE\aether.exe" version
+& "$aetherDir\aether.exe" version
 
-# 添加到 PATH (可选)
-# $env:PATH += ";$env:USERPROFILE"
+# 安装位置: C:\Users\{用户名}\.aether\aether.exe
 ```
 
 **从源码构建（通用）**:
 ```bash
-git clone https://forgejo.10cg.pub/10CG/aether-cli.git
-cd aether-cli
-go build -ldflags="-s -w -X main.version=$(cat VERSION)" -o /usr/local/bin/aether .
+mkdir -p ~/.aether
+git clone https://forgejo.10cg.pub/10CG/aether-cli.git /tmp/aether-cli
+cd /tmp/aether-cli
+go build -ldflags="-s -w -X main.version=$(cat VERSION)" -o ~/.aether/aether .
+rm -rf /tmp/aether-cli
+~/.aether/aether version
 ```
 
 #### 支持的平台
 
-| 平台 | 架构 | 二进制名称 |
-|------|------|-----------|
-| Linux | amd64 (x86_64) | `aether-linux-amd64` |
-| Linux | arm64 (aarch64) | `aether-linux-arm64` |
-| macOS | amd64 (Intel) | `aether-darwin-amd64` |
-| macOS | arm64 (Apple Silicon) | `aether-darwin-arm64` |
-| Windows | amd64 | `aether-windows-amd64.exe` |
+| 平台 | 架构 | 二进制名称 | 安装路径 |
+|------|------|-----------|---------|
+| Linux | amd64 (x86_64) | `aether-linux-amd64` | `~/.aether/aether` |
+| Linux | arm64 (aarch64) | `aether-linux-arm64` | `~/.aether/aether` |
+| macOS | amd64 (Intel) | `aether-darwin-amd64` | `~/.aether/aether` |
+| macOS | arm64 (Apple Silicon) | `aether-darwin-arm64` | `~/.aether/aether` |
+| Windows | amd64 | `aether-windows-amd64.exe` | `%USERPROFILE%\.aether\aether.exe` |
+
+**安装后的目录结构**:
+```
+~/.aether/
+├── config.yaml        # Aether 配置文件
+├── environment.yaml   # 环境状态缓存 (由 aether-doctor 生成)
+└── aether[.exe]       # CLI 二进制文件
+```
 
 ---
 
@@ -343,7 +428,7 @@ go build -ldflags="-s -w -X main.version=$(cat VERSION)" -o /usr/local/bin/aethe
     是否自动安装/升级 aether CLI？ [Y/n]
 
     选项:
-      1. 自动安装（推荐）- 下载预构建二进制
+      1. 自动安装（推荐）- 下载预构建二进制到 ~/.aether/
       2. 从源码构建 - 需要 Go 环境
       3. 显示手动安装命令
       4. 指定版本安装 (如 v0.7.0)
@@ -362,15 +447,15 @@ go build -ldflags="-s -w -X main.version=$(cat VERSION)" -o /usr/local/bin/aethe
     URL: https://forgejo.10cg.pub/attachments/xxx/aether-linux-amd64
     ✓ 下载完成
 
-    正在安装到 /usr/local/bin/aether...
-    ✓ 安装完成
+    正在安装到 ~/.aether/aether...
+    ✓ 安装完成 (无需 sudo)
 
     验证安装...
-    ✓ aether version: 0.7.0
+    ✓ ~/.aether/aether version: 0.7.0
 
     [✓] aether CLI
         版本: 0.7.0
-        路径: /usr/local/bin/aether
+        路径: ~/.aether/aether
         平台: linux/amd64
 ```
 
@@ -384,7 +469,7 @@ go build -ldflags="-s -w -X main.version=$(cat VERSION)" -o /usr/local/bin/aethe
     发布源: https://forgejo.10cg.pub/api/v1/repos/10CG/Aether/releases/tags/aether-cli/v0.6.0
 
     ✓ 安装完成
-    ✓ aether version: 0.6.0
+    ✓ ~/.aether/aether version: 0.6.0
 ```
 
 ---
@@ -1280,6 +1365,6 @@ ssh -o ConnectTimeout=5 root@192.168.69.80 "hostname"
 
 ---
 
-**Skill 版本**: 1.4.0
+**Skill 版本**: 1.5.0
 **最后更新**: 2026-03-12
 **维护者**: 10CG Infrastructure Team
