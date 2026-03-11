@@ -2,6 +2,62 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [0.8.4] - 2026-03-12
+
+### Added
+- **Complete CLI Installation Workflow**: Enhanced `aether-doctor` (v1.4.0) with full installation support
+  - Automatic installation from Forgejo releases (方案 A)
+  - Source build fallback (方案 B)
+  - Platform-specific manual installation commands (方案 C)
+  - Specify version installation option
+
+- **requirements.yaml**: Complete CLI dependency configuration
+  - Release API URLs (latest and versioned)
+  - Tag format: `aether-cli/v{VERSION}`
+  - Binary naming: `aether-{OS}-{ARCH}[.exe]`
+  - Supported platforms matrix (Linux/macOS/Windows, amd64/arm64)
+
+### Changed
+- `aether-doctor` skill (v1.3.0 → v1.4.0):
+  - Fixed download URLs to use correct Aether releases API
+  - Updated binary naming format documentation
+  - Added Windows `.exe` suffix handling
+  - Enhanced interactive installation with version selection
+
+- Removed invalid `cli` field from `plugin.json` (caused installation error)
+- Moved CLI requirements to `requirements.yaml` and skill frontmatters
+
+### Fixed
+- **CLI Release Workflow**: Fixed ldflags variable name (`main.version` → `main.Version`)
+  - Binary version now correctly embedded at build time
+  - Affects `.forgejo/workflows/cli-release.yml`
+
+### Configuration
+
+```yaml
+# .claude-plugin/requirements.yaml
+cli:
+  min_version: "0.7.0"
+  recommended_version: "0.7.0"
+  release_api: "https://forgejo.10cg.pub/api/v1/repos/10CG/Aether/releases"
+  tag_format: "aether-cli/v{VERSION}"
+  binary_format: "aether-{OS}-{ARCH}"
+  platforms:
+    - { os: linux, arch: amd64, binary: "aether-linux-amd64" }
+    - { os: linux, arch: arm64, binary: "aether-linux-arm64" }
+    - { os: darwin, arch: amd64, binary: "aether-darwin-amd64" }
+    - { os: darwin, arch: arm64, binary: "aether-darwin-arm64" }
+    - { os: windows, arch: amd64, binary: "aether-windows-amd64.exe" }
+```
+
+### Release Source
+
+| Item | Value |
+|------|-------|
+| Release API | `https://forgejo.10cg.pub/api/v1/repos/10CG/Aether/releases` |
+| Latest | `.../releases/latest` |
+| Versioned | `.../releases/tags/aether-cli/v{VERSION}` |
+
 ## [0.8.3] - 2026-03-09
 
 ### Added
