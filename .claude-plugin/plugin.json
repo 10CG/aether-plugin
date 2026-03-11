@@ -2,11 +2,6 @@
   "name": "aether",
   "description": "Aether 基础设施部署插件 - 9个 Skills + 2个 Agents (环境诊断/配置发现/项目接入/Volume管理/部署监控/开发测试/生产部署/故障诊断)",
   "version": "0.8.3",
-  "cli": {
-    "minVersion": "0.7.0",
-    "recommendedVersion": "0.7.0",
-    "downloadUrl": "https://forgejo.10cg.pub/api/v1/repos/10CG/aether-cli/releases/latest"
-  },
   "author": {
     "name": "10CG"
   },
