@@ -2,6 +2,47 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [0.8.5] - 2026-03-12
+
+### Changed
+- **CLI Installation Directory**: Changed from `/usr/local/bin/` to `~/.aether/`
+  - No longer requires `sudo` privileges
+  - CLI installed alongside `config.yaml` for unified management
+  - Skills auto-detect CLI location (PATH → ~/.aether/)
+
+- `aether-doctor` skill (v1.4.0 → v1.5.0):
+  - Added multi-path CLI detection logic
+  - Updated all installation scripts to use `~/.aether/`
+  - Enhanced error messages with correct paths
+
+### CLI Detection Priority
+
+```bash
+# 1. Check PATH
+if command -v aether &> /dev/null; then
+  AETHER_CLI="aether"
+# 2. Check ~/.aether/
+elif [ -f "$HOME/.aether/aether" ]; then
+  AETHER_CLI="$HOME/.aether/aether"
+fi
+```
+
+### Installation Paths
+
+| Platform | Old Path | New Path |
+|----------|----------|----------|
+| Linux/macOS | `/usr/local/bin/aether` | `~/.aether/aether` |
+| Windows | `%USERPROFILE%\aether.exe` | `%USERPROFILE%\.aether\aether.exe` |
+
+### Directory Structure
+
+```
+~/.aether/
+├── config.yaml        # Aether 配置文件
+├── environment.yaml   # 环境状态缓存
+└── aether[.exe]       # CLI 二进制文件
+```
+
 ## [0.8.4] - 2026-03-12
 
 ### Added
