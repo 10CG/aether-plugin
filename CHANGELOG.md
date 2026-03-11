@@ -2,6 +2,34 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [0.8.6] - 2026-03-12
+
+### Changed
+- **Skills Optimization**: Refactored skills using Progressive Disclosure pattern
+  - `aether-doctor` SKILL.md: 1370 → 146 lines (89% reduction)
+  - `aether-init` SKILL.md: 529 → 156 lines (70% reduction)
+
+### Added
+- **aether-doctor references/** (6 files):
+  - `cli-installation.md` - CLI installation workflows
+  - `cluster-validation.md` - Cluster topology and validation
+  - `ssh-diagnostics.md` - SSH checks and fixes
+  - `ci-configuration.md` - CI/CD configuration checks
+  - `environment-cache.md` - Cache format and validity
+  - `output-examples.md` - Diagnostic output examples
+
+- **aether-init references/** (2 new files):
+  - `project-analysis.md` - Project detection and decision logic
+  - `file-generation.md` - File generation commands
+
+### Design Principle
+
+Following skill-creator best practices:
+- **SKILL.md** - Core workflow only (< 350 lines recommended)
+- **references/** - Detailed content loaded on demand
+- **scripts/** - Executable code
+- **assets/** - Templates and resources
+
 ## [0.8.5] - 2026-03-12
 
 ### Changed
