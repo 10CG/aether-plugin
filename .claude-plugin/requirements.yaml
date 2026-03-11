@@ -4,8 +4,35 @@
 cli:
   min_version: "0.7.0"
   recommended_version: "0.7.0"
-  download_url: "https://forgejo.10cg.pub/api/v1/repos/10CG/aether-cli/releases/latest"
+  # 发布源: 主项目 Aether 的 releases
+  release_api: "https://forgejo.10cg.pub/api/v1/repos/10CG/Aether/releases"
+  # 获取最新版本
+  latest_url: "https://forgejo.10cg.pub/api/v1/repos/10CG/Aether/releases/latest"
+  # 获取指定版本 (替换 {VERSION})
+  version_url: "https://forgejo.10cg.pub/api/v1/repos/10CG/Aether/releases/tags/aether-cli/v{VERSION}"
+  # Tag 格式
+  tag_format: "aether-cli/v{VERSION}"
+  # 二进制命名格式
+  binary_format: "aether-{OS}-{ARCH}"  # Windows 添加 .exe
+  # 源码仓库
   source_repo: "https://forgejo.10cg.pub/10CG/aether-cli.git"
+  # 支持的平台
+  platforms:
+    - os: linux
+      arch: amd64
+      binary: "aether-linux-amd64"
+    - os: linux
+      arch: arm64
+      binary: "aether-linux-arm64"
+    - os: darwin
+      arch: amd64
+      binary: "aether-darwin-amd64"
+    - os: darwin
+      arch: arm64
+      binary: "aether-darwin-arm64"
+    - os: windows
+      arch: amd64
+      binary: "aether-windows-amd64.exe"
 
 # 版本兼容性矩阵
 compatibility:
