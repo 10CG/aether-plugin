@@ -2,6 +2,54 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [0.8.9] - 2026-03-12
+
+### Added
+- **PreToolUse Hook for CLI Auto-Detection** (P2 Optimization):
+  - `skills/aether-cli-guard/SKILL.md` - Hook skill documentation
+  - `scripts/cli-guard-hook.sh` - Executable hook script
+  - Automatic CLI detection before executing aether commands
+  - User-friendly install guidance when CLI is missing
+
+- **Hook Configuration** (`hooks.json`):
+  - PreToolUse hook with Bash tool filter
+  - Command pattern matching for `aether`
+  - Graceful fallback with install instructions
+
+### Changed
+- **Automated CLI Detection Flow**:
+  ```
+  User runs: aether volume list
+       ↓
+  Hook triggers: CLI detection
+       ↓
+  ├─ CLI found → Command executes
+  └─ CLI missing → Block + Show install guide
+  ```
+
+### User Experience
+**Before (Manual):**
+```
+User: 运行 aether volume list
+Claude: ❌ CLI 未安装...
+```
+
+**After (Automatic):**
+```
+User: 运行 aether volume list
+Hook: 🔍 检测 aether CLI...
+      ❌ 未找到 → 显示安装引导
+      ✅ 已找到 → 命令继续执行
+```
+
+### Hook Skill
+| 属性 | 值 |
+|------|-----|
+| Name | aether-cli-guard |
+| Type | Hook Skill (内部) |
+| Trigger | PreToolUse + Bash + "aether" |
+| User-invocable | false |
+
 ## [0.8.8] - 2026-03-12
 
 ### Added
