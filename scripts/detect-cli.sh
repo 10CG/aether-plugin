@@ -28,7 +28,23 @@ CLI_INSTALL_DIR="$HOME/.aether"
 RELEASE_API="https://forgejo.10cg.pub/api/v1/repos/10CG/Aether/releases/latest"
 
 # ============================================
-# detect_cf_access_token - 检测 Cloudflare Access Token
+# detect_cf_service_token - 检测 CF Access Service Token (aria 规范)
+# ============================================
+# 返回格式: "CLIENT_ID:CLIENT_SECRET" 或空
+detect_cf_service_token() {
+    local client_id="${CF_ACCESS_CLIENT_ID:-}"
+    local client_secret="${CF_ACCESS_CLIENT_SECRET:-}"
+
+    if [ -n "$client_id" ] && [ -n "$client_secret" ]; then
+        echo "${client_id}:${client_secret}"
+        return 0
+    fi
+
+    return 1
+}
+
+# ============================================
+# detect_cf_access_token - 检测 Cloudflare Access User Token
 # ============================================
 detect_cf_access_token() {
     local token=""
@@ -56,26 +72,75 @@ detect_cf_access_token() {
 }
 
 # ============================================
-# fetch_release_with_cf_auth - 使用 CF Token 获取 Release 信息
+# detect_cf_auth - 统一 CF 认证检测 (优先 Service Token)
+# ============================================
+# 返回格式: "service:CLIENT_ID:CLIENT_SECRET" 或 "user:TOKEN"
+detect_cf_auth() {
+    # 1. 优先检测 Service Token (aria 规范)
+    local service_token
+    if service_token=$(detect_cf_service_token); then
+        echo "service:${service_token}"
+        return 0
+    fi
+
+    # 2. 检测 User Token
+    local user_token
+    if user_token=$(detect_cf_access_token); then
+        echo "user:${user_token}"
+        return 0
+    fi
+
+    return 1
+}
+
+# ============================================
+# fetch_release_with_cf_auth - 使用 CF 认证获取 Release 信息
+# 支持双重认证: CF Token (绕过 Cloudflare) + Forgejo Token (API 认证)
 # ============================================
 fetch_release_with_cf_auth() {
     local binary_name="$1"
-    local cf_token
+    local cf_auth
+    local curl_opts=""
 
-    cf_token=$(detect_cf_access_token) || {
+    # 1. 获取 CF 认证信息 (优先 Service Token)
+    cf_auth=$(detect_cf_auth) || {
         echo "NO_CF_TOKEN"
         return 1
     }
 
-    # 使用 CF Token 认证请求
-    local response
-    response=$(curl -s -H "Authorization: Bearer $cf_token" \
-        -H "Cookie: CF_Authorization=$cf_token" \
-        "$RELEASE_API" 2>/dev/null)
+    # 2. 根据 CF 认证类型构建 headers
+    local auth_type="${cf_auth%%:*}"
+    local auth_data="${cf_auth#*:}"
 
-    # 检查是否成功获取 (不是 302 重定向)
+    case "$auth_type" in
+        service)
+            # aria 规范: Service Token 方式
+            local client_id="${auth_data%%:*}"
+            local client_secret="${auth_data#*:}"
+            curl_opts="-H 'CF-Access-Client-Id: $client_id' -H 'CF-Access-Client-Secret: $client_secret'"
+            ;;
+        user)
+            # User Token 方式 (Cookie + Bearer)
+            curl_opts="-H 'Authorization: Bearer $auth_data' -H 'Cookie: CF_Authorization=$auth_data'"
+            ;;
+        *)
+            echo "UNKNOWN_AUTH_TYPE"
+            return 1
+            ;;
+    esac
+
+    # 3. 添加 Forgejo API Token (如果配置了)
+    # Forgejo API 需要 CF Token (绕过 Cloudflare) + Forgejo Token (API 认证)
+    if [ -n "${FORGEJO_TOKEN:-}" ]; then
+        curl_opts="$curl_opts -H 'Authorization: token ${FORGEJO_TOKEN}'"
+    fi
+
+    # 4. 执行请求
+    local response
+    eval "response=\$(curl -s $curl_opts \"$RELEASE_API\" 2>/dev/null)"
+
+    # 5. 检查是否成功获取
     if echo "$response" | grep -q '"browser_download_url"'; then
-        # 提取下载 URL
         local download_url
         download_url=$(echo "$response" | grep -o "\"browser_download_url\":\"[^\"]*${binary_name}[^\"]*\"" | \
             head -1 | sed 's/.*"browser_download_url":"\([^"]*\)".*/\1/')
@@ -112,16 +177,23 @@ print_cf_token_guidance() {
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 检测到 Forgejo 部署在 Cloudflare Access 保护后面。
-请配置 CF Access Token 后重试：
+请配置 CF Access 凭据后重试：
 
-▸ 方法 1: 环境变量（推荐）
+▸ 方法 1: Service Token（推荐，aria 规范）
+  export CF_ACCESS_CLIENT_ID="your-client-id"
+  export CF_ACCESS_CLIENT_SECRET="your-client-secret"
+
+  获取方式:
+  1. 登录 Cloudflare Zero Trust Dashboard
+  2. Access → Service Auth → Service Tokens
+  3. 创建 Service Token 并复制 Client ID 和 Secret
+
+▸ 方法 2: User Session Token
   export CF_ACCESS_TOKEN="your-token-here"
+  # 或
+  echo "your-token-here" > ~/.cfaccess && chmod 600 ~/.cfaccess
 
-▸ 方法 2: 配置文件
-  echo "your-token-here" > ~/.cfaccess
-  chmod 600 ~/.cfaccess
-
-▸ 如何获取 Token:
+  获取方式:
   1. 在浏览器中访问 https://forgejo.10cg.pub 并完成 CF 认证
   2. 打开开发者工具 (F12) → Application → Cookies
   3. 找到并复制 CF_Authorization cookie 值

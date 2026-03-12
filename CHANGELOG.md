@@ -2,6 +2,31 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [0.9.1] - 2026-03-13
+
+### Fixed
+- **Dual Authentication Support**: Forgejo API requires both CF Token AND Forgejo Token
+  - Added `FORGEJO_TOKEN` to authentication headers
+  - Updated `fetch_release_with_cf_auth()` to include Forgejo API token
+
+### Test Results
+| Auth Method | HTTP Code | Notes |
+|-------------|-----------|-------|
+| None | 302 | CF redirect |
+| Forgejo Token only | 302 | CF blocked |
+| CF Token only | 403 | Forgejo rejected |
+| **CF + Forgejo Token** | **200** | **Success!** |
+
+### Configuration Required
+```bash
+# CF Access Service Token (aria spec)
+export CF_ACCESS_CLIENT_ID="your-client-id"
+export CF_ACCESS_CLIENT_SECRET="your-client-secret"
+
+# Forgejo API Token
+export FORGEJO_TOKEN="your-forgejo-token"
+```
+
 ## [0.9.0] - 2026-03-13
 
 ### Added
