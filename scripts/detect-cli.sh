@@ -24,6 +24,120 @@ set -e
 CLI_MIN_VERSION="${CLI_MIN_VERSION:-0.7.0}"
 CLI_INSTALL_DIR="$HOME/.aether"
 
+# Forgejo Release API
+RELEASE_API="https://forgejo.10cg.pub/api/v1/repos/10CG/Aether/releases/latest"
+
+# ============================================
+# detect_cf_access_token - 检测 Cloudflare Access Token
+# ============================================
+detect_cf_access_token() {
+    local token=""
+
+    # 1. 检查环境变量 (优先级从高到低)
+    for var in CF_ACCESS_TOKEN CLOUDFLARE_ACCESS_TOKEN CF_AUTHORIZATION; do
+        if [ -n "${!var}" ]; then
+            echo "${!var}"
+            return 0
+        fi
+    done
+
+    # 2. 检查配置文件
+    for file in ~/.cloudflare/access-token ~/.cfaccess ~/.config/cloudflare/access-token; do
+        if [ -f "$file" ] && [ -r "$file" ]; then
+            token=$(cat "$file" 2>/dev/null | tr -d '[:space:]')
+            if [ -n "$token" ]; then
+                echo "$token"
+                return 0
+            fi
+        fi
+    done
+
+    return 1
+}
+
+# ============================================
+# fetch_release_with_cf_auth - 使用 CF Token 获取 Release 信息
+# ============================================
+fetch_release_with_cf_auth() {
+    local binary_name="$1"
+    local cf_token
+
+    cf_token=$(detect_cf_access_token) || {
+        echo "NO_CF_TOKEN"
+        return 1
+    }
+
+    # 使用 CF Token 认证请求
+    local response
+    response=$(curl -s -H "Authorization: Bearer $cf_token" \
+        -H "Cookie: CF_Authorization=$cf_token" \
+        "$RELEASE_API" 2>/dev/null)
+
+    # 检查是否成功获取 (不是 302 重定向)
+    if echo "$response" | grep -q '"browser_download_url"'; then
+        # 提取下载 URL
+        local download_url
+        download_url=$(echo "$response" | grep -o "\"browser_download_url\":\"[^\"]*${binary_name}[^\"]*\"" | \
+            head -1 | sed 's/.*"browser_download_url":"\([^"]*\)".*/\1/')
+        echo "$download_url"
+        return 0
+    fi
+
+    echo "CF_AUTH_FAILED"
+    return 1
+}
+
+# ============================================
+# check_cf_access_required - 检查是否需要 CF Access 认证
+# ============================================
+check_cf_access_required() {
+    local response
+    response=$(curl -s -o /dev/null -w "%{http_code}" "$RELEASE_API" 2>/dev/null)
+
+    # 302 表示需要重定向到认证页
+    if [ "$response" = "302" ] || [ "$response" = "401" ]; then
+        return 0  # 需要 CF 认证
+    fi
+    return 1  # 不需要认证
+}
+
+# ============================================
+# print_cf_token_guidance - 打印 CF Token 配置引导
+# ============================================
+print_cf_token_guidance() {
+    cat << 'EOF'
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️  Forgejo API 需要 Cloudflare Access 认证
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+检测到 Forgejo 部署在 Cloudflare Access 保护后面。
+请配置 CF Access Token 后重试：
+
+▸ 方法 1: 环境变量（推荐）
+  export CF_ACCESS_TOKEN="your-token-here"
+
+▸ 方法 2: 配置文件
+  echo "your-token-here" > ~/.cfaccess
+  chmod 600 ~/.cfaccess
+
+▸ 如何获取 Token:
+  1. 在浏览器中访问 https://forgejo.10cg.pub 并完成 CF 认证
+  2. 打开开发者工具 (F12) → Application → Cookies
+  3. 找到并复制 CF_Authorization cookie 值
+
+▸ 配置后重试:
+  /aether:doctor
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+或者使用备选安装方案:
+  - 从 GitHub releases 下载（如果已同步）
+  - 从源码构建（需要 Go 环境）
+
+EOF
+}
+
 # ============================================
 # detect_aether_cli - 检测 aether CLI 路径
 # ============================================

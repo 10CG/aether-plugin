@@ -2,6 +2,112 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [0.9.0] - 2026-03-13
+
+### Added
+- **Cloudflare Access Token Detection**: Smart token detection before Forgejo API requests
+  - Check environment variables: `CF_ACCESS_TOKEN`, `CLOUDFLARE_ACCESS_TOKEN`, `CF_AUTHORIZATION`
+  - Check config files: `~/.cloudflare/access-token`, `~/.cfaccess`, `~/.config/cloudflare/access-token`
+  - Auto-detect when CF authentication is required (302/401 response)
+
+### Changed
+- **CLI Installation Workflow**: Prioritize existing CF token configuration
+  - `scripts/detect-cli.sh`: Added `detect_cf_access_token()`, `fetch_release_with_cf_auth()`, `check_cf_access_required()` functions
+  - `skills/aether-doctor/references/cli-installation.md`: Updated installation flow with CF token detection
+  - `.claude-plugin/requirements.yaml`: Added complete `cf_access` configuration section
+
+### Workflow
+**Before (Fallback immediately):**
+```
+Forgejo API → 302 → 放弃，尝试源码构建
+```
+
+**After (Check CF token first):**
+```
+Forgejo API → 302 → 检查本地 CF Token
+                          ├─ 有 Token → 使用认证请求下载
+                          └─ 无 Token → 显示配置引导
+```
+
+### Configuration
+```yaml
+# .claude-plugin/requirements.yaml
+cli:
+  cf_access:
+    env_vars:
+      - "CF_ACCESS_TOKEN"
+      - "CLOUDFLARE_ACCESS_TOKEN"
+      - "CF_AUTHORIZATION"
+    config_files:
+      - "~/.cloudflare/access-token"
+      - "~/.cfaccess"
+      - "~/.config/cloudflare/access-token"
+    cookie_name: "CF_Authorization"
+    instructions: |
+      1. 在浏览器中访问 https://forgejo.10cg.pub 并完成 CF 认证
+      2. 打开开发者工具 → Application → Cookies
+      3. 复制 CF_Authorization cookie 值
+      4. 设置环境变量: export CF_ACCESS_TOKEN="your-token"
+```
+
+### How to Get CF Token
+```bash
+# Method 1: Environment variable (recommended)
+export CF_ACCESS_TOKEN="your-token-here"
+
+# Method 2: Config file
+echo "your-token-here" > ~/.cfaccess
+chmod 600 ~/.cfaccess
+
+# Steps to obtain token:
+# 1. Visit https://forgejo.10cg.pub in browser and complete CF authentication
+# 2. Open DevTools (F12) → Application → Cookies
+# 3. Copy the CF_Authorization cookie value
+```
+
+## [0.9.0] - 2026-03-13
+
+### Added
+- **Cloudflare Access Token Detection**: Smart token detection before Forgejo API requests
+  - Check environment variables: `CF_ACCESS_TOKEN`, `CLOUDFLARE_ACCESS_TOKEN`, `CF_AUTHORIZATION`
+  - Check config files: `~/.cloudflare/access-token`, `~/.cfaccess`, `~/.config/cloudflare/access-token`
+  - Auto-detect when CF authentication is required (302/401 response)
+
+### Changed
+- **CLI Installation Workflow**: Prioritize existing CF token configuration
+  - `scripts/detect-cli.sh`: Added `detect_cf_access_token()`, `fetch_release_with_cf_auth()`, `check_cf_access_required()` functions
+  - `skills/aether-doctor/references/cli-installation.md`: Updated installation flow with CF token detection
+  - `.claude-plugin/requirements.yaml`: Added complete `cf_access` configuration section
+
+### Workflow
+**Before (Fallback immediately):**
+```
+Forgejo API → 302 → 放弃，尝试源码构建
+```
+
+**After (Check CF token first):**
+```
+Forgejo API → 302 → 检查本地 CF Token
+                          ├─ 有 Token → 使用认证请求下载
+                          └─ 无 Token → 显示配置引导
+```
+
+### Configuration
+```yaml
+# .claude-plugin/requirements.yaml
+cli:
+  cf_access:
+    env_vars:
+      - "CF_ACCESS_TOKEN"
+      - "CLOUDFLARE_ACCESS_TOKEN"
+      - "CF_AUTHORIZATION"
+    config_files:
+      - "~/.cloudflare/access-token"
+      - "~/.cfaccess"
+      - "~/.config/cloudflare/access-token"
+    cookie_name: "CF_Authorization"
+```
+
 ## [0.8.9] - 2026-03-12
 
 ### Added

@@ -22,6 +22,27 @@ cli:
   binary_format: "aether-{OS}-{ARCH}"  # Windows 添加 .exe
   # 源码仓库
   source_repo: "https://forgejo.10cg.pub/10CG/aether-cli.git"
+  # Cloudflare Access 认证配置
+  cf_access:
+    # 环境变量 (优先级从高到低)
+    env_vars:
+      - "CF_ACCESS_TOKEN"
+      - "CLOUDFLARE_ACCESS_TOKEN"
+      - "CF_AUTHORIZATION"
+    # 配置文件路径 (优先级从高到低)
+    config_files:
+      - "~/.cloudflare/access-token"
+      - "~/.cfaccess"
+      - "~/.config/cloudflare/access-token"
+    # Cookie 名称 (用于浏览器导出)
+    cookie_name: "CF_Authorization"
+    # 如何获取 Token 的说明
+    instructions: |
+      1. 在浏览器中访问 https://forgejo.10cg.pub 并完成 CF 认证
+      2. 打开开发者工具 → Application → Cookies
+      3. 复制 CF_Authorization cookie 值
+      4. 设置环境变量: export CF_ACCESS_TOKEN="your-token"
+         或保存到文件: echo "your-token" > ~/.cfaccess
   # 支持的平台
   platforms:
     - os: linux

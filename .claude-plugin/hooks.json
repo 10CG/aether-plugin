@@ -1,17 +1,27 @@
 {
-  "version": "0.8.7",
-  "description": "Aether 基础设施部署 Hooks 配置 - 9个 Skills + 2个 Agents",
+  "version": "0.9.0",
+  "description": "Aether 基础设施部署 Hooks 配置 - 9个 Skills + 2个 Agents + 1个 Hook",
   "enabled": true,
   "hooks": {
+    "PreToolUse": {
+      "skill": "aether:aether-cli-guard",
+      "enabled": true,
+      "description": "执行 aether 命令前自动检测 CLI，未安装时引导用户",
+      "filter": {
+        "tools": ["Bash"],
+        "command_patterns": ["aether"]
+      },
+      "timeout": 10
+    },
     "SessionStart": {
       "skill": "aether:aether-status",
       "enabled": false,
-      "description": "会话开始时自动检查集群状态（默认禁用，按需启用）",
+      "description": "会话开始时自动检查集群状态（默认禁用）",
       "timeout": 15
     },
     "PostToolUse": {
       "enabled": false,
-      "description": "工具调用后检查（预留，未来可用于部署结果验证）"
+      "description": "工具调用后检查（预留）"
     }
   },
   "disable_with_env": "AETHER_HOOKS_DISABLED=true"
