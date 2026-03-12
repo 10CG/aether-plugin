@@ -54,6 +54,38 @@ compatibility:
 
 # 依赖 CLI 的 Skills
 dependent_skills:
-  - aether-doctor   # 环境诊断，负责版本检查
-  - aether-init     # 项目初始化
-  - aether-volume   # Volume 管理
+  - name: aether-doctor
+    cli_required: false
+    role: "CLI 安装和检测的提供者"
+
+  - name: aether-init
+    cli_required: true
+    min_version: "0.7.0"
+
+  - name: aether-volume
+    cli_required: true
+    min_version: "0.7.0"
+
+  - name: aether-deploy
+    cli_required: true
+    min_version: "0.7.0"
+
+  - name: aether-dev
+    cli_required: true
+    min_version: "0.7.0"
+
+  - name: aether-rollback
+    cli_required: true
+    min_version: "0.7.0"
+
+  - name: aether-status
+    cli_required: false
+    note: "通过 Nomad/Consul API 直接查询"
+
+  - name: aether-deploy-watch
+    cli_required: false
+    note: "调用 aether-status，不直接使用 CLI"
+
+  - name: aether-setup
+    cli_required: false
+    note: "只写配置文件"

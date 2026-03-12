@@ -9,11 +9,26 @@ argument-hint: "<action> [args]"
 disable-model-invocation: false
 user-invocable: true
 allowed-tools: Bash, Read, Write, AskUserQuestion
+dependencies:
+  cli:
+    required: true
+    min_version: "0.7.0"
 ---
 
 # Aether 开发环境工具 (aether-dev)
 
-> **版本**: 0.1.0 | **优先级**: P1
+> **版本**: 0.2.0 | **优先级**: P1
+
+## 前置检查
+
+**⚠️ 此 Skill 需要 aether CLI**
+
+检测 CLI:
+```bash
+command -v aether || test -f ~/.aether/aether || test -f ~/.aether/aether.exe
+```
+
+**如果未安装**: 提示用户运行 `/aether:doctor` 完成安装。
 
 ## 快速开始
 

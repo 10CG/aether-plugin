@@ -9,11 +9,15 @@ argument-hint: "[service-name] [--failed] [--recent] [--logs] [--watch]"
 disable-model-invocation: false
 user-invocable: true
 allowed-tools: Bash
+dependencies:
+  cli:
+    required: false
+    note: "可直接通过 Nomad/Consul API 查询，无需 CLI"
 ---
 
 # Aether 状态查询 (aether-status)
 
-> **版本**: 1.0.0 | **优先级**: P0
+> **版本**: 1.1.0 | **优先级**: P0
 
 ## 快速开始
 

@@ -2,14 +2,55 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [0.8.7] - 2026-03-12
+
+### Changed
+- **Unified CLI Dependency Declaration**: Standardized `dependencies.cli` frontmatter across all skills
+  - Consistent format: `required`, `min_version`, `note`
+  - Clear guidance when CLI is missing: "请运行 /aether:doctor 安装 CLI"
+
+- **Skills updated with CLI pre-check section**:
+  - `aether-deploy` v0.2.0 - Added CLI detection and guidance
+  - `aether-dev` v0.2.0 - Added CLI detection and guidance
+  - `aether-rollback` v0.2.0 - Added CLI detection and guidance
+  - `aether-init` v0.4.0 - Updated dependencies format
+  - `aether-volume` v1.2.0 - Updated dependencies format
+  - `aether-status` v1.1.0 - Marked CLI as optional (API-only mode)
+  - `aether-deploy-watch` v1.2.0 - Marked CLI as not required
+  - `aether-doctor` v2.1.0 - Marked as CLI installer/provider
+
+- **requirements.yaml**: Updated with complete skill dependency matrix
+
+### CLI Dependency Matrix
+
+| Skill | CLI Required | Min Version | Notes |
+|-------|-------------|-------------|-------|
+| aether-doctor | No | - | CLI installer |
+| aether-init | Yes | 0.7.0 | Project setup |
+| aether-volume | Yes | 0.7.0 | Volume management |
+| aether-deploy | Yes | 0.7.0 | Production deploy |
+| aether-dev | Yes | 0.7.0 | Dev deployment |
+| aether-rollback | Yes | 0.7.0 | Rollback |
+| aether-status | No | - | API-only mode |
+| aether-deploy-watch | No | - | Uses aether-status |
+| aether-setup | No | - | Config only |
+
 ## [0.8.6] - 2026-03-12
 
 ### Changed
 - **Skills Optimization**: Refactored skills using Progressive Disclosure pattern
   - `aether-doctor` SKILL.md: 1370 → 146 lines (89% reduction)
   - `aether-init` SKILL.md: 529 → 156 lines (70% reduction)
+  - `aether-volume` SKILL.md: 461 → 149 lines (68% reduction)
 
 ### Added
+- **aether-volume references/** (5 files):
+  - `command-details.md` - Full command parameters and examples
+  - `ssh-authentication.md` - SSH authentication methods
+  - `nomad-configuration.md` - Generated configuration and Job usage
+  - `troubleshooting.md` - Common issues and solutions
+  - `best-practices.md` - Best practices and project type recommendations
+
 - **aether-doctor references/** (6 files):
   - `cli-installation.md` - CLI installation workflows
   - `cluster-validation.md` - Cluster topology and validation

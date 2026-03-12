@@ -8,15 +8,16 @@ argument-hint: "[--ssh|--cluster|--ci|--refresh] [--fix]"
 disable-model-invocation: false
 user-invocable: true
 allowed-tools: Bash, Read, Write, AskUserQuestion
-cli_requirements:
-  source: ".claude-plugin/requirements.yaml"
-  min_version: "0.7.0"
-  recommended_version: "0.7.0"
+dependencies:
+  cli:
+    required: false
+    role: "此 Skill 负责安装和检测 CLI，不是依赖方"
+    install_capability: true
 ---
 
 # Aether 环境诊断 (aether-doctor)
 
-> **版本**: 2.0.0 | **优先级**: P0
+> **版本**: 2.1.0 | **优先级**: P0
 
 ## 快速开始
 

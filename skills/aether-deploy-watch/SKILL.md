@@ -9,11 +9,15 @@ argument-hint: "[job-name] [--follow] [--timeout=60]"
 disable-model-invocation: false
 user-invocable: true
 allowed-tools: Bash, Read, AskUserQuestion
+dependencies:
+  cli:
+    required: false
+    note: "通过 Nomad API 查询，调用 aether-status skill"
 ---
 
 # Aether 部署监控 (aether-deploy-watch)
 
-> **版本**: 1.1.0 | **优先级**: P0
+> **版本**: 1.2.0 | **优先级**: P0
 
 ## 概述
 
