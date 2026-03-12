@@ -2,6 +2,33 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [0.8.8] - 2026-03-12
+
+### Added
+- **Shared CLI Detection Scripts** (`scripts/`):
+  - `detect-cli.sh` - Full CLI detection with version checking and install guidance
+  - `cli-functions.sh` - Lightweight functions for sourcing in skills
+
+### Changed
+- **Unified CLI Pre-check**: All CLI-dependent skills now use shared detection:
+  ```bash
+  source "${CLAUDE_PLUGIN_ROOT}/scripts/cli-functions.sh"
+  require_aether_cli || exit 1
+  ```
+
+- **Skills updated**:
+  - `aether-deploy` v0.3.0 - Uses shared script, gets CLI path
+  - `aether-dev` v0.3.0 - Uses shared script
+  - `aether-rollback` v0.3.0 - Uses shared script
+  - `aether-init` v0.5.0 - Uses shared script
+  - `aether-volume` v1.3.0 - Uses shared script
+
+### Benefits
+- **DRY**: Single source of truth for CLI detection logic
+- **Consistency**: Same error messages across all skills
+- **Maintainability**: Update detection in one place
+- **Extensibility**: Easy to add new detection paths
+
 ## [0.8.7] - 2026-03-12
 
 ### Changed

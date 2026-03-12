@@ -17,18 +17,20 @@ dependencies:
 
 # Aether 生产部署 (aether-deploy)
 
-> **版本**: 0.2.0 | **优先级**: P1
+> **版本**: 0.3.0 | **优先级**: P1
 
 ## 前置检查
 
 **⚠️ 此 Skill 需要 aether CLI**
 
-检测 CLI:
 ```bash
-command -v aether || test -f ~/.aether/aether || test -f ~/.aether/aether.exe
-```
+# 使用共享检测脚本
+source "${CLAUDE_PLUGIN_ROOT}/scripts/cli-functions.sh"
+require_aether_cli || exit 1
 
-**如果未安装**: 提示用户运行 `/aether:doctor` 完成安装。
+# 获取 CLI 路径
+CLI=$(get_aether_cli)
+```
 
 ## 快速开始
 
