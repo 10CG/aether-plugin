@@ -1,0 +1,57 @@
+name: "deploy-watch-trigger-positive-post-deploy"
+skill: "aether-deploy-watch"
+category: "trigger-positive"
+input: "CI 跑完了，帮我看看部署是否成功"
+expected:
+  triggered: true
+  tools_used: ["Bash", "Read"]
+  output_contains: ["部署", "状态"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p0", "smoke"]
+
+---
+
+name: "deploy-watch-trigger-positive-service-down"
+skill: "aether-deploy-watch"
+category: "trigger-positive"
+input: "CI 成功了但是服务访问不了，帮我查一下"
+expected:
+  triggered: true
+  tools_used: ["Bash", "Read"]
+  output_contains: ["allocation", "错误"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p0"]
+
+---
+
+name: "deploy-watch-trigger-positive-alloc-check"
+skill: "aether-deploy-watch"
+category: "trigger-positive"
+input: "部署后检查 my-api 的 allocation 状态"
+expected:
+  triggered: true
+  tools_used: ["Bash"]
+  output_contains: ["allocation", "my-api"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p0"]
+
+---
+
+name: "deploy-watch-trigger-positive-failure-debug"
+skill: "aether-deploy-watch"
+category: "trigger-positive"
+input: "部署失败了，帮我排查原因"
+expected:
+  triggered: true
+  tools_used: ["Bash", "Read"]
+  output_contains: ["失败", "原因"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p0"]

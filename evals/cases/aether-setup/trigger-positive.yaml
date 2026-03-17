@@ -1,0 +1,57 @@
+name: "setup-trigger-positive-first-config"
+skill: "aether-setup"
+category: "trigger-positive"
+input: "配置 Aether 集群连接"
+expected:
+  triggered: true
+  tools_used: ["Read", "Write", "Bash", "AskUserQuestion"]
+  output_contains: ["Nomad", "Consul", "地址"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p0", "smoke"]
+
+---
+
+name: "setup-trigger-positive-first-use"
+skill: "aether-setup"
+category: "trigger-positive"
+input: "第一次使用 Aether，怎么配置"
+expected:
+  triggered: true
+  tools_used: ["Read", "Write", "AskUserQuestion"]
+  output_contains: ["配置", "集群"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p0"]
+
+---
+
+name: "setup-trigger-positive-switch-cluster"
+skill: "aether-setup"
+category: "trigger-positive"
+input: "切换到另一个 Aether 集群"
+expected:
+  triggered: true
+  tools_used: ["Read", "Write", "AskUserQuestion"]
+  output_contains: ["集群", "切换"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p0"]
+
+---
+
+name: "setup-trigger-positive-show-config"
+skill: "aether-setup"
+category: "trigger-positive"
+input: "查看当前 Aether 配置"
+expected:
+  triggered: true
+  tools_used: ["Read", "Bash"]
+  output_contains: ["配置", "地址"]
+  output_not_contains: []
+  output_structure: "table"
+  error_handled: false
+tags: ["p1"]

@@ -1,0 +1,57 @@
+name: "volume-trigger-positive-create"
+skill: "aether-volume"
+category: "trigger-positive"
+input: "在 heavy-1 上给 myapp 创建 data 和 logs 两个 volume"
+expected:
+  triggered: true
+  tools_used: ["Bash", "AskUserQuestion"]
+  output_contains: ["volume", "create", "heavy-1"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p0", "smoke"]
+
+---
+
+name: "volume-trigger-positive-list"
+skill: "aether-volume"
+category: "trigger-positive"
+input: "查看 heavy-1 上有哪些 volume"
+expected:
+  triggered: true
+  tools_used: ["Bash"]
+  output_contains: ["volume", "heavy-1"]
+  output_not_contains: []
+  output_structure: "table"
+  error_handled: false
+tags: ["p0"]
+
+---
+
+name: "volume-trigger-positive-delete"
+skill: "aether-volume"
+category: "trigger-positive"
+input: "删除 heavy-2 上 old-project 的 volume"
+expected:
+  triggered: true
+  tools_used: ["Bash", "AskUserQuestion"]
+  output_contains: ["删除", "volume"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p0"]
+
+---
+
+name: "volume-trigger-positive-configure-storage"
+skill: "aether-volume"
+category: "trigger-positive"
+input: "给数据库服务配置持久化存储"
+expected:
+  triggered: true
+  tools_used: ["Bash", "AskUserQuestion"]
+  output_contains: ["volume", "持久化"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p1"]

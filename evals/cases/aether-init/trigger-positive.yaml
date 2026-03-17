@@ -1,0 +1,57 @@
+name: "init-trigger-positive-new-project"
+skill: "aether-init"
+category: "trigger-positive"
+input: "把这个项目接入 Aether 集群"
+expected:
+  triggered: true
+  tools_used: ["Read", "Write", "Bash", "Glob", "AskUserQuestion"]
+  output_contains: ["Dockerfile", "deploy", "workflow"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p0", "smoke"]
+
+---
+
+name: "init-trigger-positive-generate-config"
+skill: "aether-init"
+category: "trigger-positive"
+input: "生成部署配置文件"
+expected:
+  triggered: true
+  tools_used: ["Read", "Write", "Bash", "Glob"]
+  output_contains: ["配置", "生成"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p0"]
+
+---
+
+name: "init-trigger-positive-cicd-init"
+skill: "aether-init"
+category: "trigger-positive"
+input: "初始化 CI/CD 流水线配置"
+expected:
+  triggered: true
+  tools_used: ["Read", "Write", "Bash"]
+  output_contains: ["CI", "workflow"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p0"]
+
+---
+
+name: "init-trigger-positive-plan-deployment"
+skill: "aether-init"
+category: "trigger-positive"
+input: "帮我规划这个 Go 项目的部署方案"
+expected:
+  triggered: true
+  tools_used: ["Read", "Glob", "AskUserQuestion"]
+  output_contains: ["Go", "部署"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p1"]

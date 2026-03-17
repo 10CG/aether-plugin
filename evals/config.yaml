@@ -1,0 +1,70 @@
+# Skill Benchmark Configuration
+# 评估维度、阈值和权重定义
+
+version: "1.0.0"
+created: "2026-03-17"
+
+# 评估维度与权重
+dimensions:
+  trigger_accuracy:
+    weight: 0.25
+    description: "Skill description 是否能准确触发/跳过"
+  output_quality:
+    weight: 0.25
+    description: "指令完整性、示例、格式定义"
+  tool_usage:
+    weight: 0.20
+    description: "allowed-tools 精确性和使用引导"
+  error_handling:
+    weight: 0.15
+    description: "错误场景覆盖和降级策略"
+  token_efficiency:
+    weight: 0.15
+    description: "SKILL.md 大小和信息密度"
+
+# 回归检测阈值
+regression_thresholds:
+  trigger_accuracy:
+    warning: -5     # 下降超过 5% 警告
+    blocking: -15   # 下降超过 15% 阻断
+  output_quality:
+    warning: -10
+    blocking: -20
+  tool_usage:
+    warning: -5
+    blocking: -15
+  error_handling:
+    warning: -10
+    blocking: -20
+  token_efficiency:
+    warning: 20     # 增长超过 20% 警告 (注意方向相反)
+    blocking: 50    # 增长超过 50% 阻断
+
+# 基准线管理策略
+baseline:
+  path: "evals/baseline.yaml"
+  require_comparison: true    # 每次优化必须与基准对比
+  auto_update: false          # 不自动更新，需手动确认
+  history_path: "evals/results/"
+
+# 评估用例路径
+eval_cases:
+  path: "evals/cases/"
+  min_cases_per_skill: 3      # 每个 Skill 至少 3 个用例
+  required_categories:        # 每个 Skill 至少覆盖这些类别
+    - trigger-positive
+    - trigger-negative
+    - output-quality
+
+# 目标 Skills (按 plugin.json 中的 Skill 列表)
+target_skills:
+  - aether-status
+  - aether-deploy
+  - aether-deploy-watch
+  - aether-dev
+  - aether-doctor
+  - aether-init
+  - aether-rollback
+  - aether-setup
+  - aether-volume
+  - aether-cli-guard

@@ -1,0 +1,39 @@
+name: "status-trigger-negative-deploy-request"
+skill: "aether-status"
+category: "trigger-negative"
+input: "把 my-api 部署到生产环境"
+expected:
+  triggered: false
+  tools_used: []
+  output_contains: []
+  output_not_contains: []
+  error_handled: false
+tags: ["p0", "smoke"]
+
+---
+
+name: "status-trigger-negative-volume-query"
+skill: "aether-status"
+category: "trigger-negative"
+input: "在 heavy-1 上创建 data volume"
+expected:
+  triggered: false
+  tools_used: []
+  output_contains: []
+  output_not_contains: []
+  error_handled: false
+tags: ["p0"]
+
+---
+
+name: "status-trigger-negative-init-project"
+skill: "aether-status"
+category: "trigger-negative"
+input: "初始化一个新项目的部署配置"
+expected:
+  triggered: false
+  tools_used: []
+  output_contains: []
+  output_not_contains: []
+  error_handled: false
+tags: ["p1"]

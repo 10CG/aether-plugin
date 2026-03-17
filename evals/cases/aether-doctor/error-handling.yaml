@@ -1,0 +1,27 @@
+name: "doctor-error-handling-cli-not-installed"
+skill: "aether-doctor"
+category: "error-handling"
+input: "诊断环境"
+expected:
+  triggered: true
+  tools_used: ["Bash", "Read"]
+  output_contains: ["CLI", "未安装", "安装"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: true
+tags: ["p0"]
+
+---
+
+name: "doctor-error-handling-cluster-down"
+skill: "aether-doctor"
+category: "error-handling"
+input: "集群连不上了，帮我看看"
+expected:
+  triggered: true
+  tools_used: ["Bash"]
+  output_contains: ["连接", "失败", "网络"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: true
+tags: ["p0"]

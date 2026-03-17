@@ -1,0 +1,39 @@
+name: "deploy-watch-trigger-negative-do-deploy"
+skill: "aether-deploy-watch"
+category: "trigger-negative"
+input: "帮我把 my-api 部署到生产"
+expected:
+  triggered: false
+  tools_used: []
+  output_contains: []
+  output_not_contains: []
+  error_handled: false
+tags: ["p0", "smoke"]
+
+---
+
+name: "deploy-watch-trigger-negative-cluster-status"
+skill: "aether-deploy-watch"
+category: "trigger-negative"
+input: "集群节点状态怎么样"
+expected:
+  triggered: false
+  tools_used: []
+  output_contains: []
+  output_not_contains: []
+  error_handled: false
+tags: ["p0"]
+
+---
+
+name: "deploy-watch-trigger-negative-rollback"
+skill: "aether-deploy-watch"
+category: "trigger-negative"
+input: "服务有问题，回滚到上一个版本"
+expected:
+  triggered: false
+  tools_used: []
+  output_contains: []
+  output_not_contains: []
+  error_handled: false
+tags: ["p1"]

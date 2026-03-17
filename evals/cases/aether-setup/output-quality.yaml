@@ -1,0 +1,42 @@
+name: "setup-output-quality-guided-config"
+skill: "aether-setup"
+category: "output-quality"
+input: "引导我配置 Aether 集群"
+expected:
+  triggered: true
+  tools_used: ["Read", "Write", "AskUserQuestion"]
+  output_contains: ["NOMAD_ADDR", "CONSUL_HTTP_ADDR", "AETHER_REGISTRY"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p0"]
+
+---
+
+name: "setup-output-quality-project-level"
+skill: "aether-setup"
+category: "output-quality"
+input: "为当前项目配置一个不同的集群地址"
+expected:
+  triggered: true
+  tools_used: ["Read", "Write", "AskUserQuestion"]
+  output_contains: ["项目", "配置", ".env"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p0"]
+
+---
+
+name: "setup-output-quality-show-all"
+skill: "aether-setup"
+category: "output-quality"
+input: "显示当前所有 Aether 配置信息和来源"
+expected:
+  triggered: true
+  tools_used: ["Read", "Bash"]
+  output_contains: ["全局", "项目", "配置"]
+  output_not_contains: []
+  output_structure: "table"
+  error_handled: false
+tags: ["p1"]

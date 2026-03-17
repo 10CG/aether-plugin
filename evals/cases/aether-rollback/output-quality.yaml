@@ -1,0 +1,42 @@
+name: "rollback-output-quality-version-history"
+skill: "aether-rollback"
+category: "output-quality"
+input: "回滚 my-api，先看看版本历史"
+expected:
+  triggered: true
+  tools_used: ["Bash", "AskUserQuestion"]
+  output_contains: ["版本", "历史", "选择"]
+  output_not_contains: []
+  output_structure: "table"
+  error_handled: false
+tags: ["p0"]
+
+---
+
+name: "rollback-output-quality-verification"
+skill: "aether-rollback"
+category: "output-quality"
+input: "把 user-service 回滚并验证是否成功"
+expected:
+  triggered: true
+  tools_used: ["Bash", "AskUserQuestion"]
+  output_contains: ["回滚", "验证", "健康"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p0"]
+
+---
+
+name: "rollback-output-quality-confirmation"
+skill: "aether-rollback"
+category: "output-quality"
+input: "回滚 order-service 到 v2.1.0"
+expected:
+  triggered: true
+  tools_used: ["Bash", "AskUserQuestion"]
+  output_contains: ["确认", "v2.1.0", "回滚"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p1"]

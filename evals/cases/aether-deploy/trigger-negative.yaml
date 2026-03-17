@@ -1,0 +1,39 @@
+name: "deploy-trigger-negative-dev-deploy"
+skill: "aether-deploy"
+category: "trigger-negative"
+input: "部署这个分支到 dev 环境测试一下"
+expected:
+  triggered: false
+  tools_used: []
+  output_contains: []
+  output_not_contains: []
+  error_handled: false
+tags: ["p0", "smoke"]
+
+---
+
+name: "deploy-trigger-negative-rollback"
+skill: "aether-deploy"
+category: "trigger-negative"
+input: "刚才的部署有问题，回滚到上一个版本"
+expected:
+  triggered: false
+  tools_used: []
+  output_contains: []
+  output_not_contains: []
+  error_handled: false
+tags: ["p0"]
+
+---
+
+name: "deploy-trigger-negative-status-check"
+skill: "aether-deploy"
+category: "trigger-negative"
+input: "部署之后看看服务状态怎么样"
+expected:
+  triggered: false
+  tools_used: []
+  output_contains: []
+  output_not_contains: []
+  error_handled: false
+tags: ["p1"]

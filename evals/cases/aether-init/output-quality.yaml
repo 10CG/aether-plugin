@@ -1,0 +1,42 @@
+name: "init-output-quality-two-phase-flow"
+skill: "aether-init"
+category: "output-quality"
+input: "接入新项目 my-api 到 Aether"
+expected:
+  triggered: true
+  tools_used: ["Read", "Glob", "AskUserQuestion", "Write", "Bash"]
+  output_contains: ["Phase 1", "Phase 2", "分析", "生成"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p0"]
+
+---
+
+name: "init-output-quality-project-analysis"
+skill: "aether-init"
+category: "output-quality"
+input: "分析当前项目特征并生成部署方案"
+expected:
+  triggered: true
+  tools_used: ["Read", "Glob", "Grep"]
+  output_contains: ["语言", "端口", "依赖"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p0"]
+
+---
+
+name: "init-output-quality-file-generation"
+skill: "aether-init"
+category: "output-quality"
+input: "为 Node.js 项目生成 Dockerfile 和 Nomad HCL"
+expected:
+  triggered: true
+  tools_used: ["Write", "Bash"]
+  output_contains: ["Dockerfile", "nomad", "hcl"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p1"]

@@ -1,0 +1,27 @@
+name: "status-error-handling-cluster-unreachable"
+skill: "aether-status"
+category: "error-handling"
+input: "查看集群状态"
+expected:
+  triggered: true
+  tools_used: ["Bash"]
+  output_contains: ["连接", "失败"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: true
+tags: ["p0"]
+
+---
+
+name: "status-error-handling-no-config"
+skill: "aether-status"
+category: "error-handling"
+input: "查看集群节点状态"
+expected:
+  triggered: true
+  tools_used: ["Bash"]
+  output_contains: ["配置", "setup"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: true
+tags: ["p1"]

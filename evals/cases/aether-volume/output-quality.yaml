@@ -1,0 +1,42 @@
+name: "volume-output-quality-create-flow"
+skill: "aether-volume"
+category: "output-quality"
+input: "在 heavy-1 上为 postgres 创建 data volume"
+expected:
+  triggered: true
+  tools_used: ["Bash", "AskUserQuestion"]
+  output_contains: ["volume", "create", "heavy-1", "postgres"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p0"]
+
+---
+
+name: "volume-output-quality-list-format"
+skill: "aether-volume"
+category: "output-quality"
+input: "列出所有节点上的 volume 信息"
+expected:
+  triggered: true
+  tools_used: ["Bash"]
+  output_contains: ["volume", "node"]
+  output_not_contains: []
+  output_structure: "table"
+  error_handled: false
+tags: ["p0"]
+
+---
+
+name: "volume-output-quality-dry-run"
+skill: "aether-volume"
+category: "output-quality"
+input: "预览一下在 heavy-2 上创建 volume 会做什么"
+expected:
+  triggered: true
+  tools_used: ["Bash"]
+  output_contains: ["dry-run", "预览"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p1"]

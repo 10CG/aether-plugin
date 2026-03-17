@@ -1,0 +1,57 @@
+name: "dev-trigger-positive-branch-deploy"
+skill: "aether-dev"
+category: "trigger-positive"
+input: "把当前分支部署到 dev 环境"
+expected:
+  triggered: true
+  tools_used: ["Bash", "Read"]
+  output_contains: ["dev", "部署", "分支"]
+  output_not_contains: ["生产", "prod"]
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p0", "smoke"]
+
+---
+
+name: "dev-trigger-positive-test-job"
+skill: "aether-dev"
+category: "trigger-positive"
+input: "跑个临时测试 job 验证一下功能"
+expected:
+  triggered: true
+  tools_used: ["Bash"]
+  output_contains: ["job", "测试"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p0"]
+
+---
+
+name: "dev-trigger-positive-manual-deploy"
+skill: "aether-dev"
+category: "trigger-positive"
+input: "CI 挂了，手动部署到开发环境"
+expected:
+  triggered: true
+  tools_used: ["Bash"]
+  output_contains: ["部署", "dev"]
+  output_not_contains: ["prod"]
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p0"]
+
+---
+
+name: "dev-trigger-positive-dev-logs"
+skill: "aether-dev"
+category: "trigger-positive"
+input: "看下 dev 环境的日志"
+expected:
+  triggered: true
+  tools_used: ["Bash"]
+  output_contains: ["日志", "dev"]
+  output_not_contains: []
+  output_structure: "code-block"
+  error_handled: false
+tags: ["p1"]

@@ -1,0 +1,42 @@
+name: "deploy-watch-output-quality-diagnosis"
+skill: "aether-deploy-watch"
+category: "output-quality"
+input: "CI 流水线成功了但是 web-app 服务不可用，帮我诊断"
+expected:
+  triggered: true
+  tools_used: ["Bash", "Read"]
+  output_contains: ["allocation", "健康检查", "修复"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p0"]
+
+---
+
+name: "deploy-watch-output-quality-fix-suggestion"
+skill: "aether-deploy-watch"
+category: "output-quality"
+input: "部署后 allocation 一直在 pending，什么原因"
+expected:
+  triggered: true
+  tools_used: ["Bash"]
+  output_contains: ["pending", "建议", "原因"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p0"]
+
+---
+
+name: "deploy-watch-output-quality-monitoring-loop"
+skill: "aether-deploy-watch"
+category: "output-quality"
+input: "持续监控 payment-service 的部署状态直到稳定"
+expected:
+  triggered: true
+  tools_used: ["Bash"]
+  output_contains: ["监控", "稳定", "状态"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p1"]

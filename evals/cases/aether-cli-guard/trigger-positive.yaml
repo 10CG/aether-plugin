@@ -1,0 +1,42 @@
+name: "cli-guard-trigger-positive-aether-command"
+skill: "aether-cli-guard"
+category: "trigger-positive"
+input: "aether volume list --node heavy-1"
+expected:
+  triggered: true
+  tools_used: ["Bash"]
+  output_contains: ["aether"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p0", "smoke"]
+
+---
+
+name: "cli-guard-trigger-positive-aether-init"
+skill: "aether-cli-guard"
+category: "trigger-positive"
+input: "aether init"
+expected:
+  triggered: true
+  tools_used: ["Bash"]
+  output_contains: ["aether"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p0"]
+
+---
+
+name: "cli-guard-trigger-positive-home-aether"
+skill: "aether-cli-guard"
+category: "trigger-positive"
+input: "~/.aether/aether version"
+expected:
+  triggered: true
+  tools_used: ["Bash"]
+  output_contains: ["aether"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p0"]

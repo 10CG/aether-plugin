@@ -1,0 +1,39 @@
+name: "cli-guard-trigger-negative-non-aether-command"
+skill: "aether-cli-guard"
+category: "trigger-negative"
+input: "ls -la"
+expected:
+  triggered: false
+  tools_used: []
+  output_contains: []
+  output_not_contains: []
+  error_handled: false
+tags: ["p0", "smoke"]
+
+---
+
+name: "cli-guard-trigger-negative-git-command"
+skill: "aether-cli-guard"
+category: "trigger-negative"
+input: "git status"
+expected:
+  triggered: false
+  tools_used: []
+  output_contains: []
+  output_not_contains: []
+  error_handled: false
+tags: ["p0"]
+
+---
+
+name: "cli-guard-trigger-negative-docker-command"
+skill: "aether-cli-guard"
+category: "trigger-negative"
+input: "docker ps"
+expected:
+  triggered: false
+  tools_used: []
+  output_contains: []
+  output_not_contains: []
+  error_handled: false
+tags: ["p1"]

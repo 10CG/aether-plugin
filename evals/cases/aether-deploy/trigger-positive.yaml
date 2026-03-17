@@ -1,0 +1,57 @@
+name: "deploy-trigger-positive-to-prod"
+skill: "aether-deploy"
+category: "trigger-positive"
+input: "把 my-api 部署到生产环境"
+expected:
+  triggered: true
+  tools_used: ["Bash", "AskUserQuestion"]
+  output_contains: ["部署", "生产"]
+  output_not_contains: ["dev", "开发"]
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p0", "smoke"]
+
+---
+
+name: "deploy-trigger-positive-promote"
+skill: "aether-deploy"
+category: "trigger-positive"
+input: "从 dev 提升 web-frontend 到 prod"
+expected:
+  triggered: true
+  tools_used: ["Bash", "AskUserQuestion"]
+  output_contains: ["web-frontend", "提升", "prod"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p0"]
+
+---
+
+name: "deploy-trigger-positive-version"
+skill: "aether-deploy"
+category: "trigger-positive"
+input: "发布 my-api v1.2.3 到生产"
+expected:
+  triggered: true
+  tools_used: ["Bash", "AskUserQuestion"]
+  output_contains: ["v1.2.3", "my-api"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p0"]
+
+---
+
+name: "deploy-trigger-positive-release"
+skill: "aether-deploy"
+category: "trigger-positive"
+input: "发布新版本到线上"
+expected:
+  triggered: true
+  tools_used: ["Bash", "AskUserQuestion"]
+  output_contains: ["版本", "部署"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p1"]

@@ -1,0 +1,72 @@
+name: "doctor-trigger-positive-full-diagnosis"
+skill: "aether-doctor"
+category: "trigger-positive"
+input: "诊断一下环境有没有问题"
+expected:
+  triggered: true
+  tools_used: ["Bash", "Read"]
+  output_contains: ["CLI", "配置", "连接"]
+  output_not_contains: []
+  output_structure: "table"
+  error_handled: false
+tags: ["p0", "smoke"]
+
+---
+
+name: "doctor-trigger-positive-ssh-check"
+skill: "aether-doctor"
+category: "trigger-positive"
+input: "SSH 连接失败了，帮我检查一下"
+expected:
+  triggered: true
+  tools_used: ["Bash", "Read"]
+  output_contains: ["SSH", "密钥"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p0"]
+
+---
+
+name: "doctor-trigger-positive-first-use"
+skill: "aether-doctor"
+category: "trigger-positive"
+input: "第一次用 Aether，检查下环境是否就绪"
+expected:
+  triggered: true
+  tools_used: ["Bash", "Read"]
+  output_contains: ["CLI", "配置"]
+  output_not_contains: []
+  output_structure: "table"
+  error_handled: false
+tags: ["p0"]
+
+---
+
+name: "doctor-trigger-positive-config-error"
+skill: "aether-doctor"
+category: "trigger-positive"
+input: "配置有问题，帮我检查一下"
+expected:
+  triggered: true
+  tools_used: ["Bash", "Read"]
+  output_contains: ["配置"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p1"]
+
+---
+
+name: "doctor-trigger-positive-auto-fix"
+skill: "aether-doctor"
+category: "trigger-positive"
+input: "环境有问题，帮我自动修复"
+expected:
+  triggered: true
+  tools_used: ["Bash", "Read", "Write"]
+  output_contains: ["修复"]
+  output_not_contains: []
+  output_structure: "step-by-step"
+  error_handled: false
+tags: ["p1"]
