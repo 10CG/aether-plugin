@@ -199,6 +199,147 @@ for ALLOC in ${ALLOCS}; do
 done
 ```
 
+## 错误处理
+
+### Docker 构建失败
+
+```bash
+# 检查 Dockerfile 存在
+if [ ! -f "Dockerfile" ]; then
+  echo "错误: 当前目录未找到 Dockerfile"
+  echo "修复:"
+  echo "  1. 运行 /aether:init 生成 Dockerfile"
+  echo "  2. 或手动创建: touch Dockerfile"
+  exit 1
+fi
+
+# 构建镜像并捕获错误
+if ! docker build -t "${IMAGE}" . 2>&1; then
+  echo ""
+  echo "错误: Docker 镜像构建失败"
+  echo "常见原因:"
+  echo "  - Dockerfile 语法错误（检查 FROM/RUN/COPY 指令）"
+  echo "  - 依赖下载失败（检查网络连接或镜像源）"
+  echo "  - COPY 的文件不存在（检查 .dockerignore 是否排除了必要文件）"
+  echo "修复: docker build -t ${IMAGE} . --no-cache --progress=plain"
+  exit 1
+fi
+```
+
+### Docker 推送失败
+
+```bash
+# 推送镜像并捕获错误
+PUSH_OUTPUT=$(docker push "${IMAGE}" 2>&1)
+PUSH_EXIT=$?
+
+if [ $PUSH_EXIT -ne 0 ]; then
+  if echo "$PUSH_OUTPUT" | grep -qi "unauthorized\|authentication\|denied"; then
+    echo "错误: Registry 认证失败 (${AETHER_REGISTRY})"
+    echo "修复:"
+    echo "  docker login ${AETHER_REGISTRY}"
+    echo "  # 或检查凭据: cat ~/.docker/config.json"
+  elif echo "$PUSH_OUTPUT" | grep -qi "timeout\|connection refused\|no such host"; then
+    echo "错误: 无法连接到 Registry (${AETHER_REGISTRY})"
+    echo "修复:"
+    echo "  1. 检查 Registry 是否运行: curl -s https://${AETHER_REGISTRY}/v2/"
+    echo "  2. 检查 DNS 解析: nslookup ${AETHER_REGISTRY}"
+    echo "  3. 检查网络连通: ping ${AETHER_REGISTRY}"
+  else
+    echo "错误: 镜像推送失败"
+    echo "详情: ${PUSH_OUTPUT}"
+  fi
+  exit 1
+fi
+```
+
+### Nomad Job 提交失败
+
+```bash
+# 提交 Job 并捕获错误
+JOB_OUTPUT=$(nomad job run deploy/nomad.hcl 2>&1)
+JOB_EXIT=$?
+
+if [ $JOB_EXIT -ne 0 ]; then
+  if echo "$JOB_OUTPUT" | grep -qi "connection refused"; then
+    echo "错误: 无法连接到 Nomad (${NOMAD_ADDR})"
+    echo "修复: 检查 Nomad 服务状态或运行 /aether:setup 重新配置"
+  elif echo "$JOB_OUTPUT" | grep -qi "403\|permission\|token"; then
+    echo "错误: Nomad ACL 认证失败"
+    echo "修复: 检查 NOMAD_TOKEN 环境变量是否正确"
+  elif echo "$JOB_OUTPUT" | grep -qi "constraint"; then
+    echo "错误: 没有节点满足 Job 约束条件"
+    echo "修复:"
+    echo "  1. 检查节点状态: nomad node status"
+    echo "  2. 检查 nomad.hcl 中的 constraint 配置"
+  elif echo "$JOB_OUTPUT" | grep -qi "invalid\|parse error\|syntax"; then
+    echo "错误: nomad.hcl 配置文件语法错误"
+    echo "修复: nomad job validate deploy/nomad.hcl"
+  else
+    echo "错误: Job 提交失败"
+    echo "详情: ${JOB_OUTPUT}"
+  fi
+  exit 1
+fi
+```
+
+### 网络超时
+
+```bash
+# 带超时的 API 调用
+api_call() {
+  local url="$1"
+  local result
+  result=$(curl -s --connect-timeout 5 --max-time 15 "$url" 2>&1)
+
+  if [ $? -ne 0 ]; then
+    if echo "$result" | grep -qi "timed out"; then
+      echo "错误: 请求超时 ($url)"
+      echo "修复:"
+      echo "  1. 检查网络连通: ping $(echo $url | sed 's|https\?://||;s|/.*||;s|:.*||')"
+      echo "  2. 检查防火墙规则"
+      echo "  3. 增加超时重试: curl --connect-timeout 10 $url"
+    else
+      echo "错误: 网络请求失败 ($url)"
+      echo "详情: ${result}"
+    fi
+    return 1
+  fi
+
+  echo "$result"
+}
+```
+
+### rsync/exec 模式部署失败
+
+```bash
+# rsync 文件同步
+RSYNC_OUTPUT=$(rsync -avz --exclude '.git' ./ root@${TARGET_NODE}:/opt/apps/${PROJECT}/ 2>&1)
+RSYNC_EXIT=$?
+
+if [ $RSYNC_EXIT -ne 0 ]; then
+  if echo "$RSYNC_OUTPUT" | grep -qi "permission denied\|ssh"; then
+    echo "错误: SSH 连接失败 (${TARGET_NODE})"
+    echo "修复:"
+    echo "  1. 测试 SSH: ssh root@${TARGET_NODE} 'echo ok'"
+    echo "  2. 检查密钥: ls -la ~/.ssh/id_ed25519"
+    echo "  3. 检查权限: chmod 600 ~/.ssh/id_ed25519"
+  elif echo "$RSYNC_OUTPUT" | grep -qi "No such file\|not found"; then
+    echo "错误: 目标路径不存在 (/opt/apps/${PROJECT}/)"
+    echo "修复: ssh root@${TARGET_NODE} 'mkdir -p /opt/apps/${PROJECT}'"
+  elif echo "$RSYNC_OUTPUT" | grep -qi "No space left"; then
+    echo "错误: 目标节点磁盘空间不足"
+    echo "修复: ssh root@${TARGET_NODE} 'df -h /opt/apps/'"
+  else
+    echo "错误: 文件同步失败"
+    echo "详情: ${RSYNC_OUTPUT}"
+  fi
+  exit 1
+fi
+```
+
+---
+
 ## 前置条件：集群配置
 
 执行前需要配置 Aether 集群入口，参考 `/aether:setup`。

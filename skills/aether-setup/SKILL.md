@@ -235,6 +235,159 @@ EXEC_CLASS=$(curl -s "${NOMAD_ADDR}/v1/nodes" | jq -r '
 
 ---
 
+## 错误处理
+
+### CLI 可用性检查
+
+在执行操作前，确认必要工具已安装：
+
+```bash
+# 检查 curl 和 jq 是否可用
+for cmd in curl jq; do
+  if ! command -v $cmd &> /dev/null; then
+    echo "错误: 未找到 $cmd 命令"
+    echo "修复: sudo apt install $cmd  # Debian/Ubuntu"
+    echo "修复: brew install $cmd      # macOS"
+    exit 1
+  fi
+done
+
+# 检查 yq（读取 config.yaml 需要）
+if ! command -v yq &> /dev/null; then
+  echo "错误: 未找到 yq 命令，无法读取 config.yaml"
+  echo "修复: sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 && sudo chmod +x /usr/local/bin/yq"
+  exit 1
+fi
+```
+
+### 连接验证失败
+
+当 `curl` 到 Nomad 或 Consul 失败时，提供明确的诊断信息：
+
+```bash
+# Nomad 连接验证
+validate_nomad() {
+  local addr="$1"
+  local response
+  response=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "${addr}/v1/agent/self" 2>&1)
+
+  if [ $? -ne 0 ]; then
+    echo "错误: 无法连接到 Nomad (${addr})"
+    echo "可能原因:"
+    echo "  - Nomad 服务未启动"
+    echo "  - 网络不可达或防火墙阻拦"
+    echo "  - 地址格式错误（需要 http:// 前缀）"
+    echo "修复:"
+    echo "  ssh root@<node> 'systemctl status nomad'"
+    echo "  curl -v ${addr}/v1/agent/self"
+    return 1
+  elif [ "$response" = "403" ]; then
+    echo "错误: Nomad 返回 403 - Token 认证失败"
+    echo "修复: 设置 NOMAD_TOKEN 环境变量或在 config.yaml 中配置 token"
+    return 1
+  elif [ "$response" != "200" ]; then
+    echo "错误: Nomad 返回 HTTP ${response}"
+    return 1
+  fi
+}
+
+# Consul 连接验证（同理）
+validate_consul() {
+  local addr="$1"
+  local response
+  response=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "${addr}/v1/status/leader" 2>&1)
+
+  if [ $? -ne 0 ]; then
+    echo "错误: 无法连接到 Consul (${addr})"
+    echo "修复: ssh root@<node> 'systemctl status consul'"
+    return 1
+  elif [ "$response" != "200" ]; then
+    echo "错误: Consul 返回 HTTP ${response}"
+    return 1
+  fi
+}
+```
+
+### 目录权限错误
+
+创建 `~/.aether/` 目录时可能遇到权限问题：
+
+```bash
+# 创建配置目录
+AETHER_DIR="$HOME/.aether"
+if ! mkdir -p "$AETHER_DIR" 2>/dev/null; then
+  echo "错误: 无法创建目录 ${AETHER_DIR}"
+  echo "可能原因: 权限不足或 \$HOME 路径异常 (HOME=${HOME})"
+  echo "修复:"
+  echo "  sudo mkdir -p ${AETHER_DIR} && sudo chown $(whoami) ${AETHER_DIR}"
+  exit 1
+fi
+
+# 写入配置文件
+if ! touch "$AETHER_DIR/config.yaml" 2>/dev/null; then
+  echo "错误: 无法写入 ${AETHER_DIR}/config.yaml"
+  echo "修复: chmod 755 ${AETHER_DIR}"
+  exit 1
+fi
+```
+
+### URL 格式验证
+
+验证用户输入的地址格式：
+
+```bash
+validate_url() {
+  local url="$1"
+  local name="$2"
+
+  # 检查空值
+  if [ -z "$url" ]; then
+    echo "错误: ${name} 地址不能为空"
+    return 1
+  fi
+
+  # 检查 http/https 前缀
+  if [[ ! "$url" =~ ^https?:// ]]; then
+    echo "错误: ${name} 地址缺少协议前缀"
+    echo "示例: http://192.168.69.70:4646"
+    return 1
+  fi
+
+  # 检查端口号
+  if [[ ! "$url" =~ :[0-9]+$ ]]; then
+    echo "警告: ${name} 地址未指定端口，将使用默认端口"
+  fi
+}
+
+# 使用
+validate_url "$NOMAD_ADDR" "Nomad" || exit 1
+validate_url "$CONSUL_HTTP_ADDR" "Consul" || exit 1
+```
+
+### Token 认证失败
+
+Nomad ACL 启用时的 Token 认证处理：
+
+```bash
+# 检查 Token 是否有效
+if [ -n "$NOMAD_TOKEN" ]; then
+  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+    -H "X-Nomad-Token: ${NOMAD_TOKEN}" \
+    "${NOMAD_ADDR}/v1/agent/self")
+
+  if [ "$HTTP_CODE" = "403" ]; then
+    echo "错误: NOMAD_TOKEN 无效或权限不足"
+    echo "修复:"
+    echo "  1. 检查 token 是否过期: nomad acl token self"
+    echo "  2. 重新获取 token: nomad acl token create -name='aether' -type='client'"
+    echo "  3. 更新配置: 编辑 ~/.aether/config.yaml 中的 nomad_token"
+    exit 1
+  fi
+fi
+```
+
+---
+
 ## 与其他 Skills 的关系
 
 ```
