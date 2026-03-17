@@ -1,0 +1,9 @@
+[
+  {"query": "把 my-api 部署到生产环境", "should_trigger": true},
+  {"query": "从 dev 提升 web-frontend 到 prod", "should_trigger": true},
+  {"query": "发布 my-api v1.2.3 到生产", "should_trigger": true},
+  {"query": "发布新版本到线上", "should_trigger": true},
+  {"query": "部署这个分支到 dev 环境测试一下", "should_trigger": false},
+  {"query": "刚才的部署有问题，回滚到上一个版本", "should_trigger": false},
+  {"query": "部署之后看看服务状态怎么样", "should_trigger": false}
+]

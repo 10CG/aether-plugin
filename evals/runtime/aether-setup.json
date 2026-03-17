@@ -1,0 +1,9 @@
+[
+  {"query": "配置 Aether 集群连接", "should_trigger": true},
+  {"query": "第一次使用 Aether，怎么配置", "should_trigger": true},
+  {"query": "切换到另一个 Aether 集群", "should_trigger": true},
+  {"query": "查看当前 Aether 配置", "should_trigger": true},
+  {"query": "部署服务到集群", "should_trigger": false},
+  {"query": "诊断环境问题", "should_trigger": false},
+  {"query": "初始化新项目部署配置", "should_trigger": false}
+]

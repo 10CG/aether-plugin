@@ -1,0 +1,8 @@
+[
+  {"query": "aether volume list --node heavy-1", "should_trigger": true},
+  {"query": "aether init", "should_trigger": true},
+  {"query": "~/.aether/aether version", "should_trigger": true},
+  {"query": "ls -la", "should_trigger": false},
+  {"query": "git status", "should_trigger": false},
+  {"query": "docker ps", "should_trigger": false}
+]

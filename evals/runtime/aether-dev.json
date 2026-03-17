@@ -1,0 +1,9 @@
+[
+  {"query": "把当前分支部署到 dev 环境", "should_trigger": true},
+  {"query": "跑个临时测试 job 验证一下功能", "should_trigger": true},
+  {"query": "CI 挂了，手动部署到开发环境", "should_trigger": true},
+  {"query": "看下 dev 环境的日志", "should_trigger": true},
+  {"query": "部署到生产环境", "should_trigger": false},
+  {"query": "查看集群整体状态", "should_trigger": false},
+  {"query": "初始化一个新项目接入 Aether", "should_trigger": false}
+]
