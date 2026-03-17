@@ -163,6 +163,135 @@ aether init --lang go --port 8080
 
 ---
 
-**Skill 版本**: 0.3.0
-**最后更新**: 2026-03-12
+## 故障处理
+
+### 集群连接失败（Registry 验证）
+
+Phase 1 分析阶段需要从集群配置读取 registry 信息，连接失败时降级处理：
+
+```bash
+# 尝试从集群获取 registry 配置
+REGISTRY=""
+if [ -f "$HOME/.aether/config.yaml" ]; then
+  REGISTRY=$(yq '.cluster.registry' "$HOME/.aether/config.yaml" 2>/dev/null)
+fi
+
+if [ -z "$REGISTRY" ] || [ "$REGISTRY" = "null" ]; then
+  echo "⚠ 无法从配置中读取 registry 地址"
+  echo ""
+  echo "可选操作:"
+  echo "  1. 运行 /aether:setup 配置集群（推荐）"
+  echo "  2. 手动指定: aether init --registry forgejo.10cg.pub"
+  echo "  3. 跳过 registry 配置，生成后手动编辑 workflow 文件"
+fi
+
+# 验证 registry 可达性（可选，非阻塞）
+if [ -n "$REGISTRY" ]; then
+  if ! curl -sf --max-time 5 "https://${REGISTRY}/v2/" > /dev/null 2>&1; then
+    echo "⚠ Registry (${REGISTRY}) 不可达，将继续生成文件"
+    echo "  部署前请确认 registry 地址正确"
+  fi
+fi
+```
+
+### 项目类型无法识别
+
+当扫描项目特征后未能匹配任何已知语言/框架：
+
+```bash
+# 如果未检测到已知语言
+if [ -z "$DETECTED_LANG" ]; then
+  echo "⚠ 未能自动识别项目类型"
+  echo ""
+  echo "已检查: go.mod, package.json, requirements.txt, pyproject.toml, Cargo.toml, pom.xml, build.gradle"
+  echo ""
+  echo "请选择:"
+  echo "  1. 手动指定语言: aether init --lang <go|node|python|rust|java>"
+  echo "  2. 仅生成基础 Nomad HCL（无 Dockerfile）"
+  echo "  3. 提供自定义 Dockerfile 路径"
+  # 等待用户选择后继续
+fi
+```
+
+### 文件冲突（目标文件已存在）
+
+生成文件前检查冲突，避免覆盖用户已有配置：
+
+```bash
+CONFLICTS=()
+[ -f "Dockerfile" ] && CONFLICTS+=("Dockerfile")
+[ -f "deploy/nomad-dev.hcl" ] && CONFLICTS+=("deploy/nomad-dev.hcl")
+[ -f "deploy/nomad-prod.hcl" ] && CONFLICTS+=("deploy/nomad-prod.hcl")
+[ -f ".forgejo/workflows/deploy.yaml" ] && CONFLICTS+=(".forgejo/workflows/deploy.yaml")
+
+if [ ${#CONFLICTS[@]} -gt 0 ]; then
+  echo "⚠ 以下文件已存在："
+  for f in "${CONFLICTS[@]}"; do
+    echo "  - $f"
+  done
+  echo ""
+  echo "请选择:"
+  echo "  1. 覆盖全部（已有文件备份为 .bak）"
+  echo "  2. 仅生成缺失的文件（跳过已有）"
+  echo "  3. 取消操作"
+  # 用户选择 1 时：
+  # for f in "${CONFLICTS[@]}"; do cp "$f" "${f}.bak"; done
+fi
+```
+
+### 模板渲染错误
+
+占位符替换失败时的检查：
+
+```bash
+# 生成后验证占位符是否全部替换
+for file in Dockerfile deploy/nomad-dev.hcl deploy/nomad-prod.hcl .forgejo/workflows/deploy.yaml; do
+  if [ -f "$file" ] && grep -q '__[A-Z_]*__' "$file"; then
+    UNREPLACED=$(grep -o '__[A-Z_]*__' "$file" | sort -u | tr '\n' ', ')
+    echo "⚠ ${file} 中仍有未替换的占位符: ${UNREPLACED}"
+    echo "  请手动检查并替换，或重新运行 /aether:init"
+  fi
+done
+```
+
+### 生成后验证失败
+
+```bash
+# Dockerfile 语法检查
+if [ -f "Dockerfile" ]; then
+  if ! docker build --check . 2>/dev/null; then
+    echo "⚠ Dockerfile 语法检查失败"
+    echo "  常见原因: 缺少基础镜像、COPY 路径错误"
+    echo "  手动检查: docker build --no-cache ."
+  fi
+fi
+
+# Nomad HCL 语法检查
+for hcl in deploy/nomad-dev.hcl deploy/nomad-prod.hcl; do
+  if [ -f "$hcl" ]; then
+    if ! nomad job validate "$hcl" 2>/dev/null; then
+      echo "⚠ ${hcl} 验证失败"
+      echo "  常见原因: 端口号错误、node class 不存在"
+      echo "  手动检查: nomad job validate ${hcl}"
+    fi
+  fi
+done
+```
+
+### 常见错误速查
+
+| 错误 | 原因 | 修复 |
+|------|------|------|
+| `未能自动识别项目类型` | 缺少语言标识文件 | 使用 `--lang` 手动指定 |
+| `无法从配置中读取 registry` | 未运行 setup | 运行 `/aether:setup` |
+| `文件已存在` | 项目已有部署配置 | 选择覆盖（自动备份）或跳过 |
+| `未替换的占位符` | 缺少项目参数 | 检查项目名、端口、registry 配置 |
+| `Dockerfile 语法检查失败` | 模板与项目结构不匹配 | 手动调整 Dockerfile |
+| `HCL 验证失败` | 端口或节点类型错误 | 检查 `--port` 和集群节点配置 |
+| `aether CLI 未安装` | PATH 中找不到 aether | 参考 CLI 安装文档 |
+
+---
+
+**Skill 版本**: 0.5.0
+**最后更新**: 2026-03-17
 **维护者**: 10CG Infrastructure Team

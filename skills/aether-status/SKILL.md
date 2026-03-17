@@ -248,17 +248,34 @@ Task: api
 /aether:status my-project --watch
 ```
 
-持续监控服务状态，每 5 秒刷新一次：
+持续监控服务状态，每 5 秒刷新一次，连续失败 5 次自动退出：
 
 ```bash
-while true; do
+FAIL_COUNT=0
+MAX_FAILURES=5
+
+while [ $FAIL_COUNT -lt $MAX_FAILURES ]; do
   clear
   echo "Aether 状态监控 - $(date)"
   echo "================================"
+
+  # 检查 API 可达性
+  if ! curl -sf --max-time 5 "${NOMAD_ADDR}/v1/agent/health" > /dev/null 2>&1; then
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+    echo "⚠ Nomad API 无响应 (${FAIL_COUNT}/${MAX_FAILURES})"
+    echo "  连续失败 ${MAX_FAILURES} 次后将自动退出"
+    sleep 5
+    continue
+  fi
+
+  FAIL_COUNT=0  # 重置计数
   # 显示状态
   /aether:status my-project
   sleep 5
 done
+
+echo "错误: Nomad API 连续 ${MAX_FAILURES} 次无响应，监控已停止"
+echo "修复建议: 检查 NOMAD_ADDR (${NOMAD_ADDR}) 是否可达"
 ```
 
 ---
@@ -349,6 +366,97 @@ fi
 
 ---
 
+## 故障处理
+
+### 集群不可达
+
+所有 API 调用前先检查连通性，设置超时防止长时间阻塞：
+
+```bash
+# 检查 Nomad 可达性（5 秒超时）
+if ! curl -sf --max-time 5 "${NOMAD_ADDR}/v1/agent/health" > /dev/null 2>&1; then
+  echo "错误: 无法连接 Nomad API (${NOMAD_ADDR})"
+  echo ""
+  echo "修复建议:"
+  echo "  1. 确认地址正确: echo \$NOMAD_ADDR"
+  echo "  2. 测试网络连通: curl -v ${NOMAD_ADDR}/v1/agent/health"
+  echo "  3. 检查 Nomad 服务: ssh root@heavy-1 'systemctl status nomad'"
+  echo "  4. 重新配置: /aether:setup"
+  exit 1
+fi
+
+# 检查 Consul 可达性（5 秒超时）
+if ! curl -sf --max-time 5 "${CONSUL_HTTP_ADDR}/v1/status/leader" > /dev/null 2>&1; then
+  echo "错误: 无法连接 Consul API (${CONSUL_HTTP_ADDR})"
+  echo ""
+  echo "修复建议:"
+  echo "  1. 确认地址正确: echo \$CONSUL_HTTP_ADDR"
+  echo "  2. 测试网络连通: curl -v ${CONSUL_HTTP_ADDR}/v1/status/leader"
+  echo "  3. 检查 Consul 服务: ssh root@heavy-1 'systemctl status consul'"
+  echo "  4. 重新配置: /aether:setup"
+  exit 1
+fi
+```
+
+### 部分可达（降级策略）
+
+当 Nomad 可达但 Consul 不可达（或反之），采用降级模式：
+
+```bash
+NOMAD_OK=false
+CONSUL_OK=false
+
+curl -sf --max-time 5 "${NOMAD_ADDR}/v1/agent/health" > /dev/null 2>&1 && NOMAD_OK=true
+curl -sf --max-time 5 "${CONSUL_HTTP_ADDR}/v1/status/leader" > /dev/null 2>&1 && CONSUL_OK=true
+
+if [ "$NOMAD_OK" = true ] && [ "$CONSUL_OK" = false ]; then
+  echo "⚠ Consul 不可达，仅显示 Nomad 数据（服务健康信息不可用）"
+  # 仅查询 Nomad 节点、Jobs、Allocations
+  # 跳过 Consul 服务健康查询
+
+elif [ "$NOMAD_OK" = false ] && [ "$CONSUL_OK" = true ]; then
+  echo "⚠ Nomad 不可达，仅显示 Consul 数据（节点和 Job 信息不可用）"
+  # 仅查询 Consul 服务状态
+
+elif [ "$NOMAD_OK" = false ] && [ "$CONSUL_OK" = false ]; then
+  echo "错误: Nomad 和 Consul 均不可达，无法查询状态"
+  echo "修复建议: 运行 /aether:setup 检查集群配置"
+  exit 1
+fi
+```
+
+### API 超时处理
+
+所有 API 请求添加 `--max-time` 防止阻塞：
+
+```bash
+# 标准查询（10 秒超时）
+RESPONSE=$(curl -sf --max-time 10 "${NOMAD_ADDR}/v1/nodes" 2>&1)
+if [ $? -ne 0 ]; then
+  echo "⚠ 查询节点状态超时，请检查网络或稍后重试"
+fi
+
+# 日志获取（30 秒超时，数据量较大）
+LOGS=$(curl -sf --max-time 30 "${NOMAD_ADDR}/v1/client/fs/logs/${ALLOC_ID}?task=api&type=stdout&plain=true" 2>&1)
+if [ $? -ne 0 ]; then
+  echo "⚠ 获取日志超时"
+  echo "  尝试直接获取: ssh root@<node> 'nomad alloc logs ${ALLOC_ID}'"
+fi
+```
+
+### 常见错误速查
+
+| 错误 | 原因 | 修复 |
+|------|------|------|
+| `无法连接 Nomad API` | 地址错误或服务未启动 | 检查 `NOMAD_ADDR`，重启 Nomad 服务 |
+| `无法连接 Consul API` | 地址错误或服务未启动 | 检查 `CONSUL_HTTP_ADDR`，重启 Consul 服务 |
+| `查询超时` | 网络不稳定或集群负载高 | 稍后重试，检查集群资源占用 |
+| `请先运行 /aether:setup` | 未配置集群地址 | 运行 `/aether:setup` 完成配置 |
+| `jq: parse error` | API 返回非 JSON（HTML 错误页等） | 确认地址和端口正确 |
+| `watch 模式自动退出` | Nomad API 连续 5 次无响应 | 检查集群状态后重新启动 watch |
+
+---
+
 ## 与其他 Skills 的关系
 
 ```
@@ -362,6 +470,6 @@ aether-doctor (诊断层) - 环境诊断
 
 ---
 
-**Skill 版本**: 1.0.0
-**最后更新**: 2026-03-08
+**Skill 版本**: 1.1.0
+**最后更新**: 2026-03-17
 **维护者**: 10CG Infrastructure Team
