@@ -1,0 +1,98 @@
+{
+  "grading": {
+    "A": {
+      "expectations": [
+        {
+          "text": "输出包含节点状态信息 (node status)",
+          "passed": true,
+          "evidence": "Section 1 provides a detailed table of all 8 Client nodes (heavy-1~3, light-1~5) with IP, type, status (ready), drain, scheduling eligibility, and running alloc counts. Also lists 3 Server peers with addresses and roles."
+        },
+        {
+          "text": "输出包含 Job 列表或 Job 状态信息",
+          "passed": true,
+          "evidence": "Section 2 lists all 15 Jobs in a table with name, type, status, and node distribution. Also includes a 'most recent deployments' sub-table sorted by ModifyIndex."
+        },
+        {
+          "text": "使用了 curl 或 nomad 命令查询 Nomad API",
+          "passed": true,
+          "evidence": "Footer states 'data source: Nomad API + Consul API'. Remediation suggestions include explicit curl commands to the Nomad API (e.g., curl -s http://192.168.69.80:4646/v1/job/...). The report clearly queried live API data."
+        },
+        {
+          "text": "输出有结构化格式 (表格或列表)",
+          "passed": true,
+          "evidence": "Uses extensive Markdown tables throughout: Server cluster table, Client node table (7 columns), Jobs table, recent deployments table, Consul services table, and a final summary table. Also uses code blocks and numbered lists."
+        },
+        {
+          "text": "对异常情况给出了建议或说明",
+          "passed": true,
+          "evidence": "Section 5 provides detailed remediation for 3 issues: (1) psych-ai-supervision-dev celery failure with 4-step fix including Docker cleanup commands, log checking, redeployment, and port verification; (2) kairos-dev transient critical with wait-and-check command; (3) load distribution observation with architectural explanation."
+        }
+      ],
+      "summary": {
+        "passed": 5,
+        "total": 5,
+        "pass_rate": 1.0
+      }
+    },
+    "B": {
+      "expectations": [
+        {
+          "text": "输出包含节点状态信息 (node status)",
+          "passed": true,
+          "evidence": "Section 2 provides separate tables for Heavy Nodes (with Docker version, Exec status, Host Volumes detail) and Light Nodes. Also Section 1 lists all 3 Nomad Servers with IP, status, and version. Section 5 further lists all 11 Consul members with roles and Consul version."
+        },
+        {
+          "text": "输出包含 Job 列表或 Job 状态信息",
+          "passed": true,
+          "evidence": "Section 3 provides a comprehensive 15-row table including Job name, type, priority, task groups, running/failed counts, and status. Also includes allocation distribution per node and notes the ABNORMAL status of psych-ai-supervision-dev."
+        },
+        {
+          "text": "使用了 curl 或 nomad 命令查询 Nomad API",
+          "passed": true,
+          "evidence": "Footer explicitly lists the API endpoints queried: '/v1/nodes, /v1/jobs, /v1/allocations, /v1/deployments' and Consul endpoints '/v1/agent/members, /v1/health/state/any, /v1/catalog/services'. Remediation suggestions include nomad CLI commands (nomad alloc logs, nomad job dispatch, nomad alloc restart)."
+        },
+        {
+          "text": "输出有结构化格式 (表格或列表)",
+          "passed": true,
+          "evidence": "Uses extensive Markdown tables: overview table, Server table, Heavy/Light node tables (with extra columns like Docker version and Host Volumes), Jobs table (7 columns), Consul members table (5 columns), registered services table (4 columns), historical failures table. Also uses code blocks, numbered lists, and severity-labeled sections."
+        },
+        {
+          "text": "对异常情况给出了建议或说明",
+          "passed": true,
+          "evidence": "Section 6 provides tiered recommendations: CRITICAL (2 items with specific commands), WARNING (2 items including kairos-prod component degradation and load imbalance), and INFO (historical failures). Notably identifies issues A missed: kairos-prod component degradation (wecomApi/relayClient/mediaHandler false), wecom-relay token expiration, and the API unhealthy deployment status. Also provides configuration advice in Section 7."
+        }
+      ],
+      "summary": {
+        "passed": 5,
+        "total": 5,
+        "pass_rate": 1.0
+      }
+    }
+  },
+  "comparison": {
+    "winner": "B",
+    "reasoning": "Both outputs pass all 5 expectations and are well-structured cluster health reports. However, Output B is superior in several dimensions: (1) Content depth -- B identifies additional real issues that A misses: kairos-prod's component degradation (wecomApi, relayClient, mediaHandler reporting false), wecom-relay's expired token and its causal relationship to kairos-prod issues, and the psych-ai-dev-api being marked unhealthy at the deployment level. A treats kairos-dev critical as a transient startup issue but B correctly identifies it as passing while finding the deeper kairos-prod component issue instead. (2) Node detail -- B includes Docker version, host volume counts with names, and Consul member details with versions, providing a more complete infrastructure picture. (3) Consul coverage -- B lists all 11 Consul members (servers + clients) with roles and versions, while A only covers services. B also parses health check response bodies to find application-level degradation (kairos-prod components, wecom-relay token), going beyond simple pass/fail status. (4) Jobs table -- B includes priority, task group names, and historical failure counts per job, giving better operational context. (5) Actionable insights -- B provides the configuration note about the Nomad address discrepancy (config.yaml uses 192.168.69.70 vs queried 192.168.69.80), which is genuinely useful operational advice. (6) Root cause chain -- B connects wecom-relay token expiration to kairos-prod component failures, demonstrating deeper diagnostic reasoning. Output A is still excellent -- its summary dashboard at the top is clean, and its root cause analysis of the celery failure is equally detailed. But B simply uncovers more issues and provides richer data.",
+    "rubric": {
+      "A": {
+        "content_score": 4.0,
+        "structure_score": 4.5,
+        "overall_score": 4.25
+      },
+      "B": {
+        "content_score": 4.8,
+        "structure_score": 4.5,
+        "overall_score": 4.65
+      }
+    }
+  },
+  "timing": {
+    "A": {
+      "tokens": 49405,
+      "duration_ms": 194205
+    },
+    "B": {
+      "tokens": 56247,
+      "duration_ms": 118665
+    }
+  }
+}

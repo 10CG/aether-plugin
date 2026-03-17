@@ -1,0 +1,30 @@
+{
+  "skill_name": "aether-status",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "我的 Aether 集群配置在 ~/.aether/config.yaml，Nomad 地址是 http://192.168.69.80:4646。我需要一份完整的集群健康报告：所有节点状态、当前运行的 Jobs、有没有失败的 allocation、Consul 服务健康状况。如果有任何异常请标出来并给出建议。",
+      "expected_output": "包含节点列表表格、Job 状态汇总、失败 allocation 详情、Consul 服务健康状态的结构化报告",
+      "files": [],
+      "expectations": [
+        "输出包含节点状态信息 (node status)",
+        "输出包含 Job 列表或 Job 状态信息",
+        "使用了 curl 或 nomad 命令查询 Nomad API",
+        "输出有结构化格式 (表格或列表)",
+        "对异常情况给出了建议或说明"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "my-api 这个服务好像有问题，用户反馈 502 了。帮我查一下这个服务在 Aether 集群上的状态：allocation 是否健康、最近有没有重启、日志里有没有错误。集群 Nomad 地址 http://192.168.69.80:4646。",
+      "expected_output": "针对 my-api 服务的诊断报告，包含 allocation 状态、重启历史、错误日志摘要",
+      "files": [],
+      "expectations": [
+        "查询了 my-api 相关的 allocation 状态",
+        "尝试获取服务日志或提及日志查看方法",
+        "输出提到了 allocation 健康状态或事件",
+        "给出了可能的问题原因或下一步排查建议"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,84 @@
+{
+  "eval_prompt": "my-api 的 v1.2.3 版本已经在 dev 环境跑了两天没问题，镜像地址是 forgejo.10cg.pub/10CG/my-api:v1.2.3。现在要部署到生产环境。Nomad 地址 http://192.168.69.80:4646，生产 HCL 文件在 deploy/nomad-prod.hcl。帮我走标准部署流程。",
+  "grading": {
+    "output_A": {
+      "file": "with_skill/outputs/report.md",
+      "expectations": {
+        "E1_image_verification": {
+          "result": "PASS",
+          "evidence": "Step 2 is entirely dedicated to image verification. Attempts 'docker manifest inspect' and falls back to Registry V2 API via curl. Clearly flags the warning when verification is unavailable and provides the command for manual verification."
+        },
+        "E2_config_diff": {
+          "result": "PASS",
+          "evidence": "Step 3 retrieves the current job state via 'curl -s http://192.168.69.80:4646/v1/job/my-api | jq ...' to compare current vs target image. Step 4 shows a structured deployment confirmation with 'current version vs target version' diff display. Identifies it as first deployment (no prior version to diff against)."
+        },
+        "E3_user_confirmation_before_deploy": {
+          "result": "PASS",
+          "evidence": "Step 4 explicitly shows a '确认部署到生产环境？ [y/N]' confirmation prompt before proceeding to Step 5 (deployment execution)."
+        },
+        "E4_health_check_post_deploy": {
+          "result": "PASS",
+          "evidence": "Step 6 details a full health check flow: polling allocation status via Nomad API, checking running allocations against desired count, and Consul health check via 'curl -s http://192.168.69.70:8500/v1/health/service/my-api?passing'."
+        },
+        "E5_nomad_or_curl_commands": {
+          "result": "PASS",
+          "evidence": "Uses curl extensively to interact with Nomad API (e.g., 'curl -s http://192.168.69.80:4646/v1/job/my-api'). Also shows nomad CLI commands ('nomad job run -address=...'). Step 3 uses curl for current status, Step 5 uses nomad/curl for deployment, Step 6 uses curl for health checks."
+        }
+      },
+      "score": "5/5 expectations passed"
+    },
+    "output_B": {
+      "file": "without_skill/outputs/report.md",
+      "expectations": {
+        "E1_image_verification": {
+          "result": "PASS",
+          "evidence": "Section '2. Image Verification' attempts three methods: Registry API HEAD, docker manifest inspect, and docker pull. Clearly flags the blocker when image cannot be found. Notes case-sensitivity issue with repository name."
+        },
+        "E2_config_diff": {
+          "result": "FAIL",
+          "evidence": "There is no explicit config diff or comparison step. Output B checks for HCL file existence and provides a template, and has a 'Step 3: Validate the HCL (Dry Run)' with nomad job plan, but never performs or proposes an explicit diff between current and new configuration. The nomad job plan is more of a validation than a config diff comparison."
+        },
+        "E3_user_confirmation_before_deploy": {
+          "result": "FAIL",
+          "evidence": "No explicit user confirmation step before deployment. The deployment is blocked due to missing image and HCL file, but there is no step that asks the user to confirm before executing the deploy. The flow goes directly from validation to 'Step 4: Deploy' with 'nomad job run' without any confirmation gate."
+        },
+        "E4_health_check_post_deploy": {
+          "result": "PASS",
+          "evidence": "Step 5 'Monitor Deployment' shows nomad job status and alloc status commands. Step 6 'Verify Health' explicitly checks Consul service registration and tests the endpoint via curl. Also includes health check configuration in the HCL template."
+        },
+        "E5_nomad_or_curl_commands": {
+          "result": "PASS",
+          "evidence": "Extensive use of both nomad CLI (via ssh to heavy-1) and curl commands. Uses 'nomad job validate', 'nomad job plan', 'nomad job run', 'nomad job status', 'nomad alloc status', 'nomad alloc logs', 'nomad job revert', 'nomad job stop', plus curl for Consul health checks."
+        }
+      },
+      "score": "3/5 expectations passed"
+    }
+  },
+  "comparison": {
+    "output_A": {
+      "content_score": 5,
+      "content_rationale": "Output A follows a rigorous 7-step deployment flow that maps directly to the 'standard deployment process' requested. It covers parameter extraction, image verification (with fallback), current state retrieval, diff/confirmation, deployment execution, health checks, and result output. It correctly identifies both blockers (missing HCL, unverifiable image) and distinguishes them clearly (WARN vs FAIL). The explicit user confirmation step ('确认部署到生产环境？ [y/N]') demonstrates production safety awareness. The report language is predominantly Chinese, matching the user's request language. The rollback suggestion via /aether:rollback is well-placed.",
+      "structure_score": 5,
+      "structure_rationale": "Clean, sequential step-by-step structure (Steps 1-7) with clear status indicators. Uses tables effectively for parameter summary and final status. Each step has a clear execution command, expected result, and actual result. The final conclusion section provides a comprehensive status table and actionable next steps. The WARNING and FAIL markers are well-differentiated."
+    },
+    "output_B": {
+      "content_score": 4,
+      "content_rationale": "Output B is thorough in its pre-deployment checks and provides significantly more operational detail, including a full HCL template with production-quality configurations (update stanzas, Traefik tags, restart/reschedule policies, auth blocks). The node status table and rollback plan are valuable additions. However, it lacks two critical standard-deployment-process elements: no explicit config diff step and no user confirmation gate before deployment. The image case-sensitivity observation is insightful. The output is in English despite the Chinese request, which is a minor mismatch.",
+      "structure_score": 4,
+      "structure_rationale": "Well-organized with clear sections (Pre-Deployment Checks, Deployment Plan, Rollback Plan, Deployment Status). Good use of tables for status tracking. However, the mixing of check results and deployment steps is less clean than A's linear flow. The lengthy HCL template, while useful, dominates the report and pushes the actionable deployment steps far down. The final status table is effective."
+    },
+    "winner": "A",
+    "comparison_rationale": "Output A wins on completeness of the standard deployment process. It includes all five expected elements: image verification, config diff/comparison, user confirmation before deploy, health checks, and nomad/curl commands. Output B misses the config diff and user confirmation steps, which are critical safety gates in a production deployment workflow. Output A also responds in Chinese matching the request language. While Output B provides more operational detail (full HCL template, node listing, detailed rollback plan), the missing safety steps are more important in a deployment process evaluation. Output A's structured 7-step flow maps more faithfully to what a 'standard deployment process' should look like."
+  },
+  "timing": {
+    "output_A": {
+      "tokens": 29358,
+      "duration_ms": 134246
+    },
+    "output_B": {
+      "tokens": 33984,
+      "duration_ms": 147139
+    },
+    "efficiency_notes": "Output A used fewer tokens (29358 vs 33984, -13.6%) and completed faster (134s vs 147s, -8.8%) while achieving a higher expectation pass rate (5/5 vs 3/5). Output A is more efficient both in resource usage and quality delivery."
+  }
+}
