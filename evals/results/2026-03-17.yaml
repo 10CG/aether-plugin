@@ -1,0 +1,235 @@
+# Skill Benchmark Results
+# Date: 2026-03-17
+# Type: full (first baseline)
+# Scope: all (10 skills)
+
+date: "2026-03-17"
+type: "full"
+scope: "all"
+is_baseline: true
+
+summary:
+  overall_score: 88.7
+  skills_evaluated: 10
+  eval_cases_total: 70
+  top_performer: "aether-doctor (95.0)"
+  needs_improvement: "aether-status, aether-dev, aether-init (86.3)"
+
+dimension_averages:
+  trigger_accuracy: 96.9
+  output_quality: 85.9
+  tool_usage: 91.5
+  error_handling: 75.0
+  token_efficiency: 89.0
+
+results:
+  aether-doctor:
+    trigger_accuracy:
+      score: 100.0
+      cases_passed: 8
+      cases_total: 8
+      details: "All positive/negative cases perfectly matched"
+    output_quality:
+      score: 90.0
+      details: "6 output examples, excellent format, minor gap on 'why' explanations"
+    tool_usage:
+      score: 95.0
+      details: "Minimal 4-tool set precisely matched to needs"
+    error_handling:
+      score: 95.0
+      details: "Best in class: CLI install options, connection troubleshooting, degradation states"
+    token_efficiency:
+      score: 95.0
+      details: "147 lines SKILL.md + 6 on-demand references, density 2.25"
+    overall: 95.0
+
+  aether-deploy:
+    trigger_accuracy:
+      score: 100.0
+      cases_passed: 7
+      cases_total: 7
+    output_quality:
+      score: 84.0
+      details: "Good step-by-step format, missing error output examples"
+    tool_usage:
+      score: 95.0
+      details: "Bash + AskUserQuestion precisely matched, safety mechanisms"
+    error_handling:
+      score: 75.0
+      details: "CLI + image + config handled, missing cluster unreachable"
+    token_efficiency:
+      score: 100.0
+      details: "166 lines, density 2.82 (good)"
+    overall: 91.3
+
+  aether-setup:
+    trigger_accuracy:
+      score: 100.0
+      cases_passed: 7
+      cases_total: 7
+    output_quality:
+      score: 90.0
+      details: "Detailed examples for all modes, weak on error flows"
+    tool_usage:
+      score: 95.0
+      details: "4-tool set justified, clear guidance"
+    error_handling:
+      score: 70.0
+      details: "Handles config-missing (core purpose), lacks connection failure handling"
+    token_efficiency:
+      score: 90.0
+      details: "250 lines, density 1.26"
+    overall: 90.5
+
+  aether-deploy-watch:
+    trigger_accuracy:
+      score: 100.0
+      cases_passed: 7
+      cases_total: 7
+    output_quality:
+      score: 96.0
+      details: "Excellent structured output with diagnosis phases"
+    tool_usage:
+      score: 90.0
+      details: "Minimal 3-tool set, could add tool selection guidance"
+    error_handling:
+      score: 75.0
+      details: "Strong app-level pattern matching, weak on infra-level errors"
+    token_efficiency:
+      score: 70.0
+      details: "336 lines, redundancy in output examples, needs reference splitting"
+    overall: 88.8
+
+  aether-cli-guard:
+    trigger_accuracy:
+      score: 100.0
+      cases_passed: 6
+      cases_total: 6
+    output_quality:
+      score: 75.0
+      details: "Clear behavior table, lacks passthrough output docs"
+    tool_usage:
+      score: 95.0
+      details: "Bash-only, perfectly minimal for hook"
+    error_handling:
+      score: 70.0
+      details: "CLI-not-installed handled, missing chmod/corrupted binary cases"
+    token_efficiency:
+      score: 100.0
+      details: "100 lines, density 1.92, most efficient skill"
+    overall: 88.5
+
+  aether-volume:
+    trigger_accuracy:
+      score: 85.7
+      cases_passed: 6
+      cases_total: 7
+    output_quality:
+      score: 90.0
+      details: "Clear tables, good examples, error flows in references"
+    tool_usage:
+      score: 90.0
+      details: "Bash + AskUserQuestion minimal and appropriate"
+    error_handling:
+      score: 85.0
+      details: "SSH/Nomad/permission errors covered in references"
+    token_efficiency:
+      score: 80.0
+      details: "161 lines SKILL.md + 979w references, some duplication"
+    overall: 86.9
+
+  aether-rollback:
+    trigger_accuracy:
+      score: 83.3
+      cases_passed: 5
+      cases_total: 6
+    output_quality:
+      score: 84.0
+      details: "Version table format, weak on 'why' explanations"
+    tool_usage:
+      score: 90.0
+      details: "Bash + AskUserQuestion precise, while loop noted"
+    error_handling:
+      score: 80.0
+      details: "CLI + config + rollback failure handled, missing timeouts"
+    token_efficiency:
+      score: 100.0
+      details: "156 lines, density 1.79"
+    overall: 86.8
+
+  aether-status:
+    trigger_accuracy:
+      score: 100.0
+      cases_passed: 8
+      cases_total: 8
+    output_quality:
+      score: 86.0
+      details: "6 modes with examples, limited error flow coverage"
+    tool_usage:
+      score: 90.0
+      details: "Bash-only appropriate, watch mode loop concern"
+    error_handling:
+      score: 65.0
+      details: "Config-missing handled, cluster unreachable NOT covered"
+    token_efficiency:
+      score: 80.0
+      details: "367 lines, no references, density 1.07"
+    overall: 86.3
+
+  aether-dev:
+    trigger_accuracy:
+      score: 100.0
+      cases_passed: 7
+      cases_total: 7
+    output_quality:
+      score: 84.0
+      details: "5 subcommands documented, missing error flow examples"
+    tool_usage:
+      score: 85.0
+      details: "4-tool set justified, Write for HCL generation"
+    error_handling:
+      score: 70.0
+      details: "CLI + config handled, missing runtime error handling"
+    token_efficiency:
+      score: 85.0
+      details: "238 lines, density 1.16"
+    overall: 86.3
+
+  aether-init:
+    trigger_accuracy:
+      score: 100.0
+      cases_passed: 7
+      cases_total: 7
+    output_quality:
+      score: 80.0
+      details: "Good two-phase structure, limited error documentation"
+    tool_usage:
+      score: 90.0
+      details: "6-tool set wider but justified for scanning + generation"
+    error_handling:
+      score: 65.0
+      details: "Basic CLI check only, no connection/generation error handling"
+    token_efficiency:
+      score: 90.0
+      details: "168 lines SKILL.md + 2153w references, density 2.84"
+    overall: 86.3
+
+insights:
+  strengths:
+    - "Trigger accuracy is excellent across all skills (avg 96.9%)"
+    - "Tool usage is well-optimized (avg 91.5%)"
+    - "aether-doctor is the gold standard with 95.0% overall"
+    - "Token efficiency is generally good, especially compact skills (cli-guard, rollback, deploy)"
+
+  weaknesses:
+    - "Error handling is the weakest dimension across all skills (avg 75.0%)"
+    - "Most skills lack cluster-unreachable error handling"
+    - "aether-deploy-watch has token efficiency issues (336 lines, no reference splitting)"
+    - "aether-rollback and aether-volume have trigger accuracy edge cases"
+
+  recommendations:
+    - "P1: Add cluster connection error handling to status, deploy, setup, init"
+    - "P1: Split deploy-watch output examples into references/ to reduce SKILL.md size"
+    - "P2: Improve rollback description to better differentiate from 'dev环境撤掉'"
+    - "P2: Add passthrough output documentation to cli-guard"
+    - "P3: Add 'why' explanations to rollback step descriptions"
