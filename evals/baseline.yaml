@@ -1,9 +1,9 @@
 # Skill Benchmark Baseline
-# Generated: 2026-03-17 (first baseline)
+# Updated: 2026-03-17 (post error-handling optimization)
 # Generated-by: skill-benchmark v1.0.0
 
-version: "2026-03-17"
-overall_score: 88.7
+version: "2026-03-17-v2"
+overall_score: 90.0
 
 skills:
   aether-doctor:
@@ -26,13 +26,43 @@ skills:
     eval_count: 7
     last_evaluated: "2026-03-17"
 
+  aether-cli-guard:
+    trigger_accuracy: 100.0
+    output_quality: 75.0
+    tool_usage: 95.0
+    error_handling: 88.0
+    token_efficiency: 100.0
+    overall: 91.0
+    eval_count: 6
+    last_evaluated: "2026-03-17"
+
+  aether-init:
+    trigger_accuracy: 100.0
+    output_quality: 80.0
+    tool_usage: 90.0
+    error_handling: 95.0
+    token_efficiency: 90.0
+    overall: 90.8
+    eval_count: 7
+    last_evaluated: "2026-03-17"
+
   aether-setup:
     trigger_accuracy: 100.0
     output_quality: 90.0
     tool_usage: 95.0
-    error_handling: 70.0
-    token_efficiency: 90.0
-    overall: 90.5
+    error_handling: 92.0
+    token_efficiency: 70.0
+    overall: 90.8
+    eval_count: 7
+    last_evaluated: "2026-03-17"
+
+  aether-dev:
+    trigger_accuracy: 100.0
+    output_quality: 84.0
+    tool_usage: 85.0
+    error_handling: 95.0
+    token_efficiency: 80.0
+    overall: 89.3
     eval_count: 7
     last_evaluated: "2026-03-17"
 
@@ -46,14 +76,14 @@ skills:
     eval_count: 7
     last_evaluated: "2026-03-17"
 
-  aether-cli-guard:
+  aether-status:
     trigger_accuracy: 100.0
-    output_quality: 75.0
-    tool_usage: 95.0
-    error_handling: 70.0
-    token_efficiency: 100.0
-    overall: 88.5
-    eval_count: 6
+    output_quality: 86.0
+    tool_usage: 90.0
+    error_handling: 92.0
+    token_efficiency: 70.0
+    overall: 88.8
+    eval_count: 8
     last_evaluated: "2026-03-17"
 
   aether-volume:
@@ -74,34 +104,4 @@ skills:
     token_efficiency: 100.0
     overall: 86.8
     eval_count: 6
-    last_evaluated: "2026-03-17"
-
-  aether-status:
-    trigger_accuracy: 100.0
-    output_quality: 86.0
-    tool_usage: 90.0
-    error_handling: 65.0
-    token_efficiency: 80.0
-    overall: 86.3
-    eval_count: 8
-    last_evaluated: "2026-03-17"
-
-  aether-dev:
-    trigger_accuracy: 100.0
-    output_quality: 84.0
-    tool_usage: 85.0
-    error_handling: 70.0
-    token_efficiency: 85.0
-    overall: 86.3
-    eval_count: 7
-    last_evaluated: "2026-03-17"
-
-  aether-init:
-    trigger_accuracy: 100.0
-    output_quality: 80.0
-    tool_usage: 90.0
-    error_handling: 65.0
-    token_efficiency: 90.0
-    overall: 86.3
-    eval_count: 7
     last_evaluated: "2026-03-17"
