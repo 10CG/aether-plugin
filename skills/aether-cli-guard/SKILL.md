@@ -36,34 +36,36 @@ if [[ "$COMMAND" != *"aether"* ]]; then
     exit 0  # 不是 aether 命令，放行
 fi
 
-# 2. 检查 CLI 是否存在
-CLI_FOUND=false
-
+# 2. 查找 CLI 二进制文件
+CLI_PATH=""
 if command -v aether &> /dev/null; then
-    CLI_FOUND=true
-elif [ -f "$HOME/.aether/aether" ] && [ -x "$HOME/.aether/aether" ]; then
-    CLI_FOUND=true
+    CLI_PATH="$(command -v aether)"
+elif [ -f "$HOME/.aether/aether" ]; then
+    CLI_PATH="$HOME/.aether/aether"
 elif [ -f "$HOME/.aether/aether.exe" ]; then
-    CLI_FOUND=true
+    CLI_PATH="$HOME/.aether/aether.exe"
 fi
 
-# 3. 如果未找到，输出引导信息并阻止
-if [ "$CLI_FOUND" = false ]; then
-    echo ""
+# 3. 检测结果处理
+if [ -z "$CLI_PATH" ]; then
     echo "❌ 检测到 aether 命令，但 CLI 未安装"
-    echo ""
-    echo "请运行以下命令安装:"
-    echo "  /aether:doctor"
-    echo ""
-    echo "或手动安装:"
+    echo "请运行 /aether:doctor 安装，或手动安装:"
     echo "  curl -sL https://forgejo.10cg.pub/api/v1/repos/10CG/Aether/releases/latest | \\"
     echo "    jq -r '.assets[] | select(.name | test(\"aether-linux\")) | .browser_download_url' | \\"
     echo "    head -1 | xargs curl -sL -o ~/.aether/aether && chmod +x ~/.aether/aether"
-    echo ""
-    exit 1  # 阻止命令执行
+    echo "⚠️  安装提示: 如网络不通，请检查 DNS 或使用代理; 下载后请用 file 命令验证为 ELF 二进制"
+    exit 1
+elif [ ! -x "$CLI_PATH" ]; then
+    echo "❌ CLI 存在但不可执行: $CLI_PATH"
+    echo "请运行: chmod +x $CLI_PATH"
+    exit 1
+elif ! "$CLI_PATH" version &> /dev/null; then
+    echo "❌ CLI 二进制可能损坏: $CLI_PATH"
+    echo "请删除后重新安装: rm $CLI_PATH && /aether:doctor"
+    exit 1
 fi
 
-exit 0  # CLI 已安装，放行
+exit 0  # CLI 可用，放行
 ```
 
 ## Hook 配置
@@ -88,11 +90,13 @@ exit 0  # CLI 已安装，放行
 
 ## 行为说明
 
-| 检测结果 | 行为 |
-|---------|------|
-| CLI 已安装 | 放行，命令正常执行 |
-| CLI 未安装 | 阻止，显示安装引导 |
-| 非 aether 命令 | 跳过检测，放行 |
+| 检测结果 | 行为 | 输出 |
+|---------|------|------|
+| CLI 可用 | `exit 0` 放行，命令正常执行 | 无（透传至原命令） |
+| CLI 未安装 | `exit 1` 阻止，显示安装引导 | 安装命令 + 网络/验证提示 |
+| 存在但不可执行 | `exit 1` 阻止，提示 chmod | `chmod +x` 修复命令 |
+| 二进制损坏 | `exit 1` 阻止，提示重装 | 删除 + 重装命令 |
+| 非 aether 命令 | `exit 0` 跳过检测，放行 | 无 |
 
 ---
 
