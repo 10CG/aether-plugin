@@ -2,6 +2,26 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.0.0] - 2026-03-18
+
+### Milestone
+- First stable release with full AB test baseline validation
+
+### Added
+- **skill-benchmark**: AB comparison testing skill for quality verification
+- **Error handling improvements**: 5 skills upgraded (status, init, setup, dev, cli-guard)
+- **Deep investigation guidance**: aether-status now encourages exploration beyond basic queries
+
+### Fixed
+- **aether-setup**: Config schema corrected (endpoints.* → cluster.*)
+- **aether-setup**: Project config path corrected (.env → .aether/config.yaml)
+- **aether-volume CLI**: Idempotency check for existing volumes
+
+### Quality
+- AB test baseline: 9 Skills × 18 evals, WITH 50% win rate
+- 3 real bugs discovered and fixed through AB testing
+- Benchmark infrastructure moved to aether-plugin-benchmarks/
+
 ## [0.9.1] - 2026-03-13
 
 ### Fixed
