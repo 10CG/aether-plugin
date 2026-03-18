@@ -1,0 +1,93 @@
+{
+  "eval_id": "eval-2-temp-job-run-and-cleanup",
+  "skill": "aether-dev",
+  "date": "2026-03-18",
+  "eval_prompt": "Run a temporary batch data migration job on Aether cluster (python:3.11, python migrate.py, /data volume), check logs, then clean up",
+  "grading": {
+    "output_a": {
+      "label": "with_skill",
+      "criteria": [
+        {
+          "id": 1,
+          "level": "CRITICAL",
+          "description": "Must generate and submit a batch-type Nomad job (not service)",
+          "pass": true,
+          "notes": "Job spec clearly shows Type: batch. Submitted via Nomad HTTP API with EvalID returned."
+        },
+        {
+          "id": 2,
+          "level": "CRITICAL",
+          "description": "Must complete run -> logs -> clean three-step flow",
+          "pass": true,
+          "notes": "All three steps documented: run (job submission), logs (stdout/stderr retrieved), clean (purged dev-temp-* jobs). Skill Flow Adherence table confirms all subcommands executed."
+        },
+        {
+          "id": 3,
+          "level": "HIGH",
+          "description": "Job must use python:3.11 image",
+          "pass": true,
+          "notes": "image: python:3.11 in job spec JSON."
+        },
+        {
+          "id": 4,
+          "level": "HIGH",
+          "description": "Must check logs after execution to confirm results",
+          "pass": true,
+          "notes": "Retrieved stdout (empty) and stderr (migrate.py not found). Provided clear analysis: failure is expected since no script was deployed. Migration Result: FAILED."
+        }
+      ],
+      "criteria_pass_rate": "4/4"
+    },
+    "output_b": {
+      "label": "without_skill",
+      "criteria": [
+        {
+          "id": 1,
+          "level": "CRITICAL",
+          "description": "Must generate and submit a batch-type Nomad job (not service)",
+          "pass": true,
+          "notes": "Job type is batch. Submitted via Nomad HTTP API."
+        },
+        {
+          "id": 2,
+          "level": "CRITICAL",
+          "description": "Must complete run -> logs -> clean three-step flow",
+          "pass": true,
+          "notes": "Run (sections 2-4), logs (section 4 stdout/stderr/events), clean (section 6 with verification)."
+        },
+        {
+          "id": 3,
+          "level": "HIGH",
+          "description": "Job must use python:3.11 image",
+          "pass": true,
+          "notes": "python:3.11 specified in job specification."
+        },
+        {
+          "id": 4,
+          "level": "HIGH",
+          "description": "Must check logs after execution to confirm results",
+          "pass": true,
+          "notes": "Full stdout logs captured showing diagnostic output. Stderr confirmed empty. Task events listed. Analysis provided in section 5."
+        }
+      ],
+      "criteria_pass_rate": "4/4"
+    }
+  },
+  "blind_comparison": {
+    "output_a": {
+      "content_score": 4,
+      "structure_score": 4,
+      "content_notes": "Full JSON job spec shown. Clear problem-solving narrative (host volume -> bind mount fallback). Transparent about failure with practical recommendations. Issues table and Skill Flow Adherence table add clarity.",
+      "structure_notes": "Clean three-step structure matching skill subcommands. Tables for issues and adherence. Code block for job spec. Clear section separators."
+    },
+    "output_b": {
+      "content_score": 4,
+      "structure_score": 5,
+      "content_notes": "Includes cluster connectivity verification. Proactively created /data directory and resubmitted. Modified command to diagnostic bash script (not literal python migrate.py). More thorough cleanup (directory, local file, job). Creative but deviates from literal request.",
+      "structure_notes": "Seven well-numbered sections covering full lifecycle. Multiple tables (nodes, events, cleanup). Polished presentation with clear headers and logical flow."
+    },
+    "winner": "A",
+    "winner_label": "with_skill",
+    "rationale": "Both outputs pass all criteria. Output A wins because it more faithfully follows the skill's documented run->logs->clean subcommand pattern and is transparent about the actual failure (migrate.py not found). Output B achieved exit code 0 by substituting a diagnostic shell script for the requested 'python migrate.py' command -- clever but a deviation from the literal request. Output A's structured skill adherence tracking demonstrates the value of the skill framework. Output B has slightly better structure (score 5 vs 4) and more thorough cleanup, but the command substitution is a notable concern for faithfulness to user intent."
+  }
+}

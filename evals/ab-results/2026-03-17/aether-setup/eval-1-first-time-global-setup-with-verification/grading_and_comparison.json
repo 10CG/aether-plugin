@@ -1,0 +1,119 @@
+{
+  "eval": "eval-1-first-time-global-setup-with-verification",
+  "skill": "aether-setup",
+  "date": "2026-03-18",
+  "grader": "claude-opus-4-6",
+
+  "part1_grading": {
+    "output_a": {
+      "label": "with_skill",
+      "criteria": {
+        "c1_create_config": {
+          "severity": "CRITICAL",
+          "pass": true,
+          "notes": "Created ~/.aether/config.yaml with endpoints.* format. Replaced existing config."
+        },
+        "c2_verify_connections": {
+          "severity": "CRITICAL",
+          "pass": true,
+          "notes": "Verified Nomad (v1.11.2) and Consul (v1.22.3) via HTTP. Both reported reachable with version and leader info."
+        },
+        "c3_diagnostics_on_failure": {
+          "severity": "CRITICAL",
+          "pass": "N/A",
+          "notes": "No connection failures occurred, so diagnostics were not triggered. Report only states 'No connection issues detected' with no proactive health checks beyond connectivity."
+        },
+        "c4_config_format": {
+          "severity": "HIGH",
+          "pass": false,
+          "notes": "Uses endpoints.* keys (nomad, consul, registry) which does NOT match the documented Aether schema in CLAUDE.md. The documented format uses cluster.* keys (consul_addr, nomad_addr, registry, registry_url). The report claims this is the 'correct' format per the skill, but it diverges from the project's own documentation."
+        },
+        "c5_discover_nodes": {
+          "severity": "HIGH",
+          "pass": true,
+          "notes": "Discovered 8 client nodes across 2 classes (heavy_workload: 3, light_exec: 5) with IPs. Also listed 18 running jobs. Did not discover server nodes."
+        }
+      },
+      "critical_pass": 2,
+      "critical_fail": 0,
+      "critical_na": 1,
+      "high_pass": 1,
+      "high_fail": 1
+    },
+    "output_b": {
+      "label": "without_skill",
+      "criteria": {
+        "c1_create_config": {
+          "severity": "CRITICAL",
+          "pass": true,
+          "notes": "Verified existing ~/.aether/config.yaml with correct values. Fixed permissions from 644 to 0600."
+        },
+        "c2_verify_connections": {
+          "severity": "CRITICAL",
+          "pass": true,
+          "notes": "Verified Nomad (HTTP 200, v1.11.2, leader, 8 nodes, 17 jobs) and Consul (HTTP 200, leader). Also verified Registry (HTTP 302 with Cloudflare analysis) and SSH key availability."
+        },
+        "c3_diagnostics_on_failure": {
+          "severity": "CRITICAL",
+          "pass": true,
+          "notes": "Found actual health issue: psych-ai-dev-api Consul health check critical on heavy-1. Provided recommendation to run 'aether status --failed'. Also diagnosed Registry timeout as expected Cloudflare Access behavior with credential chain explanation."
+        },
+        "c4_config_format": {
+          "severity": "HIGH",
+          "pass": true,
+          "notes": "Uses cluster.* format (consul_addr, nomad_addr, registry, registry_url) matching the CLAUDE.md documented schema exactly. Includes registry_url field."
+        },
+        "c5_discover_nodes": {
+          "severity": "HIGH",
+          "pass": true,
+          "notes": "Discovered 3 server nodes (with leader/follower roles, IPs, ports) and 8 client nodes (with IPs, classes, status). More comprehensive than Output A."
+        }
+      },
+      "critical_pass": 3,
+      "critical_fail": 0,
+      "critical_na": 0,
+      "high_pass": 2,
+      "high_fail": 0
+    }
+  },
+
+  "part2_blind_comparison": {
+    "output_a": {
+      "content_score": 4,
+      "structure_score": 4,
+      "strengths": [
+        "Clean 6-section structure with prerequisites check and read-back verification",
+        "Listed all 18 running jobs with types",
+        "Included next steps for onboarding (init, status, deploy)",
+        "Config read-back verification step adds confidence"
+      ],
+      "weaknesses": [
+        "Config format uses non-standard endpoints.* keys instead of documented cluster.* schema",
+        "No registry connectivity verification",
+        "No SSH key check",
+        "No server node discovery (only client nodes)",
+        "No proactive health issue detection"
+      ]
+    },
+    "output_b": {
+      "content_score": 5,
+      "structure_score": 5,
+      "strengths": [
+        "Matches documented config schema exactly (cluster.* format)",
+        "Most thorough verification: Nomad, Consul, Registry, and SSH all checked",
+        "Discovered both server nodes (3) and client nodes (8) with roles",
+        "Found actual health issue (psych-ai-dev-api critical) with actionable recommendation",
+        "Registry analysis with Cloudflare Access diagnosis and credential chain",
+        "Fixed file permissions (644 -> 600) as a security improvement",
+        "Included CLI version for context"
+      ],
+      "weaknesses": [
+        "No next steps section for onboarding",
+        "Minor job count discrepancy (17 vs 18, likely timing)"
+      ]
+    },
+    "winner": "output_b",
+    "winner_label": "without_skill",
+    "reasoning": "Output B is superior across all evaluation criteria. It passes all 5 criteria (3 CRITICAL, 2 HIGH) while Output A fails on config format (HIGH). Output B demonstrates deeper verification (4 subsystems vs 2), discovers more infrastructure (servers + clients vs clients only), finds an actual health issue with actionable advice, correctly uses the documented config schema, and provides security improvements (permissions fix). Output A's main advantages (next steps, job listing, read-back verification) are useful but less impactful than Output B's broader coverage, correct schema usage, and proactive diagnostics."
+  }
+}

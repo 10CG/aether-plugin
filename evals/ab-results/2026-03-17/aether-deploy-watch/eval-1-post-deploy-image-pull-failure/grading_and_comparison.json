@@ -1,0 +1,123 @@
+{
+  "eval_id": "eval-1-post-deploy-image-pull-failure",
+  "skill": "aether-deploy-watch",
+  "eval_date": "2026-03-18",
+  "eval_prompt_summary": "CI deployed nexus-api-dev, job run succeeded but service inaccessible. Check allocation status, health checks, diagnose and fix.",
+
+  "grading": {
+    "expectations": [
+      {
+        "id": 1,
+        "priority": "CRITICAL",
+        "description": "Must check allocation running status and report health",
+        "output_a": {
+          "pass": true,
+          "score": 5,
+          "notes": "Reports allocation ID, node, status (running), deploy health (healthy), all 3 task states with details (migrate/api/worker). Clear and complete."
+        },
+        "output_b": {
+          "pass": true,
+          "score": 5,
+          "notes": "Reports allocation ID, node, ClientStatus, deployment result. All 3 tasks in table format. Additionally includes image hash and startup time. Slightly more data-rich."
+        }
+      },
+      {
+        "id": 2,
+        "priority": "CRITICAL",
+        "description": "Must match specific error pattern and give targeted fix recommendations",
+        "output_a": {
+          "pass": true,
+          "score": 5,
+          "notes": "Identifies 'Cloudflare Access Blocking' as the error pattern. Provides 4 distinct fix options: configure Access application, service token, bypass health path, Cloudflare tunnel. Traffic flow diagram is excellent for understanding the block point."
+        },
+        "output_b": {
+          "pass": true,
+          "score": 5,
+          "notes": "Identifies Cloudflare Access as blocking issue. Provides 3 fix options plus enumerates possible root cause scenarios (policy change, session expired, always required). Actionable and contextual."
+        }
+      },
+      {
+        "id": 3,
+        "priority": "CRITICAL",
+        "description": "Check Consul health check status",
+        "output_a": {
+          "pass": true,
+          "score": 4,
+          "notes": "Reports Consul health check as passing with HTTP 200 and response body. Covers the primary service only."
+        },
+        "output_b": {
+          "pass": true,
+          "score": 5,
+          "notes": "Reports Consul health check as passing with HTTP 200 and response body. Additionally checks dependency services (nexus-db-dev PostgreSQL, nexus-redis-dev Redis) - demonstrating deeper diagnostic coverage."
+        }
+      },
+      {
+        "id": 4,
+        "priority": "HIGH",
+        "description": "Check Traefik routing configuration",
+        "output_a": {
+          "pass": true,
+          "score": 4,
+          "notes": "Reports Traefik router rule, entrypoints ([web] port 80), status (enabled), priority, backend (UP). Tests internal access via Traefik with Host header."
+        },
+        "output_b": {
+          "pass": true,
+          "score": 5,
+          "notes": "Reports same Traefik details. Additionally identifies that only 'web' entrypoint is bound (no websecure/443) and provides a concrete HCL fix with TLS configuration. Includes contextual note about Cloudflare SSL modes (Flexible vs Full). This is proactive optimization beyond the immediate issue."
+        }
+      },
+      {
+        "id": 5,
+        "priority": "HIGH",
+        "description": "Provide complete diagnostic chain (deploy -> allocation -> health -> routing -> access)",
+        "output_a": {
+          "pass": true,
+          "score": 5,
+          "notes": "Excellent phase-based structure covering Status Check -> Routing Chain -> External Access -> Diagnosis. Summary table maps all 6 layers (Nomad Job, Allocation, Health Check, Traefik Router, Traefik Backend, Cloudflare Access). Traffic flow ASCII diagram clearly shows where the block occurs."
+        },
+        "output_b": {
+          "pass": true,
+          "score": 5,
+          "notes": "Complete chain covered: Nomad Job -> Consul -> Traefik -> External Access -> Application Logs -> Root Cause Analysis. Adds application log verification (Uvicorn output) which Output A lacks. Quick verification steps at the end close the loop."
+        }
+      }
+    ],
+    "summary": {
+      "output_a": {
+        "critical_pass": 3,
+        "critical_fail": 0,
+        "high_pass": 2,
+        "high_fail": 0,
+        "total_score": 23,
+        "max_score": 25,
+        "grade": "A"
+      },
+      "output_b": {
+        "critical_pass": 3,
+        "critical_fail": 0,
+        "high_pass": 2,
+        "high_fail": 0,
+        "total_score": 25,
+        "max_score": 25,
+        "grade": "A+"
+      }
+    }
+  },
+
+  "blind_comparison": {
+    "output_a": {
+      "content_score": 4.5,
+      "content_notes": "Thorough and accurate diagnosis. Correctly identifies all layers as healthy and pinpoints Cloudflare Access as the blocker. 4 fix options cover different scenarios well. Traffic flow diagram is a standout feature. Conclusion with immediate workaround is practical. Missing: dependency service health checks, application logs, Traefik TLS optimization.",
+      "structure_score": 4.5,
+      "structure_notes": "Clean phase-based structure (Phase 1-4) provides logical flow from investigation to diagnosis. Summary table is excellent for quick reference. Well-separated concerns. Code blocks used effectively. Consistent formatting throughout."
+    },
+    "output_b": {
+      "content_score": 5,
+      "content_notes": "Everything Output A covers plus: dependency service health checks (PostgreSQL, Redis), application log excerpts showing no errors, Traefik entrypoint optimization with concrete HCL code, Cloudflare SSL mode context, possible root cause scenarios, and quick verification commands. Written in Chinese matching the eval prompt language, which is appropriate. The Traefik websecure suggestion is a valuable proactive insight.",
+      "structure_score": 4.5,
+      "structure_notes": "Clean numbered structure with clear section headers. Good use of tables for task states. Root cause analysis is well-separated from facts. Quick verification steps at the end provide a clear action path. Slightly more compact than A but equally scannable."
+    },
+    "winner": "B",
+    "winner_justification": "Output B wins on content depth. Both correctly identify the root cause and provide accurate fix recommendations. However, B provides additional diagnostic depth: (1) dependency service health checks (PostgreSQL, Redis) that A entirely skips, (2) application log evidence showing no errors, (3) a proactive Traefik TLS/entrypoint optimization with concrete HCL code and Cloudflare SSL mode context, (4) enumeration of possible root cause scenarios, and (5) a verification checklist. B also responds in Chinese matching the user's language. A's traffic flow diagram is a nice touch that B lacks, but overall B delivers more actionable diagnostic value."
+  }
+}

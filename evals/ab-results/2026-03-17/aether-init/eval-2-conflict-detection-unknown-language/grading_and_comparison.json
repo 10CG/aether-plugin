@@ -1,0 +1,102 @@
+{
+  "eval_id": "eval-2-conflict-detection-unknown-language",
+  "skill": "aether-init",
+  "date": "2026-03-18",
+  "grader": "claude-opus-4-6",
+
+  "grading": {
+    "expectations": [
+      {
+        "id": 1,
+        "description": "Detect existing Dockerfile and handle conflict (backup/ask/skip)",
+        "severity": "CRITICAL",
+        "output_a": {
+          "pass": true,
+          "score": 5,
+          "notes": "Explicitly detects Dockerfile via conflict table. Backs up as Dockerfile.bak. Also detects docker-compose.yml and preserves it. Documents processing strategy clearly with rationale."
+        },
+        "output_b": {
+          "pass": true,
+          "score": 3,
+          "notes": "Detects Dockerfile and backs up as Dockerfile.bak. However, self-identifies a gap: no explicit user confirmation before overwriting. Conflict handling is functional but less systematic."
+        }
+      },
+      {
+        "id": 2,
+        "description": "Clear strategy for unrecognizable project language (prompt user / infer from Dockerfile)",
+        "severity": "CRITICAL",
+        "output_a": {
+          "pass": true,
+          "score": 5,
+          "notes": "Comprehensive language identifier scan (7 files checked). Infers Node.js from Dockerfile (FROM node:16), npm install, NODE_ENV, and port evidence. Acknowledges ambiguity with app.py and explains why Node.js is the primary language. Multi-signal reasoning."
+        },
+        "output_b": {
+          "pass": true,
+          "score": 4,
+          "notes": "Detects Node.js from Dockerfile signals (FROM node:16-alpine, npm install, CMD). Notes the heuristic nature and describes fallback if Dockerfile were generic. Solid but less thorough than Output A -- does not enumerate all checked language files or address the app.py ambiguity."
+        }
+      },
+      {
+        "id": 3,
+        "description": "Confirm plan before generating files (two-phase process)",
+        "severity": "HIGH",
+        "output_a": {
+          "pass": true,
+          "score": 5,
+          "notes": "Explicitly structured as Phase 1 (Project Analysis & Deployment Plan) and Phase 2 (File Generation). Deployment plan presented as a summary box before any file generation occurs. Decision table with rationale included. Clear two-phase flow."
+        },
+        "output_b": {
+          "pass": false,
+          "score": 2,
+          "notes": "No explicit two-phase structure. Report reads as post-hoc documentation of actions taken, not a plan-then-confirm-then-execute workflow. Self-notes 'No explicit user confirmation before overwriting' as a gap. Does not meet the two-phase requirement."
+        }
+      },
+      {
+        "id": 4,
+        "description": "Generated HCL uses correct port 3000",
+        "severity": "HIGH",
+        "output_a": {
+          "pass": true,
+          "score": 5,
+          "notes": "Port 3000 explicitly stated in both nomad-dev.hcl and nomad-prod.hcl descriptions. Consistent with user specification and existing Dockerfile/docker-compose.yml."
+        },
+        "output_b": {
+          "pass": true,
+          "score": 4,
+          "notes": "States 'static port 3000' in the generated files table for nomad-dev.hcl. Port is correct. Slightly less detail on prod HCL port specification."
+        }
+      }
+    ],
+    "summary": {
+      "output_a": {
+        "critical_pass": "2/2",
+        "high_pass": "2/2",
+        "total_pass": "4/4",
+        "overall_notes": "All expectations met. Comprehensive two-phase approach, thorough language detection with multi-signal reasoning, and systematic conflict handling with backup strategy."
+      },
+      "output_b": {
+        "critical_pass": "2/2",
+        "high_pass": "1/2",
+        "total_pass": "3/4",
+        "overall_notes": "Both critical expectations met. Failed on two-phase confirmation flow (HIGH). Self-aware of gaps but does not address them within the output itself."
+      }
+    }
+  },
+
+  "blind_comparison": {
+    "output_a": {
+      "content_score": 5,
+      "content_rationale": "Exceptionally detailed coverage. Language detection with 7-file scan and multi-signal reasoning. Source code analysis identifying both server.js and app.py with ambiguity resolution. Old-vs-new Dockerfile comparison table (base image, dependency install, health check, image size). Placeholder validation table. Comprehensive next steps with specific commands. Error handling summary table with trigger-reason-action-result columns. Database dependency identified from docker-compose.yml analysis.",
+      "structure_score": 5,
+      "structure_rationale": "Well-organized hierarchy: Phase 1 with sub-steps (1.1 scan, 1.2 decisions, 1.3 plan), then conflict detection and unknown language handling, then Phase 2 with file generation and placeholder validation, followed by next steps and error summary. Tables used effectively throughout. Two-phase structure directly satisfies the eval requirement."
+    },
+    "output_b": {
+      "content_score": 3,
+      "content_rationale": "Solid coverage of key areas with clear language detection explanation and functional conflict handling. Self-critical 'Issues/Gaps' section provides honest assessment. However, lacks systematic language file enumeration, no old-vs-new comparison, no placeholder validation, no database dependency analysis, and fewer actionable next steps. The self-critique is valuable but identifies gaps rather than fixing them.",
+      "structure_score": 3,
+      "structure_rationale": "Reasonably organized with clear sections (Scenario, Language Detection, Conflict Handling, Generated Files, Quality Assessment, Summary). The Quality Assessment with pros/cons is a useful self-reflective pattern. However, flat structure with no sub-steps or phased execution flow. Missing the two-phase confirmation structure that the eval requires. Report reads as retrospective documentation rather than structured workflow output."
+    },
+    "winner": "A",
+    "winner_rationale": "Output A is superior across all four graded expectations and both comparison dimensions. It passes all 4 expectations (including both CRITICAL and HIGH) while Output B fails on the two-phase confirmation flow (HIGH). Content-wise, Output A provides significantly more detail: multi-signal language reasoning, old-vs-new Dockerfile comparison, placeholder validation, database dependency detection, and structured error handling summary. Structurally, Output A's explicit Phase 1/Phase 2 breakdown directly satisfies the eval's requirement for a confirmation-before-generation workflow. Output B's honest self-assessment of its own gaps is commendable but does not compensate for the missing two-phase flow and lower overall detail."
+  }
+}

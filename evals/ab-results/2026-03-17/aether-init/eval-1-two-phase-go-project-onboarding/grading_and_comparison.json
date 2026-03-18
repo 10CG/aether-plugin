@@ -1,0 +1,147 @@
+{
+  "eval_id": "eval-1-two-phase-go-project-onboarding",
+  "skill": "aether-init",
+  "date": "2026-03-18",
+  "grader": "claude-opus-4-6",
+  "eval_prompt_summary": "Onboard a Go project (user-service) to Aether cluster with two-phase flow: analyze first, confirm, then generate Dockerfile + Nomad HCL + CI workflow",
+
+  "grading": {
+    "expectations": [
+      {
+        "id": 1,
+        "level": "CRITICAL",
+        "description": "Must analyze project characteristics before generating files (two-phase flow)",
+        "output_a": {
+          "grade": "PASS",
+          "reasoning": "Clear Phase 1 (Project Analysis & Deployment Plan) with project scan, decision logic table, and deployment plan summary, followed by Phase 2 (File Generation). Textbook two-phase separation."
+        },
+        "output_b": {
+          "grade": "PASS",
+          "reasoning": "Also follows two-phase structure with analysis section before generation. Less structured than A (no decision logic table, shallower analysis), but the two-phase flow is present."
+        }
+      },
+      {
+        "id": 2,
+        "level": "CRITICAL",
+        "description": "Must request user confirmation after analysis phase before entering generation phase",
+        "output_a": {
+          "grade": "PASS",
+          "reasoning": "Explicitly includes 'Proceed with file generation? [Y/n]' prompt in the deployment plan summary, then notes 'User confirmation: Assumed YES (eval mode).' Clear confirmation gate."
+        },
+        "output_b": {
+          "grade": "PARTIAL_FAIL",
+          "reasoning": "States '确认方案后，以下是为 user-service 生成的完整部署文件' indicating confirmation happened, but never presents an explicit confirmation prompt or pause point. Flows directly from analysis to generation."
+        }
+      },
+      {
+        "id": 3,
+        "level": "CRITICAL",
+        "description": "Correctly identify project language as Go and use corresponding templates",
+        "output_a": {
+          "grade": "PASS",
+          "reasoning": "Correctly identifies Go via go.mod detection. Uses multi-stage Go Dockerfile with golang:1.23-alpine, CGO_ENABLED=0, static binary build."
+        },
+        "output_b": {
+          "grade": "PASS",
+          "reasoning": "Correctly identifies Go. Uses multi-stage Go Dockerfile with golang:1.22-alpine, CGO_ENABLED=0, additional ldflags for size optimization."
+        }
+      },
+      {
+        "id": 4,
+        "level": "HIGH",
+        "description": "Generated Nomad HCL must include Consul service registration and health check configuration",
+        "output_a": {
+          "grade": "PASS",
+          "reasoning": "Both dev and prod HCL include service block with explicit 'provider = \"consul\"', port, tags, and HTTP health check (type=http, path=/health). Fully correct."
+        },
+        "output_b": {
+          "grade": "PARTIAL_PASS",
+          "reasoning": "Both HCL files include service block with port, tags, and TCP health check. However: (1) 'provider = \"consul\"' is NOT explicitly specified, relying on Nomad default behavior; (2) Uses TCP check instead of HTTP check, which is less robust for a web service."
+        }
+      },
+      {
+        "id": 5,
+        "level": "HIGH",
+        "description": "Generated CI workflow must use forgejo.10cg.pub credentials configuration",
+        "output_a": {
+          "grade": "PASS",
+          "reasoning": "Uses forgejo.10cg.pub as registry with secrets.FORGEJO_USER and secrets.FORGEJO_TOKEN for authentication. Separate dev and prod workflow files."
+        },
+        "output_b": {
+          "grade": "PASS",
+          "reasoning": "Uses forgejo.10cg.pub as registry with 'secrets.FORGEJO_USER || secrets.REGISTRY_USERNAME' / 'secrets.FORGEJO_TOKEN || secrets.REGISTRY_PASSWORD' fallback pattern, matching the Aether template convention from CLAUDE.md."
+        }
+      }
+    ],
+    "summary": {
+      "output_a": {
+        "critical_pass": 3,
+        "critical_fail": 0,
+        "high_pass": 2,
+        "high_fail": 0,
+        "overall": "All 5 expectations met. No failures."
+      },
+      "output_b": {
+        "critical_pass": 2,
+        "critical_fail": 1,
+        "high_pass": 1,
+        "high_partial": 1,
+        "high_fail": 0,
+        "overall": "3 of 5 expectations fully met. 1 CRITICAL partial fail (no explicit confirmation gate). 1 HIGH partial pass (Consul provider implicit, TCP instead of HTTP health check)."
+      }
+    }
+  },
+
+  "blind_comparison": {
+    "content": {
+      "output_a": {
+        "score": 5,
+        "strengths": [
+          "Detailed project scan table with comprehensive detection results",
+          "Decision logic table explaining each architectural choice with reasoning",
+          "Correct __IMAGE__ placeholder pattern for CI-time substitution",
+          "Separate dev and prod CI workflows with appropriate triggers",
+          "Verification checklist covering syntax, placeholders, credentials, and health check",
+          "Post-init required actions with code samples and specific Forgejo secret instructions",
+          "HTTP health check in both Nomad HCL and Dockerfile HEALTHCHECK"
+        ],
+        "weaknesses": [
+          "Assumes github.repository variable which may not resolve correctly in Forgejo (minor)",
+          "Does not include .dockerignore explanation"
+        ]
+      },
+      "output_b": {
+        "score": 3,
+        "strengths": [
+          "Includes cluster topology overview (nice contextual detail)",
+          "go.sum* wildcard in Dockerfile COPY for new projects",
+          "Fallback credentials pattern matching Aether convention",
+          "Local verification steps with docker build/run commands",
+          "Notes about port conflicts and resource tuning",
+          "Additional ldflags -w -s for binary size optimization"
+        ],
+        "weaknesses": [
+          "No explicit confirmation gate between analysis and generation phases",
+          "Deploy workflow has flawed health check to non-existent hostname (dev.user-service.internal)",
+          "Nomad HCL uses hardcoded image tags (forgejo.10cg.pub/user-service:dev) instead of CI-substituted placeholders",
+          "Deploy step mixes curl parse AND nomad job run in same step (redundant/confusing)",
+          "TCP health check instead of HTTP for a web service",
+          "No explicit provider=consul in service block",
+          "Single workflow file handles both dev and prod, but prod HCL uses hardcoded 'latest' tag"
+        ]
+      }
+    },
+    "structure": {
+      "output_a": {
+        "score": 5,
+        "notes": "Clean Phase 1 / Phase 2 separation. Each phase has numbered sub-steps. Tables for scan results, decisions, and verification. Explicit confirmation gate. Summary table at the end. Consistent English throughout."
+      },
+      "output_b": {
+        "score": 3,
+        "notes": "Reasonable two-phase structure but no formal confirmation gate. Mixes Chinese and English section headers. Includes useful deployment steps and local verification sections. Organization is adequate but less polished than A."
+      }
+    },
+    "winner": "Output A (with_skill)",
+    "winner_reasoning": "Output A is superior across all evaluated dimensions. It provides a rigorous two-phase flow with an explicit confirmation gate (CRITICAL requirement), explicit Consul service registration with HTTP health checks (HIGH requirement), a cleaner CI architecture with image placeholder substitution, and a comprehensive verification checklist. Output B has some nice additions (cluster topology, local verification, credential fallback pattern) but fails on the CRITICAL confirmation gate requirement, uses weaker TCP health checks, omits explicit Consul provider, and has a flawed deploy workflow with hardcoded image tags and an unreachable health check hostname."
+  }
+}
