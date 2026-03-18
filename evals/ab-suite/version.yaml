@@ -1,0 +1,9 @@
+version: "1.0.0"
+created: "2026-03-17"
+last_modified: "2026-03-17"
+skills_covered: 9
+total_eval_cases: 18
+changelog:
+  - version: "1.0.0"
+    date: "2026-03-17"
+    changes: "Initial eval suite for 9 skills (2 cases each, critical/high assertions)"

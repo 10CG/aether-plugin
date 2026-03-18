@@ -1,0 +1,60 @@
+{
+  "skill_name": "aether-dev",
+  "version": "1.0.0",
+  "evals": [
+    {
+      "id": 1,
+      "name": "bypass-ci-branch-deploy",
+      "category": "standard",
+      "prompt": "我正在开发 my-api 的 feature/auth-v2 分支，项目在 /home/dev/my-api 目录下，有 Dockerfile 和 deploy/nomad.hcl。CI 流水线因为 Forgejo Runner 故障暂时跑不了，但我需要马上在 dev 环境测试这个分支的改动。集群 registry 是 forgejo.10cg.pub，Nomad 地址 http://192.168.69.70:4646。请帮我绕过 CI 直接把当前分支部署到 dev 环境，用 docker 模式构建推送镜像然后提交 Job。",
+      "expected_output": "检测 Dockerfile 和部署配置，本地构建 Docker 镜像（tag 用 dev-<short-sha>），推送到 registry，替换 nomad.hcl 中的镜像占位符后提交 Job，等待部署完成",
+      "expectations": [
+        {
+          "text": "使用 dev deploy 子命令流程：本地构建 Docker 镜像，tag 格式为 dev-<short-sha>（非 CI 的 commit SHA），推送到 forgejo.10cg.pub registry",
+          "priority": "critical"
+        },
+        {
+          "text": "替换 nomad.hcl 中的镜像占位符（__IMAGE__ 或类似）为实际镜像地址后提交 Job 到 Nomad",
+          "priority": "critical"
+        },
+        {
+          "text": "明确说明这是绕过 CI 的手动部署，与 CI 自动部署的区别（触发方式、镜像 tag、用途）",
+          "priority": "high"
+        },
+        {
+          "text": "检测 Dockerfile 和 deploy/nomad.hcl 是否存在，缺失时提示使用 /aether:init 生成",
+          "priority": "high"
+        },
+        {
+          "text": "部署后建议使用 /aether:deploy-watch 或 /aether:dev logs 验证部署状态",
+          "priority": "high"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "temp-job-run-and-cleanup",
+      "category": "edge",
+      "prompt": "我需要在集群上做几个临时操作：第一，在 heavy 节点上运行 redis:7-alpine 容器做一个快速的数据迁移测试，需要暴露 6379 端口；第二，运行完之后我想看一下之前部署的 my-api 的 dev 环境日志有没有报错。最后，帮我清理掉之前遗留的所有 dev-temp 开头的临时 Job。Nomad 地址 http://192.168.69.70:4646。",
+      "expected_output": "依次执行 run（生成临时 batch Job 运行 Redis）、logs（查看 my-api 日志）、clean（清理 dev-temp-* Job）三个子命令",
+      "expectations": [
+        {
+          "text": "使用 dev run 子命令生成临时 batch Job（名称带 dev-temp- 前缀），指定 docker driver、redis:7-alpine 镜像、heavy_workload node class 和 6379 端口映射",
+          "priority": "critical"
+        },
+        {
+          "text": "使用 dev logs 子命令获取 my-api 的最新 running allocation 日志（包括 stdout 和 stderr）",
+          "priority": "critical"
+        },
+        {
+          "text": "使用 dev clean 子命令列出并清理所有 dev-temp-* 前缀的临时 Job（nomad job stop -purge）",
+          "priority": "high"
+        },
+        {
+          "text": "临时 Job 的 HCL 包含正确的 constraint（node.class = heavy_workload）和 resources 配置",
+          "priority": "high"
+        }
+      ]
+    }
+  ]
+}

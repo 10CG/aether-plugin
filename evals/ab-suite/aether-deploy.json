@@ -1,0 +1,34 @@
+{
+  "skill_name": "aether-deploy",
+  "version": "1.0.0",
+  "evals": [
+    {
+      "id": 1,
+      "name": "prod-deploy-with-confirmation",
+      "category": "standard",
+      "prompt": "我们的 my-api 服务需要从 v1.4.2 升级到 v1.5.0，镜像已经推到 forgejo.10cg.pub/10cg/my-api:v1.5.0 了。请帮我部署到生产环境。集群地址是 http://192.168.69.70:4646，Consul 在 http://192.168.69.70:8500。这个服务跑在 heavy-1 和 heavy-2 上，有 2 个实例。部署前请确认一下变更内容。",
+      "expected_output": "应该先验证镜像存在，然后获取当前运行版本，显示版本差异（v1.4.2 -> v1.5.0），要求用户确认后才执行部署，最后等待健康检查通过并报告结果。",
+      "expectations": [
+        {"text": "在执行部署前必须通过 AskUserQuestion 或类似交互方式请求用户确认，展示当前版本和目标版本的差异信息", "priority": "critical"},
+        {"text": "部署前必须执行配置差异对比步骤，至少展示当前镜像版本与目标镜像版本的变化", "priority": "critical"},
+        {"text": "部署前必须验证目标镜像 forgejo.10cg.pub/10cg/my-api:v1.5.0 是否存在于 Registry 中", "priority": "critical"},
+        {"text": "部署完成后必须执行健康检查，验证实例状态和 Consul 服务健康", "priority": "high"},
+        {"text": "不允许使用 latest 标签，必须使用用户指定的明确版本号 v1.5.0", "priority": "high"}
+      ]
+    },
+    {
+      "id": 2,
+      "name": "deploy-nonexistent-image",
+      "category": "edge",
+      "prompt": "帮我把 payment-service 部署到生产，用 v2.0.0-beta.3 这个版本。镜像地址是 forgejo.10cg.pub/10cg/payment-service:v2.0.0-beta.3。我不太确定这个镜像有没有构建成功，CI 日志显示可能有问题。Nomad 集群在 http://192.168.69.70:4646。这是一个核心支付服务，跑在 heavy-1、heavy-2、heavy-3 三个节点上，不能出问题。",
+      "expected_output": "应该先检查镜像是否存在，发现镜像不存在时立即终止部署流程并给出明确的错误提示，不应继续执行后续步骤。",
+      "expectations": [
+        {"text": "必须在部署前验证镜像 forgejo.10cg.pub/10cg/payment-service:v2.0.0-beta.3 是否存在，镜像不存在时必须终止部署流程", "priority": "critical"},
+        {"text": "镜像验证失败时不能继续执行部署操作，不能跳过验证直接修改 Job spec", "priority": "critical"},
+        {"text": "即使用户明确要求部署，在镜像不存在的情况下也必须拒绝执行并给出错误信息", "priority": "critical"},
+        {"text": "提供有价值的后续建议，例如检查 CI 构建日志、确认镜像 tag 是否正确、或使用其他可用版本", "priority": "high"},
+        {"text": "不应在没有用户确认的情况下尝试使用其他版本替代部署", "priority": "high"}
+      ]
+    }
+  ]
+}

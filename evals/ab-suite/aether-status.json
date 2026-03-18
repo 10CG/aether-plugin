@@ -1,0 +1,34 @@
+{
+  "skill_name": "aether-status",
+  "version": "1.0.0",
+  "evals": [
+    {
+      "id": 1,
+      "name": "cluster-overview-with-failed-allocs",
+      "category": "standard",
+      "prompt": "帮我看看 Aether 集群整体状态怎么样。集群配置在 ~/.aether/config.yaml 里面，Nomad 地址是 http://192.168.69.70:4646，Consul 地址是 http://192.168.69.70:8500。我们有 3 个 heavy 节点和 5 个 light 节点，上面跑了大概 6-7 个服务。最近有同事反馈说有些服务不太稳定，你帮我全面看看节点状态、运行中的 Job、有没有失败的 allocation、Consul 健康检查有没有异常。",
+      "expected_output": "应该查询 Nomad 节点状态、运行中的 Jobs、失败的 Allocations、Consul 服务健康信息，以结构化格式输出集群概览，并高亮标注异常项。",
+      "expectations": [
+        {"text": "必须查询并展示 Nomad 节点状态（heavy + light 节点数量和 ready/down 状态）", "priority": "critical"},
+        {"text": "必须查询并展示失败的 allocation 信息，包括关联的 Job 名称和所在节点", "priority": "critical"},
+        {"text": "必须同时查询 Nomad 和 Consul 两个数据源，提供完整的集群健康视图", "priority": "critical"},
+        {"text": "输出应为结构化格式，包含节点状态、Job 列表、失败 Alloc、Consul 健康检查等分区信息", "priority": "high"},
+        {"text": "对异常项（如 failed allocation、critical 健康检查）应有明显标注或高亮提示", "priority": "high"}
+      ]
+    },
+    {
+      "id": 2,
+      "name": "partial-cluster-unreachable-degraded",
+      "category": "edge",
+      "prompt": "我想查看集群状态，但是好像 Consul 挂了，访问 http://192.168.69.70:8500 超时。Nomad 在 http://192.168.69.70:4646 应该还是正常的。另外帮我重点看一下 data-pipeline 这个 Job 的状态，它最近一直有 allocation 失败的问题，跑在 light-3 (192.168.69.92) 和 light-4 (192.168.69.93) 上。如果能看到日志就更好了。",
+      "expected_output": "应该检测到 Consul 不可达并进入降级模式，仅从 Nomad 获取数据并明确告知用户 Consul 数据不可用。对 data-pipeline 应展示 allocation 详情和日志。",
+      "expectations": [
+        {"text": "必须检测 Consul 不可达状态并采用降级策略，从 Nomad 获取可用数据而不是直接报错退出", "priority": "critical"},
+        {"text": "必须明确告知用户 Consul 健康检查信息不可用，区分哪些数据是完整的、哪些是缺失的", "priority": "critical"},
+        {"text": "对 data-pipeline 应查询其 allocation 详情，包括失败 allocation 的状态和错误信息", "priority": "high"},
+        {"text": "所有 API 调用应设置超时（如 --max-time），避免因 Consul 不可达导致长时间阻塞", "priority": "high"},
+        {"text": "应尝试获取 data-pipeline 的日志信息辅助排查 allocation 失败原因", "priority": "high"}
+      ]
+    }
+  ]
+}

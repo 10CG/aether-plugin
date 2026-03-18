@@ -1,0 +1,60 @@
+{
+  "skill_name": "aether-setup",
+  "version": "1.0.0",
+  "evals": [
+    {
+      "id": 1,
+      "name": "first-time-global-setup-with-verification",
+      "category": "standard",
+      "prompt": "我第一次使用 Aether，需要配置集群连接。我的 Nomad 地址是 http://192.168.69.70:4646，Consul 地址是 http://192.168.69.70:8500，Registry 是 forgejo.10cg.pub。请帮我创建全局配置（~/.aether/config.yaml），并验证所有服务是否可以连通。我希望配置完成后能看到集群的节点信息，比如有多少个 heavy 节点、多少个 light 节点、都支持什么 driver。",
+      "expected_output": "引导用户创建全局配置文件，验证 Nomad 和 Consul 连接，通过 API 自动发现集群节点信息（node class、driver、数量），输出完整的集群概览",
+      "expectations": [
+        {
+          "text": "生成 ~/.aether/config.yaml 配置文件，包含 endpoints.nomad、endpoints.consul、endpoints.registry 三个必要配置项",
+          "priority": "critical"
+        },
+        {
+          "text": "对 Nomad 和 Consul 地址进行连接验证（通过 curl 或 API 调用），明确显示连接成功或失败的状态",
+          "priority": "critical"
+        },
+        {
+          "text": "通过 Nomad API（/v1/nodes）自动发现集群节点信息，包括 node class 分类、节点数量和支持的 driver",
+          "priority": "critical"
+        },
+        {
+          "text": "验证 URL 格式包含 http:// 前缀和端口号",
+          "priority": "high"
+        },
+        {
+          "text": "说明配置层级关系（全局配置 vs 项目级配置）和其他 Skill 如何使用此配置",
+          "priority": "high"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "connection-failure-with-diagnostics",
+      "category": "edge",
+      "prompt": "我想配置 Aether 集群连接，但是不确定地址对不对。Nomad 可能是 http://192.168.69.70:4646 或者 http://10.0.0.1:4646（我记不清了），Consul 地址我只知道和 Nomad 在同一台机器上。Registry 是 forgejo.10cg.pub。请帮我尝试连接并配置，如果某个地址连不上，告诉我具体原因和排查方法。另外我的项目 /home/dev/payment-service 需要用不同的集群地址，能不能同时配一个项目级配置？",
+      "expected_output": "尝试连接两个候选 Nomad 地址，对失败的连接提供具体诊断信息和排查步骤，成功后同时配置全局和项目级配置",
+      "expectations": [
+        {
+          "text": "对连接失败的地址提供明确的诊断信息，包括可能原因（服务未启动、网络不可达、地址错误）和具体排查命令",
+          "priority": "critical"
+        },
+        {
+          "text": "区分全局配置（~/.aether/config.yaml）和项目级配置（.env），并解释优先级关系",
+          "priority": "critical"
+        },
+        {
+          "text": "Consul 地址自动推导为与 Nomad 同主机但不同端口（:8500），展示智能默认行为",
+          "priority": "high"
+        },
+        {
+          "text": "对连接成功的服务显示版本信息（如 Nomad v1.x）或 HTTP 状态码",
+          "priority": "high"
+        }
+      ]
+    }
+  ]
+}

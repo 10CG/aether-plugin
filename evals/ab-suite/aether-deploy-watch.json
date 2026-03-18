@@ -1,0 +1,60 @@
+{
+  "skill_name": "aether-deploy-watch",
+  "version": "1.0.0",
+  "evals": [
+    {
+      "id": 1,
+      "name": "post-deploy-image-pull-failure",
+      "category": "standard",
+      "prompt": "刚刚通过 Forgejo CI 部署了 my-api 服务到生产环境，CI 流水线显示成功，但是用户反馈服务访问不了。Nomad 地址是 http://192.168.69.70:4646，服务名是 my-api。请帮我检查部署状态，看看是不是有 allocation 失败了，如果有问题帮我分析原因并给出修复建议。之前这个服务在 heavy-1 和 heavy-2 上各跑一个实例。",
+      "expected_output": "调用 aether-status 获取 my-api 状态，发现失败 allocation 后获取详细日志，匹配错误模式（如镜像拉取失败），给出具体修复建议和命令",
+      "expectations": [
+        {
+          "text": "调用 aether-status 或等价的 Nomad API 查询获取 my-api 的 allocation 状态，区分 running 和 failed 的实例",
+          "priority": "critical"
+        },
+        {
+          "text": "对失败的 allocation 获取错误日志并进行错误模式匹配（如镜像拉取失败、OOM、健康检查失败、权限拒绝等）",
+          "priority": "critical"
+        },
+        {
+          "text": "根据匹配到的错误模式给出具体的、可操作的修复建议和修复命令",
+          "priority": "critical"
+        },
+        {
+          "text": "输出结构化的诊断报告，包含状态检查、失败诊断、错误分析、修复建议等分区",
+          "priority": "high"
+        },
+        {
+          "text": "提到修复后可以使用 /aether:deploy-watch --follow 再次验证修复效果",
+          "priority": "high"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "follow-mode-multiple-failures",
+      "category": "edge",
+      "prompt": "我在 heavy-1、heavy-2、heavy-3 三个节点上部署了 data-pipeline 服务（3 个副本），使用 /aether:deploy-watch data-pipeline --follow --timeout=120 持续监控。Nomad 地址 http://192.168.69.70:4646。目前的情况是：heavy-1 上的实例正常运行，heavy-2 上报 OOMKilled（内存不足），heavy-3 上报 health check failed。请帮我诊断这两个不同类型的失败，分别给出对应的修复建议。",
+      "expected_output": "持续监控模式下检测到多种不同类型的失败，分别对 OOM 和健康检查失败进行模式匹配，给出针对性的不同修复建议",
+      "expectations": [
+        {
+          "text": "分别识别并诊断两种不同的错误模式：OOMKilled（内存不足）和 health check failed（健康检查失败），不混为一谈",
+          "priority": "critical"
+        },
+        {
+          "text": "对 OOMKilled 给出增加 memory 资源配置的建议，对 health check failed 给出检查服务日志和健康检查配置的建议",
+          "priority": "critical"
+        },
+        {
+          "text": "体现持续监控逻辑，包含检查轮次、时间戳或超时概念",
+          "priority": "high"
+        },
+        {
+          "text": "建议修复后重新部署并再次使用 deploy-watch 验证，或提到 /aether:doctor 进一步诊断",
+          "priority": "high"
+        }
+      ]
+    }
+  ]
+}
