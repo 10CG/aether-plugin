@@ -1,0 +1,111 @@
+{
+  "eval_prompt": "第一次使用 Aether，需要配置集群连接。Nomad 地址是 http://192.168.69.70:4646，Consul 是 http://192.168.69.70:8500，Registry 用 forgejo.10cg.pub。帮我创建全局配置文件，并验证连接是否正常。如果连接有问题帮我排查。",
+  "grading_date": "2026-03-18",
+  "grader": "claude-opus-4-6",
+
+  "part1_expectations": {
+    "output_a": {
+      "label": "with_skill",
+      "criteria": [
+        {
+          "id": 1,
+          "level": "CRITICAL",
+          "description": "必须创建或更新 ~/.aether/config.yaml 配置文件",
+          "pass": true,
+          "notes": "Config file created at ~/.aether/config.yaml with correct content shown inline."
+        },
+        {
+          "id": 2,
+          "level": "CRITICAL",
+          "description": "必须验证 Nomad 和 Consul 连接可用性（实际发 HTTP 请求）",
+          "pass": true,
+          "notes": "Explicitly documents HTTP endpoints (GET /v1/agent/self, GET /v1/status/leader), HTTP 200 status codes, Nomad version (1.11.2), and Consul leader. Also verified registry via /v2/ and /api/v1/settings/api. Highly transparent verification."
+        },
+        {
+          "id": 3,
+          "level": "CRITICAL",
+          "description": "config.yaml 必须使用 cluster.* 格式",
+          "pass": true,
+          "notes": "Uses cluster.nomad_addr, cluster.consul_addr, cluster.registry - correct format."
+        },
+        {
+          "id": 4,
+          "level": "HIGH",
+          "description": "应通过 API 发现集群节点信息",
+          "pass": true,
+          "notes": "Full node discovery: 8 nodes across 2 classes (heavy_workload, light_exec), all IPs listed. Also lists all 17 running jobs by name."
+        },
+        {
+          "id": 5,
+          "level": "HIGH",
+          "description": "验证失败时提供诊断和修复建议",
+          "pass": "partial",
+          "notes": "All connections succeeded so no diagnostics triggered. Reports 'None' under Issues Found. Provides Next Steps for further usage but does not demonstrate diagnostic depth. No proactive issue identification."
+        }
+      ],
+      "critical_pass": "3/3",
+      "high_pass": "1.5/2",
+      "overall_score": "4.5/5"
+    },
+    "output_b": {
+      "label": "without_skill",
+      "criteria": [
+        {
+          "id": 1,
+          "level": "CRITICAL",
+          "description": "必须创建或更新 ~/.aether/config.yaml 配置文件",
+          "pass": true,
+          "notes": "Config created via 'aether setup' command, saved to ~/.aether/config.yaml. Content shown with correct structure."
+        },
+        {
+          "id": 2,
+          "level": "CRITICAL",
+          "description": "必须验证 Nomad 和 Consul 连接可用性（实际发 HTTP 请求）",
+          "pass": true,
+          "notes": "Verified via 'aether setup --check'. Reports Nomad healthy with leader info, Consul healthy with leader. Less explicit about raw HTTP calls but verification was performed."
+        },
+        {
+          "id": 3,
+          "level": "CRITICAL",
+          "description": "config.yaml 必须使用 cluster.* 格式",
+          "pass": true,
+          "notes": "Uses cluster.consul_addr, cluster.nomad_addr, cluster.registry, cluster.registry_url - correct format. Also includes registry_url matching the CLAUDE.md reference config."
+        },
+        {
+          "id": 4,
+          "level": "HIGH",
+          "description": "应通过 API 发现集群节点信息",
+          "pass": true,
+          "notes": "Full node table (8 nodes, IPs, classes). Job summary (17 running). Additionally queries Consul for service health checks (24 total, 22 passing, 1 critical) - goes beyond Nomad-only discovery."
+        },
+        {
+          "id": 5,
+          "level": "HIGH",
+          "description": "验证失败时提供诊断和修复建议",
+          "pass": true,
+          "notes": "Proactively identifies two issues: (1) psych-ai-dev-api critical health check with actionable advice (check logs, verify port listening), (2) config file permission 644 vs recommended 600 with fix command. Strong diagnostic output even without core connection failures."
+        }
+      ],
+      "critical_pass": "3/3",
+      "high_pass": "2/2",
+      "overall_score": "5/5"
+    }
+  },
+
+  "part2_blind_comparison": {
+    "output_a": {
+      "content_score": 5,
+      "content_notes": "Thorough and transparent: explicit HTTP endpoints and status codes, full job list (17 named jobs), prerequisites check (curl/jq/yq), version info. Very systematic verification methodology that builds user confidence.",
+      "structure_score": 5,
+      "structure_notes": "Professional report layout with clear sections: Config Summary, Connectivity Verification, Cluster Discovery, Prerequisites, Issues, Next Steps. Tables are well-formatted with consistent columns. Easy to scan."
+    },
+    "output_b": {
+      "content_score": 5,
+      "content_notes": "Strong breadth: includes Consul service health checks beyond Nomad, registry auth chain (fallback sequence), proactive issue identification (psych-ai-dev-api critical, file permissions). Shows CLI command used for reproducibility. Adds unique actionable information.",
+      "structure_score": 4,
+      "structure_notes": "Well-organized with numbered sections. Slightly less consistent formatting (mixed Chinese/English section headers, some sections more compact than others). Overall clear but marginally less polished than Output A."
+    },
+    "winner": "B",
+    "winner_justification": "Very close comparison. Both outputs pass all CRITICAL criteria and provide excellent content. Output A excels in verification transparency (explicit HTTP calls, status codes, endpoints) and report polish (prerequisites check, next steps with skill references). Output B excels in diagnostic depth (proactive identification of psych-ai-dev-api critical health check and file permission issue) and unique actionable information (registry auth chain, Consul service health). Given the eval prompt explicitly asks for troubleshooting help ('如果连接有问题帮我排查'), Output B's proactive diagnostics and actionable issue identification better address this requirement. Output B also includes registry_url matching the reference config and shows the reproducible CLI command. The margin is narrow - Output A's verification methodology is superior, but Output B's diagnostics and breadth give it the edge for this specific eval prompt."
+  }
+}
