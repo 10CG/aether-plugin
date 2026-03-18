@@ -1,0 +1,123 @@
+{
+  "eval_prompt": "我想查看集群状态，但是好像 Consul 挂了，访问 http://192.168.69.70:8500 超时。Nomad http://192.168.69.70:4646 还能访问。帮我看看当前能获取到什么信息：节点状态、Job 运行情况。对于 Consul 不可用的部分，告诉我影响范围和应急方案。",
+  "grading_date": "2026-03-18",
+  "grader": "Claude Opus 4.6 (blind comparison)",
+
+  "expectations": [
+    {
+      "id": 1,
+      "level": "CRITICAL",
+      "description": "必须检测 Consul 是否可达，并明确报告连接失败（或发现实际可达）",
+      "output_a": {
+        "pass": true,
+        "score": 4,
+        "notes": "Connectivity table at top clearly reports Consul API reachable with Leader info. Explicit conclusion about transient issue."
+      },
+      "output_b": {
+        "pass": true,
+        "score": 5,
+        "notes": "Tests Consul API, DNS (port 8600), and KV store. Also provides Raft consensus and Serf membership verification. Most thorough connectivity check."
+      }
+    },
+    {
+      "id": 2,
+      "level": "CRITICAL",
+      "description": "Consul 不可用时仍应从 Nomad 获取并展示可用信息（节点、Jobs、Allocs）",
+      "output_a": {
+        "pass": true,
+        "score": 4,
+        "notes": "Displays 8 nodes, 17 Jobs, 2 failed allocations, allocation distribution. Section 5 lists Nomad-only available data."
+      },
+      "output_b": {
+        "pass": true,
+        "score": 5,
+        "notes": "Same coverage plus Task Groups per job, all 20 running allocations listed individually, workload distribution summary with counts."
+      }
+    },
+    {
+      "id": 3,
+      "level": "HIGH",
+      "description": "分析 Consul 不可用对服务发现的影响（Traefik 路由、DNS 解析等）",
+      "output_a": {
+        "pass": true,
+        "score": 4,
+        "notes": "Covers service discovery, health checks, DNS. Lists unaffected areas. Clear and correct but lacks severity ratings and domain-level detail."
+      },
+      "output_b": {
+        "pass": true,
+        "score": 5,
+        "notes": "Severity-rated impact table, mentions KV configuration dependency (missed by A), explicit domain-to-service mapping showing affected routes."
+      }
+    },
+    {
+      "id": 4,
+      "level": "HIGH",
+      "description": "提供应急方案（重启 Consul、直连服务 IP 等）",
+      "output_a": {
+        "pass": true,
+        "score": 4,
+        "notes": "SSH commands for status, logs, members, and restart. Clear and actionable."
+      },
+      "output_b": {
+        "pass": true,
+        "score": 4,
+        "notes": "Different but equally useful: log inspection with time range, Raft config check, consul monitor. Does not explicitly include systemctl restart command."
+      }
+    },
+    {
+      "id": 5,
+      "level": "HIGH",
+      "description": "明确区分可用数据和不可用数据，不混淆",
+      "output_a": {
+        "pass": true,
+        "score": 4,
+        "notes": "Section 6 header clearly frames hypothetical scenario. Actual data in other sections. Section 5 explicitly lists Nomad-only vs Consul-dependent data."
+      },
+      "output_b": {
+        "pass": true,
+        "score": 5,
+        "notes": "Section 6 explicitly labeled as hypothetical. Summary table at end clearly shows current actual status. Two-table format (affected vs unaffected) in Section 6 is very clear."
+      }
+    }
+  ],
+
+  "blind_comparison": {
+    "content": {
+      "output_a": {
+        "score": 4,
+        "notes": "Covers all required areas with clear executive summary. Accurate and actionable. Minor gaps: no Consul KV dependency mention, no Raft/Serf internals, no Consul version."
+      },
+      "output_b": {
+        "score": 5,
+        "notes": "Most comprehensive. Includes Consul cluster internals (Raft consensus, Serf membership, 11 members), Consul version (1.22.3), DNS verification, KV store check, service routing tags/domains, severity ratings, and more precise celery analysis."
+      }
+    },
+    "structure": {
+      "output_a": {
+        "score": 4,
+        "notes": "Well-structured with 7 sections, consistent tables, clear headers, logical flow. Executive summary box at top is effective."
+      },
+      "output_b": {
+        "score": 5,
+        "notes": "Excellently structured with 8 sections and granular sub-sections (2.1, 2.2, etc.), severity indicators, comprehensive summary table at end, numbered problem list with severity ratings."
+      }
+    },
+    "winner": "Output B",
+    "winner_label": "without_skill",
+    "rationale": "Output B is superior in both content depth and structural organization. It provides deeper Consul diagnostics (Raft, Serf, DNS, KV), more detailed allocation mapping, severity-rated impact analysis, domain-to-service routing table, and a cleaner summary. While Output A is solid and covers all critical expectations, Output B goes meaningfully further in every dimension — particularly in Consul cluster internals, KV dependency analysis, and per-domain impact mapping."
+  },
+
+  "summary": {
+    "output_a_total_score": "4.0 / 5.0 (avg across 5 expectations)",
+    "output_b_total_score": "4.8 / 5.0 (avg across 5 expectations)",
+    "both_pass_all_critical": true,
+    "key_differentiators": [
+      "Output B tests Consul DNS and KV in addition to API — more thorough reachability check",
+      "Output B includes Raft consensus and Serf membership details — deeper cluster health visibility",
+      "Output B provides severity-rated impact analysis and domain-to-service routing table",
+      "Output B mentions Consul KV configuration dependency (kairos API keys/secrets) which A misses entirely",
+      "Output B lists all 20 individual running allocations vs A's grouped summary",
+      "Output A provides explicit systemctl restart command which B omits"
+    ]
+  }
+}

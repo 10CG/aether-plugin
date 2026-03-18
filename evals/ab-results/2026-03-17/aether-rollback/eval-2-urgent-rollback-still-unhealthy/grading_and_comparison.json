@@ -1,0 +1,129 @@
+{
+  "eval_id": "eval-2-urgent-rollback-still-unhealthy",
+  "eval_prompt_summary": "payment-service 回滚到 v1.8.0 后健康检查仍失败，Consul critical，allocation 持续重启，需排查原因并考虑回滚到 v1.7.x",
+  "date": "2026-03-18",
+  "grader": "claude-opus-4-6",
+
+  "part1_expectation_grading": {
+    "output_a": {
+      "label": "with_skill",
+      "expectations": [
+        {
+          "id": 1,
+          "level": "CRITICAL",
+          "description": "分析回滚后仍不健康的可能原因（DB schema、配置漂移等）",
+          "pass": true,
+          "score": 4,
+          "notes": "提供了 5 个按概率排序的可能原因表格：v1.8.0 本身问题、DB migration 不可逆、配置/环境变量缺失、健康检查端点变更、依赖服务不可用。分析清晰有条理。"
+        },
+        {
+          "id": 2,
+          "level": "CRITICAL",
+          "description": "提供具体的进一步回滚方案到 v1.7.x",
+          "pass": true,
+          "score": 4,
+          "notes": "方案 A 回滚到 v1.7.2（推荐）含完整 curl 命令和轮询脚本；方案 B 提供 v1.7.2 也失败时的后续诊断步骤。推荐 v1.7.2 作为目标版本有理有据。"
+        },
+        {
+          "id": 3,
+          "level": "HIGH",
+          "description": "查询当前 allocation 状态和重启事件",
+          "pass": true,
+          "score": 4,
+          "notes": "提供了完整的诊断命令序列：获取 allocation ID、查看 stderr、查看 allocation events。因服务未找到而以预期命令形式呈现。"
+        },
+        {
+          "id": 4,
+          "level": "HIGH",
+          "description": "查看日志以定位具体错误",
+          "pass": true,
+          "score": 4,
+          "notes": "包含 Nomad API 和 nomad alloc logs 两种方式获取 stderr 日志。附录中有优先级排列的排查指南。"
+        },
+        {
+          "id": 5,
+          "level": "HIGH",
+          "description": "提供后续预防建议",
+          "pass": true,
+          "score": 3,
+          "notes": "预防建议分散在方案 B 和附录中，未作为独立章节呈现。提到了回滚到更早版本、修复环境依赖、准备修复版本，但缺少结构化的预防措施清单。"
+        }
+      ],
+      "total_score": 19,
+      "max_score": 25
+    },
+    "output_b": {
+      "label": "without_skill",
+      "expectations": [
+        {
+          "id": 1,
+          "level": "CRITICAL",
+          "description": "分析回滚后仍不健康的可能原因（DB schema、配置漂移等）",
+          "pass": true,
+          "score": 5,
+          "notes": "Section 2 提供了 4 个场景（A-D）的详细分析，Section 6 进一步深入 5 个根因：DB schema、配置变更、健康检查端点、外部 API 升级、TLS/证书变更。覆盖面更广，包含了 TLS 这一独特且实际的考虑。"
+        },
+        {
+          "id": 2,
+          "level": "CRITICAL",
+          "description": "提供具体的进一步回滚方案到 v1.7.x",
+          "pass": true,
+          "score": 5,
+          "notes": "提供 3 套方案：A-Nomad Revert（推荐）、B-从 Git 重新提交 Job Spec、C-紧急部署（Job 完全丢失时）。覆盖了更多边缘情况，每个方案都有完整的命令序列。"
+        },
+        {
+          "id": 3,
+          "level": "HIGH",
+          "description": "查询当前 allocation 状态和重启事件",
+          "pass": true,
+          "score": 4,
+          "notes": "Section 3 第三步和第四步提供了 allocation 查询和事件检查命令。包含 stderr 和 stdout 两种日志获取。"
+        },
+        {
+          "id": 4,
+          "level": "HIGH",
+          "description": "查看日志以定位具体错误",
+          "pass": true,
+          "score": 5,
+          "notes": "除了 API 日志查询外，还包含第五步的镜像可用性验证（docker pull + docker run），这是独特且实用的诊断步骤。"
+        },
+        {
+          "id": 5,
+          "level": "HIGH",
+          "description": "提供后续预防建议",
+          "pass": true,
+          "score": 5,
+          "notes": "Section 7 作为独立章节，提供 5 条结构化的预防措施：staging 环境验证、backward-compatible migration（N-1 版本兼容）、配置版本绑定、健康检查匹配、镜像保留策略。清晰且可操作。"
+        }
+      ],
+      "total_score": 24,
+      "max_score": 25
+    }
+  },
+
+  "part2_blind_comparison": {
+    "output_a": {
+      "content_score": 4,
+      "content_notes": "内容全面，独特亮点：概率排序的原因表格、模拟版本历史可视化（直观展示哪些版本可回滚）、验证清单表格。正确识别服务未找到并给出多种解释（namespace、不同集群、不同 Job 名、已 purge）。附录的通用排查指南有附加价值。",
+      "structure_score": 4,
+      "structure_notes": "Step 1-5 结构清晰，善用表格，总结块信息完整。模拟版本历史可视化有创意。但实际发现与假设场景的混合在某些地方可能造成轻微混淆。"
+    },
+    "output_b": {
+      "content_score": 4,
+      "content_notes": "内容同样全面，独特亮点：3 套回滚方案覆盖更多边缘情况、节点状态表确认基础设施健康、深度根因分析（含 TLS/证书考量）、独立预防措施章节、Docker 镜像验证步骤。Section 1 展示 8 节点全部 ready 增加了诊断价值。",
+      "structure_score": 5,
+      "structure_notes": "7 个编号章节结构严谨，每节职责清晰：集群状态 → 诊断分析 → 排查步骤 → 回滚方案 → 验证清单 → 根因分析 → 预防措施。逻辑递进顺畅，专业诊断报告风格。三套回滚方案（A/B/C）层次分明。"
+    },
+    "winner": "B",
+    "winner_label": "without_skill",
+    "rationale": "两份输出质量都很高，内容评分持平。Output A 的模拟版本历史可视化和概率排序表格是亮点，但 Output B 在以下方面略胜：(1) 结构更专业——7 个清晰章节按逻辑递进，读起来像一份完整的诊断报告；(2) 回滚方案更全面——3 套方案覆盖了 Job 完全丢失的边缘情况；(3) 诊断更深入——包含 TLS/证书变更和 Docker 镜像可用性验证；(4) 预防措施作为独立章节更结构化、更可操作。Output B 以更好的结构和更广的覆盖面小幅胜出。"
+  },
+
+  "summary": {
+    "output_a_overall": "4.0/5 - 高质量输出，独特的版本历史可视化和概率排序分析表。所有关键期望均满足，预防建议部分稍弱。",
+    "output_b_overall": "4.5/5 - 优秀输出，结构最为专业，覆盖面最广（3 套回滚方案、TLS 考量、镜像验证）。所有期望均高分满足，预防措施章节尤其出色。",
+    "winner": "B",
+    "winner_label": "without_skill",
+    "margin": "narrow"
+  }
+}
