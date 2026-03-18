@@ -29,9 +29,10 @@ allowed-tools: Read, Write, Bash, AskUserQuestion
 配置按以下优先级读取（高 → 低）：
 
 ```
-1. 项目级 .env          → 当前项目目录下的 .env 文件
-2. 用户级全局配置        → ~/.aether/config.yaml
-3. 插件默认值           → 无（必须配置入口地址）
+1. 环境变量              → NOMAD_ADDR, CONSUL_HTTP_ADDR 等
+2. 项目级配置            → ./.aether/config.yaml (当前项目目录)
+3. 用户级全局配置        → ~/.aether/config.yaml
+4. 插件默认值           → 无（必须配置入口地址）
 ```
 
 ---
@@ -114,11 +115,11 @@ Aether 集群配置
 
 ```yaml
 # Aether 集群配置
-# 由 /aether:setup 生成于 2026-02-19
+# 由 /aether:setup 生成
 
-endpoints:
-  nomad: "http://192.168.69.70:4646"
-  consul: "http://192.168.69.70:8500"
+cluster:
+  nomad_addr: "http://192.168.69.70:4646"
+  consul_addr: "http://192.168.69.70:8500"
   registry: "forgejo.10cg.pub"
 ```
 
@@ -131,23 +132,26 @@ endpoints:
 交互流程：
 
 ```
-创建项目级配置 (.env)
+创建项目级配置 (.aether/config.yaml)
 此配置仅对当前项目生效，会覆盖全局配置。
 
 请输入 Nomad 地址: http://192.168.69.70:4646
 请输入 Consul 地址: http://192.168.69.70:8500
 请输入 Registry 地址: forgejo.10cg.pub
 
-配置已追加到 .env
+配置已保存到 .aether/config.yaml
 ```
 
-追加到 `.env`：
+生成的文件 `.aether/config.yaml`：
 
-```bash
-# Aether 集群配置
-NOMAD_ADDR=http://192.168.69.70:4646
-CONSUL_HTTP_ADDR=http://192.168.69.70:8500
-AETHER_REGISTRY=forgejo.10cg.pub
+```yaml
+# Aether 项目级配置
+# 覆盖全局配置中的对应字段
+
+cluster:
+  nomad_addr: "http://192.168.69.70:4646"
+  consul_addr: "http://192.168.69.70:8500"
+  registry: "forgejo.10cg.pub"
 ```
 
 ### 首次使用引导
@@ -174,16 +178,18 @@ AETHER_REGISTRY=forgejo.10cg.pub
 Skills 使用以下逻辑读取配置：
 
 ```bash
-# 1. 检查项目 .env
-if [ -f ".env" ]; then
-  source .env
+# 1. 检查项目级配置
+if [ -f ".aether/config.yaml" ]; then
+  NOMAD_ADDR=$(yq '.cluster.nomad_addr' .aether/config.yaml)
+  CONSUL_HTTP_ADDR=$(yq '.cluster.consul_addr' .aether/config.yaml)
+  AETHER_REGISTRY=$(yq '.cluster.registry' .aether/config.yaml)
 fi
 
-# 2. 检查全局配置
+# 2. 检查全局配置 (如果项目级未设置)
 if [ -z "$NOMAD_ADDR" ] && [ -f "$HOME/.aether/config.yaml" ]; then
-  NOMAD_ADDR=$(yq '.endpoints.nomad' ~/.aether/config.yaml)
-  CONSUL_HTTP_ADDR=$(yq '.endpoints.consul' ~/.aether/config.yaml)
-  AETHER_REGISTRY=$(yq '.endpoints.registry' ~/.aether/config.yaml)
+  NOMAD_ADDR=$(yq '.cluster.nomad_addr' ~/.aether/config.yaml)
+  CONSUL_HTTP_ADDR=$(yq '.cluster.consul_addr' ~/.aether/config.yaml)
+  AETHER_REGISTRY=$(yq '.cluster.registry' ~/.aether/config.yaml)
 fi
 
 # 3. 检查是否配置完成
