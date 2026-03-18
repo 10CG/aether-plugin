@@ -1,9 +1,0 @@
-[
-  {"query": "在 heavy-1 上给 myapp 创建 data 和 logs 两个 volume", "should_trigger": true},
-  {"query": "查看 heavy-1 上有哪些 volume", "should_trigger": true},
-  {"query": "删除 heavy-2 上 old-project 的 volume", "should_trigger": true},
-  {"query": "给数据库服务配置持久化存储", "should_trigger": true},
-  {"query": "部署 my-api 到生产环境", "should_trigger": false},
-  {"query": "查看集群节点状态", "should_trigger": false},
-  {"query": "创建一个 Docker volume 挂载本地目录", "should_trigger": false}
-]

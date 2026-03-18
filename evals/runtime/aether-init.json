@@ -1,9 +1,0 @@
-[
-  {"query": "把这个项目接入 Aether 集群", "should_trigger": true},
-  {"query": "生成部署配置文件", "should_trigger": true},
-  {"query": "初始化 CI/CD 流水线配置", "should_trigger": true},
-  {"query": "帮我规划这个 Go 项目的部署方案", "should_trigger": true},
-  {"query": "部署已有的服务到生产", "should_trigger": false},
-  {"query": "看看我的项目跑得怎么样", "should_trigger": false},
-  {"query": "配置 Aether 集群地址", "should_trigger": false}
-]

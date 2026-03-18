@@ -1,9 +1,0 @@
-[
-  {"query": "CI 跑完了，帮我看看部署是否成功", "should_trigger": true},
-  {"query": "CI 成功了但是服务访问不了，帮我查一下", "should_trigger": true},
-  {"query": "部署后检查 my-api 的 allocation 状态", "should_trigger": true},
-  {"query": "部署失败了，帮我排查原因", "should_trigger": true},
-  {"query": "帮我把 my-api 部署到生产", "should_trigger": false},
-  {"query": "集群节点状态怎么样", "should_trigger": false},
-  {"query": "服务有问题，回滚到上一个版本", "should_trigger": false}
-]
