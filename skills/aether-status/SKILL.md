@@ -42,241 +42,116 @@ dependencies:
 
 ---
 
-## 执行模式
+## 查询模式
 
-### 模式 1: 集群概览（无参数）
+以下描述各场景建议覆盖的信息维度。具体查询顺序和输出组织方式可根据实际情况灵活调整。
+
+### 集群概览（无参数）
+
+建议覆盖的信息：
+- **Nomad 节点**: 各节点状态、NodeClass 分布
+- **运行中的 Jobs**: 数量、类型分布（service/batch/system）
+- **失败的 Allocations**: 数量及关联的 Job 和节点
+- **Consul 服务健康**: passing/critical 数量
+
+常用查询：
 
 ```bash
-/aether:status
-```
-
-执行以下查询并汇总：
-
-```bash
-# 1. Nomad 节点状态
 curl -s "${NOMAD_ADDR}/v1/nodes" | jq '[.[] | {name: .Name, status: .Status, class: .NodeClass}]'
-
-# 2. 运行中的 Jobs
 curl -s "${NOMAD_ADDR}/v1/jobs" | jq '[.[] | select(.Status == "running") | {name: .Name, type: .Type, status: .Status}]'
-
-# 3. 失败的 Allocations
 curl -s "${NOMAD_ADDR}/v1/allocations" | jq '[.[] | select(.ClientStatus == "failed") | {job: .JobID, node: .NodeName, status: .ClientStatus}]'
-
-# 4. Consul 服务健康
 curl -s "${CONSUL_HTTP_ADDR}/v1/health/state/critical" | jq 'length'
 ```
 
-**输出格式**：
+---
 
-```
-Aether 集群状态
-================
-Nomad 节点: 3 heavy (ready) + 5 light (ready)
-运行中 Jobs: 5 (4 service, 1 batch)
-失败 Allocs: 1 (my-project @ heavy-1)
-Consul 服务: 8 passing, 1 critical
+### 服务详情（指定 job-name）
+
+建议覆盖的信息：
+- **Job 状态**: 类型、运行状态、当前版本、使用的镜像
+- **Allocations**: 各 allocation 的节点分布、状态、版本
+- **Consul 健康**: 服务实例地址、端口、健康状态
+- **部署历史**: 最近部署时间
+
+常用查询：
+
+```bash
+curl -s "${NOMAD_ADDR}/v1/job/{job_id}" | jq '{name: .Name, type: .Type, status: .Status, version: .Version}'
+curl -s "${NOMAD_ADDR}/v1/job/{job_id}/allocations" | jq '[.[] | {id: .ID[:8], node: .NodeName, status: .ClientStatus, version: .JobVersion}]'
+curl -s "${CONSUL_HTTP_ADDR}/v1/health/service/{job_id}?passing" | jq '[.[] | {node: .Node.Node, address: .Service.Address, port: .Service.Port}]'
 ```
 
 ---
 
-### 模式 2: 服务详情（指定 job-name）
+### 失败的 Allocations（--failed）
+
+建议覆盖的信息：
+- 每个失败 allocation 的 **Job、TaskGroup、节点、失败时间**
+- **TaskStates** 中的退出码和事件详情
+- 如有重复失败模式（同一 Job 或同一节点反复失败），**指出模式**
+
+常用查询：
 
 ```bash
-/aether:status my-project
-```
+# 获取失败的 allocations 列表
+curl -s "${NOMAD_ADDR}/v1/allocations?filter=ClientStatus==failed"
 
-执行以下查询：
-
-```bash
-# 1. Job 详情
-curl -s "${NOMAD_ADDR}/v1/job/my-project" | jq '{name: .Name, type: .Type, status: .Status, version: .Version}'
-
-# 2. Allocations
-curl -s "${NOMAD_ADDR}/v1/job/my-project/allocations" | jq '[.[] | {id: .ID[:8], node: .NodeName, status: .ClientStatus, version: .JobVersion}]'
-
-# 3. Consul 服务实例
-curl -s "${CONSUL_HTTP_ADDR}/v1/health/service/my-project?passing" | jq '[.[] | {node: .Node.Node, address: .Service.Address, port: .Service.Port}]'
-```
-
-**输出格式**：
-
-```
-服务: my-project
-================
-Job: my-project (service, running, v3)
-镜像: forgejo.10cg.pub/org/my-project:abc123
-
-Allocations:
-  abc12345 @ heavy-1 - running (v3)
-  def67890 @ heavy-2 - running (v3)
-
-Consul 实例:
-  heavy-1:28456 - healthy
-  heavy-2:31022 - healthy
-
-最近部署: 2h ago
+# 获取单个 allocation 详情
+curl -s "${NOMAD_ADDR}/v1/allocation/${alloc_id}"
 ```
 
 ---
 
-### 模式 3: 查看失败的 Allocations（--failed）
+### 最近部署（--recent）
+
+建议覆盖的信息：
+- 最近部署的 **Job 名称、状态、版本、更新时间**
+- 标注任何 **失败的部署**
+
+常用查询：
 
 ```bash
-/aether:status --failed
-```
-
-查询所有失败的 allocation 并显示详细信息：
-
-```bash
-# 获取所有失败的 allocations
-FAILED_ALLOCS=$(curl -s "${NOMAD_ADDR}/v1/allocations?filter=ClientStatus==failed")
-
-# 对每个失败的 allocation 获取详情
-for alloc_id in $(echo "$FAILED_ALLOCS" | jq -r '.[].ID'); do
-  # 获取 allocation 详情
-  curl -s "${NOMAD_ADDR}/v1/allocation/${alloc_id}" | jq '{
-    id: .ID,
-    job: .JobID,
-    task_group: .TaskGroup,
-    node: .NodeName,
-    status: .ClientStatus,
-    task_states: .TaskStates
-  }'
-done
-```
-
-**输出格式**：
-
-```
-失败的 Allocations
-==================
-
-Allocation: abc12345-def67890-ghi12345
-Job: my-project
-Task Group: api
-Node: heavy-1
-Status: failed
-
-Task 状态:
-  api: failed (exit code: 1)
-
-失败时间: 2026-03-08 18:30:00
+curl -s "${NOMAD_ADDR}/v1/jobs" | jq '[.[] | {name: .Name, status: .Status, version: .Version, modify_index: .ModifyIndex}] | sort_by(-.modify_index) | .[0:10]'
 ```
 
 ---
 
-### 模式 4: 查看最近部署（--recent）
+### 日志查看（--logs）
+
+建议覆盖的信息：
+- 目标服务 running allocation 的 **stdout 和 stderr**
+- 如果服务已失败，获取 **最近失败 allocation 的日志**
+
+常用查询：
 
 ```bash
-/aether:status --recent
-```
-
-显示最近 10 个 deployment 的状态：
-
-```bash
-# 获取所有 jobs 并按 ModifyIndex 排序
-curl -s "${NOMAD_ADDR}/v1/jobs" | jq '[.[] | {
-  name: .Name,
-  status: .Status,
-  version: .Version,
-  modify_index: .ModifyIndex
-}] | sort_by(-.modify_index) | .[0:10]'
-```
-
-**输出格式**：
-
-```
-最近部署
-========
-时间范围: 最近 24 小时
-
-┌─────────────────┬─────────┬─────────┬─────────────────────┐
-│ Job             │ 状态    │ 版本    │ 更新时间             │
-├─────────────────┼─────────┼─────────┼─────────────────────┤
-│ my-api          │ running │ v5      │ 10 分钟前           │
-│ web-frontend    │ running │ v3      │ 2 小时前            │
-│ data-worker     │ failed  │ v2      │ 5 小时前            │
-└─────────────────┴─────────┴─────────┴─────────────────────┘
-
-⚠ 1 个部署失败
+ALLOC_ID=$(curl -s "${NOMAD_ADDR}/v1/job/{job_id}/allocations" | jq -r '[.[] | select(.ClientStatus == "running") | .ID][0]')
+curl -s "${NOMAD_ADDR}/v1/client/fs/logs/${ALLOC_ID}?task={task}&type=stdout&plain=true" | tail -100
+curl -s "${NOMAD_ADDR}/v1/client/fs/logs/${ALLOC_ID}?task={task}&type=stderr&plain=true" | tail -100
 ```
 
 ---
 
-### 模式 5: 查看日志（--logs）
+### 持续监控（--watch）
 
-```bash
-/aether:status my-project --logs
-```
-
-获取指定服务的日志：
-
-```bash
-# 获取 running 的 allocation ID
-ALLOC_ID=$(curl -s "${NOMAD_ADDR}/v1/job/my-project/allocations" | jq -r '[.[] | select(.ClientStatus == "running") | .ID][0]')
-
-# 获取 stdout 日志（最近 100 行）
-curl -s "${NOMAD_ADDR}/v1/client/fs/logs/${ALLOC_ID}?task=api&type=stdout&plain=true" | tail -100
-
-# 获取 stderr 日志（最近 100 行）
-curl -s "${NOMAD_ADDR}/v1/client/fs/logs/${ALLOC_ID}?task=api&type=stderr&plain=true" | tail -100
-```
-
-**输出格式**：
-
-```
-服务日志: my-project
-===================
-Allocation: abc12345
-Task: api
-
---- stdout (最近 100 行) ---
-2026-03-08 18:30:00 INFO Server started on port 8080
-2026-03-08 18:30:01 INFO Connected to database
-...
-
---- stderr (最近 100 行) ---
-2026-03-08 18:30:05 WARN Connection pool running low
-...
-```
+持续监控服务状态。建议：
+- 每 5 秒刷新，连续失败 5 次自动退出
+- 检查 API 可达性后再查询状态
+- 失败时提示用户检查 `NOMAD_ADDR`
 
 ---
 
-### 模式 6: 持续监控（--watch）
+## 深入调查指引
 
-```bash
-/aether:status my-project --watch
-```
+在完成基本查询后，深入调查任何发现的异常。不要局限于上述查询模式 -- 以下是值得探索的方向：
 
-持续监控服务状态，每 5 秒刷新一次，连续失败 5 次自动退出：
+- **依赖链**: 如果某服务异常，检查它依赖的其他服务是否也有问题
+- **节点级别**: 如果多个服务在同一节点失败，调查节点本身的资源状况（CPU、内存、磁盘）
+- **历史模式**: 对比当前状态与近期部署历史，判断是新引入的问题还是长期存在
+- **日志关联**: 结合 stdout/stderr 日志和 allocation 事件，还原故障时间线
+- **Consul 健康检查详情**: 不仅看 passing/critical 数量，还看具体的检查输出内容
 
-```bash
-FAIL_COUNT=0
-MAX_FAILURES=5
-
-while [ $FAIL_COUNT -lt $MAX_FAILURES ]; do
-  clear
-  echo "Aether 状态监控 - $(date)"
-  echo "================================"
-
-  # 检查 API 可达性
-  if ! curl -sf --max-time 5 "${NOMAD_ADDR}/v1/agent/health" > /dev/null 2>&1; then
-    FAIL_COUNT=$((FAIL_COUNT + 1))
-    echo "⚠ Nomad API 无响应 (${FAIL_COUNT}/${MAX_FAILURES})"
-    echo "  连续失败 ${MAX_FAILURES} 次后将自动退出"
-    sleep 5
-    continue
-  fi
-
-  FAIL_COUNT=0  # 重置计数
-  # 显示状态
-  /aether:status my-project
-  sleep 5
-done
-
-echo "错误: Nomad API 连续 ${MAX_FAILURES} 次无响应，监控已停止"
-echo "修复建议: 检查 NOMAD_ADDR (${NOMAD_ADDR}) 是否可达"
-```
+**核心原则**: 覆盖所有用户请求的维度，但不止步于此。发现异常信号时主动追踪根因。
 
 ---
 
