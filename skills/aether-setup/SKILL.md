@@ -13,7 +13,7 @@ allowed-tools: Read, Write, Bash, AskUserQuestion
 
 # Aether 集群配置 (aether-setup)
 
-> **版本**: 0.1.0 | **优先级**: P0
+> **版本**: 0.2.0 | **优先级**: P0
 
 ## 快速开始
 
@@ -129,19 +129,6 @@ cluster:
 /aether:setup --project
 ```
 
-交互流程：
-
-```
-创建项目级配置 (.aether/config.yaml)
-此配置仅对当前项目生效，会覆盖全局配置。
-
-请输入 Nomad 地址: http://192.168.69.70:4646
-请输入 Consul 地址: http://192.168.69.70:8500
-请输入 Registry 地址: forgejo.10cg.pub
-
-配置已保存到 .aether/config.yaml
-```
-
 生成的文件 `.aether/config.yaml`：
 
 ```yaml
@@ -156,48 +143,13 @@ cluster:
 
 ### 首次使用引导
 
-当其他 skill（如 `/aether:init`）检测到未配置时，自动触发引导：
-
-```
-/aether:init
-
-未找到 Aether 集群配置。
-
-请选择配置方式：
-  → 创建全局配置 (~/.aether/config.yaml) - 推荐
-  → 创建项目配置 (.env) - 仅当前项目
-  → 手动输入 - 本次使用，不保存
-
-[选择后进入配置流程]
-```
+当其他 skill（如 `/aether:init`）检测到未配置时，自动触发引导，询问用户选择全局配置或项目配置。
 
 ---
 
 ## 配置读取逻辑
 
-Skills 使用以下逻辑读取配置：
-
-```bash
-# 1. 检查项目级配置
-if [ -f ".aether/config.yaml" ]; then
-  NOMAD_ADDR=$(yq '.cluster.nomad_addr' .aether/config.yaml)
-  CONSUL_HTTP_ADDR=$(yq '.cluster.consul_addr' .aether/config.yaml)
-  AETHER_REGISTRY=$(yq '.cluster.registry' .aether/config.yaml)
-fi
-
-# 2. 检查全局配置 (如果项目级未设置)
-if [ -z "$NOMAD_ADDR" ] && [ -f "$HOME/.aether/config.yaml" ]; then
-  NOMAD_ADDR=$(yq '.cluster.nomad_addr' ~/.aether/config.yaml)
-  CONSUL_HTTP_ADDR=$(yq '.cluster.consul_addr' ~/.aether/config.yaml)
-  AETHER_REGISTRY=$(yq '.cluster.registry' ~/.aether/config.yaml)
-fi
-
-# 3. 检查是否配置完成
-if [ -z "$NOMAD_ADDR" ]; then
-  echo "未找到 Aether 配置，请运行 /aether:setup"
-  exit 1
-fi
-```
+Skills 按优先级链读取配置：项目级 `.aether/config.yaml` → 全局 `~/.aether/config.yaml` → 环境变量。使用 `yq` 读取 `cluster.*` 字段。未找到任何配置时，提示用户运行 `/aether:setup`。
 
 ---
 
@@ -205,192 +157,44 @@ fi
 
 配置入口地址后，skills 通过 API 发现集群详细信息：
 
-```bash
-# 发现节点类型和 driver
-curl -s "${NOMAD_ADDR}/v1/nodes" | jq -r '
-  group_by(.NodeClass) |
-  map({
-    class: .[0].NodeClass,
-    count: length,
-    drivers: [.[0].Drivers | keys[]] | unique
-  })
-'
+- **节点拓扑**: `GET /v1/nodes` → 按 NodeClass 分组，提取各类节点数量和可用 Drivers
+- **Docker 节点**: 过滤 `Drivers.docker != null` 的节点，提取 NodeClass（通常为 `heavy_workload`）
+- **Exec 节点**: 过滤仅有 exec driver 的节点，提取 NodeClass（通常为 `light_exec`）
 
-# 输出示例:
-# [
-#   {"class": "heavy_workload", "count": 3, "drivers": ["docker"]},
-#   {"class": "light_exec", "count": 5, "drivers": ["exec"]}
-# ]
-```
-
-Skills 使用发现的信息而非硬编码：
-
-```bash
-# 获取 Docker 节点的 node_class
-DOCKER_CLASS=$(curl -s "${NOMAD_ADDR}/v1/nodes" | jq -r '
-  [.[] | select(.Drivers.docker != null)] | .[0].NodeClass
-')
-# 结果: "heavy_workload"
-
-# 获取 exec 节点的 node_class
-EXEC_CLASS=$(curl -s "${NOMAD_ADDR}/v1/nodes" | jq -r '
-  [.[] | select(.Drivers.exec != null and .Drivers.docker == null)] | .[0].NodeClass
-')
-# 结果: "light_exec"
-```
+Skills 使用发现的信息（如 node_class）而非硬编码值。
 
 ---
 
-## 错误处理
+## 连接失败诊断引导
 
-### CLI 可用性检查
+### 验证原则
 
-在执行操作前，确认必要工具已安装：
+- 验证 URL 格式：必须有 `http://` 前缀 + 端口号，缺少时提示补全
+- 验证 Nomad 连通性：`curl ${NOMAD_ADDR}/v1/agent/self`，检查 HTTP 状态码
+- 验证 Consul 连通性：`curl ${CONSUL_HTTP_ADDR}/v1/status/leader`，检查 HTTP 状态码
+- 必要工具检查：确认 `curl`、`jq`、`yq` 已安装，未安装时给出安装命令
 
-```bash
-# 检查 curl 和 jq 是否可用
-for cmd in curl jq; do
-  if ! command -v $cmd &> /dev/null; then
-    echo "错误: 未找到 $cmd 命令"
-    echo "修复: sudo apt install $cmd  # Debian/Ubuntu"
-    echo "修复: brew install $cmd      # macOS"
-    exit 1
-  fi
-done
+### 多候选地址探测
 
-# 检查 yq（读取 config.yaml 需要）
-if ! command -v yq &> /dev/null; then
-  echo "错误: 未找到 yq 命令，无法读取 config.yaml"
-  echo "修复: sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 && sudo chmod +x /usr/local/bin/yq"
-  exit 1
-fi
-```
+用户可能不确定正确的入口地址。按以下策略探测：
 
-### 连接验证失败
+1. 尝试用户提供的地址
+2. 如已知 Nomad 地址，自动推导 Consul 地址：相同 IP + 端口 8500
+3. 常见候选：`localhost`、已知的 Infra 节点 IP（如 192.168.69.70~72）
+4. 逐一尝试，报告哪个可达
 
-当 `curl` 到 Nomad 或 Consul 失败时，提供明确的诊断信息：
+### 失败原因分类与处理
 
-```bash
-# Nomad 连接验证
-validate_nomad() {
-  local addr="$1"
-  local response
-  response=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "${addr}/v1/agent/self" 2>&1)
+| 失败类型 | 表现 | 处理步骤 |
+|---------|------|---------|
+| **服务未启动** | `curl` 连接超时或拒绝 | SSH 到目标节点检查 `systemctl status nomad/consul`，确认服务是否运行 |
+| **网络不可达** | `curl` 连接超时、无响应 | 检查本机到目标 IP 的网络连通性 (`ping`)，检查防火墙规则 |
+| **地址错误** | `curl` 返回非预期内容 | 确认 IP 和端口是否正确，Nomad 默认 4646、Consul 默认 8500 |
+| **认证失败** | HTTP 403 | 检查 `NOMAD_TOKEN` 是否设置且有效，ACL 启用时需要有效 token |
 
-  if [ $? -ne 0 ]; then
-    echo "错误: 无法连接到 Nomad (${addr})"
-    echo "可能原因:"
-    echo "  - Nomad 服务未启动"
-    echo "  - 网络不可达或防火墙阻拦"
-    echo "  - 地址格式错误（需要 http:// 前缀）"
-    echo "修复:"
-    echo "  ssh root@<node> 'systemctl status nomad'"
-    echo "  curl -v ${addr}/v1/agent/self"
-    return 1
-  elif [ "$response" = "403" ]; then
-    echo "错误: Nomad 返回 403 - Token 认证失败"
-    echo "修复: 设置 NOMAD_TOKEN 环境变量或在 config.yaml 中配置 token"
-    return 1
-  elif [ "$response" != "200" ]; then
-    echo "错误: Nomad 返回 HTTP ${response}"
-    return 1
-  fi
-}
+### 目录与权限
 
-# Consul 连接验证（同理）
-validate_consul() {
-  local addr="$1"
-  local response
-  response=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "${addr}/v1/status/leader" 2>&1)
-
-  if [ $? -ne 0 ]; then
-    echo "错误: 无法连接到 Consul (${addr})"
-    echo "修复: ssh root@<node> 'systemctl status consul'"
-    return 1
-  elif [ "$response" != "200" ]; then
-    echo "错误: Consul 返回 HTTP ${response}"
-    return 1
-  fi
-}
-```
-
-### 目录权限错误
-
-创建 `~/.aether/` 目录时可能遇到权限问题：
-
-```bash
-# 创建配置目录
-AETHER_DIR="$HOME/.aether"
-if ! mkdir -p "$AETHER_DIR" 2>/dev/null; then
-  echo "错误: 无法创建目录 ${AETHER_DIR}"
-  echo "可能原因: 权限不足或 \$HOME 路径异常 (HOME=${HOME})"
-  echo "修复:"
-  echo "  sudo mkdir -p ${AETHER_DIR} && sudo chown $(whoami) ${AETHER_DIR}"
-  exit 1
-fi
-
-# 写入配置文件
-if ! touch "$AETHER_DIR/config.yaml" 2>/dev/null; then
-  echo "错误: 无法写入 ${AETHER_DIR}/config.yaml"
-  echo "修复: chmod 755 ${AETHER_DIR}"
-  exit 1
-fi
-```
-
-### URL 格式验证
-
-验证用户输入的地址格式：
-
-```bash
-validate_url() {
-  local url="$1"
-  local name="$2"
-
-  # 检查空值
-  if [ -z "$url" ]; then
-    echo "错误: ${name} 地址不能为空"
-    return 1
-  fi
-
-  # 检查 http/https 前缀
-  if [[ ! "$url" =~ ^https?:// ]]; then
-    echo "错误: ${name} 地址缺少协议前缀"
-    echo "示例: http://192.168.69.70:4646"
-    return 1
-  fi
-
-  # 检查端口号
-  if [[ ! "$url" =~ :[0-9]+$ ]]; then
-    echo "警告: ${name} 地址未指定端口，将使用默认端口"
-  fi
-}
-
-# 使用
-validate_url "$NOMAD_ADDR" "Nomad" || exit 1
-validate_url "$CONSUL_HTTP_ADDR" "Consul" || exit 1
-```
-
-### Token 认证失败
-
-Nomad ACL 启用时的 Token 认证处理：
-
-```bash
-# 检查 Token 是否有效
-if [ -n "$NOMAD_TOKEN" ]; then
-  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-    -H "X-Nomad-Token: ${NOMAD_TOKEN}" \
-    "${NOMAD_ADDR}/v1/agent/self")
-
-  if [ "$HTTP_CODE" = "403" ]; then
-    echo "错误: NOMAD_TOKEN 无效或权限不足"
-    echo "修复:"
-    echo "  1. 检查 token 是否过期: nomad acl token self"
-    echo "  2. 重新获取 token: nomad acl token create -name='aether' -type='client'"
-    echo "  3. 更新配置: 编辑 ~/.aether/config.yaml 中的 nomad_token"
-    exit 1
-  fi
-fi
-```
+创建 `~/.aether/` 或 `.aether/` 时，如遇权限错误，提示检查 `$HOME` 路径和目录所有权。
 
 ---
 
