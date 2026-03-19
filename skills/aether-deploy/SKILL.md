@@ -17,7 +17,7 @@ dependencies:
 
 # Aether 生产部署 (aether-deploy)
 
-> **版本**: 0.3.0 | **优先级**: P1
+> **版本**: 0.4.0 | **更新**: 2026-03-19 | **优先级**: P1
 
 ## 前置检查
 
@@ -59,13 +59,58 @@ CLI=$(get_aether_cli)
 
 ### Step 2: 验证镜像存在
 
+镜像验证是部署安全门控，**不可跳过**。提供两种验证方式，按优先级尝试：
+
+**Primary: docker CLI**
+
 ```bash
-# 检查镜像是否存在于 Registry
 IMAGE="forgejo.10cg.pub/org/my-project:v1.2.3"
 docker manifest inspect ${IMAGE}
 ```
 
-如果镜像不存在，报错并终止。
+**Fallback: Registry v2 API (docker CLI 不可用时)**
+
+```bash
+REGISTRY="forgejo.10cg.pub"
+REPO="org/my-project"
+TAG="v1.2.3"
+curl -sf "https://${REGISTRY}/v2/${REPO}/manifests/${TAG}" \
+  -H "Accept: application/vnd.docker.distribution.manifest.v2+json"
+```
+
+如需认证，先获取 token：
+
+```bash
+TOKEN=$(curl -sf "https://${REGISTRY}/v2/token?scope=repository:${REPO}:pull" | jq -r '.token')
+curl -sf "https://${REGISTRY}/v2/${REPO}/manifests/${TAG}" \
+  -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+  -H "Authorization: Bearer ${TOKEN}"
+```
+
+**两种方式都失败时，必须 BLOCK 部署，不允许跳过。**
+
+### Step 2.1: 镜像验证失败诊断
+
+当镜像验证失败时，不要仅报错终止 — 引导用户排查根因：
+
+1. **CI Pipeline 状态**: 构建是否成功完成？
+   ```bash
+   # 检查最近的 CI 构建状态 (Forgejo Actions)
+   curl -sf "https://${REGISTRY}/api/v1/repos/${REPO}/actions/runs?limit=5" \
+     -H "Authorization: token ${FORGEJO_TOKEN}" | jq '.[0] | {status, conclusion, created_at}'
+   ```
+
+2. **Registry 认证**: Token/凭据是否有效？
+   ```bash
+   # 验证 registry 连通性
+   curl -sf "https://${REGISTRY}/v2/" && echo "Registry reachable" || echo "Registry unreachable"
+   ```
+
+3. **网络问题**: Cloudflare Access、代理、防火墙是否阻断？
+   - Cloudflare Access 可能拦截非浏览器请求 — 检查返回是否为 HTML 登录页
+   - 内网 registry 可能需要 VPN 或特定网段访问
+
+诊断完成后，向用户报告根因并建议修复方案，**不要跳过验证直接部署**。
 
 ### Step 3: 获取当前状态
 
@@ -148,14 +193,18 @@ Consul DNS: my-project.service.consul
 ### 配置读取
 
 ```bash
-# 1. 检查项目 .env
-if [ -f ".env" ]; then source .env; fi
+# 1. 检查项目配置
+if [ -f ".aether/config.yaml" ]; then
+  NOMAD_ADDR=$(yq '.cluster.nomad_addr' .aether/config.yaml)
+  CONSUL_HTTP_ADDR=$(yq '.cluster.consul_addr' .aether/config.yaml)
+  AETHER_REGISTRY=$(yq '.cluster.registry' .aether/config.yaml)
+fi
 
-# 2. 检查全局配置
+# 2. 检查全局配置 (项目配置优先)
 if [ -z "$NOMAD_ADDR" ] && [ -f "$HOME/.aether/config.yaml" ]; then
-  NOMAD_ADDR=$(yq '.endpoints.nomad' ~/.aether/config.yaml)
-  CONSUL_HTTP_ADDR=$(yq '.endpoints.consul' ~/.aether/config.yaml)
-  AETHER_REGISTRY=$(yq '.endpoints.registry' ~/.aether/config.yaml)
+  NOMAD_ADDR=$(yq '.cluster.nomad_addr' ~/.aether/config.yaml)
+  CONSUL_HTTP_ADDR=$(yq '.cluster.consul_addr' ~/.aether/config.yaml)
+  AETHER_REGISTRY=$(yq '.cluster.registry' ~/.aether/config.yaml)
 fi
 
 # 3. 未配置则提示

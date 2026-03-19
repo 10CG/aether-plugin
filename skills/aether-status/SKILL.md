@@ -17,7 +17,7 @@ dependencies:
 
 # Aether 状态查询 (aether-status)
 
-> **版本**: 1.1.0 | **优先级**: P0
+> **版本**: 1.2.0 | **优先级**: P0
 
 ## 快速开始
 
@@ -44,91 +44,69 @@ dependencies:
 
 ## 查询模式
 
-以下描述各场景建议覆盖的信息维度。具体查询顺序和输出组织方式可根据实际情况灵活调整。
+以下描述各场景建议覆盖的信息维度。具体查询方式、顺序和输出组织可根据实际情况灵活调整，鼓励超越列表范围主动探索。
 
 ### 集群概览（无参数）
 
-建议覆盖的信息：
-- **Nomad 节点**: 各节点状态、NodeClass 分布
-- **运行中的 Jobs**: 数量、类型分布（service/batch/system）
-- **失败的 Allocations**: 数量及关联的 Job 和节点
-- **Consul 服务健康**: passing/critical 数量
+查询集群全局健康状况，覆盖以下维度：
 
-常用查询：
+- **Nomad 节点健康**: 各节点 Status、Eligibility、NodeClass 分布、Drain 状态
+- **Job 运行状态**: 数量、类型分布（service/batch/system）、Dead/Pending 异常
+- **Allocation 健康**: Running vs Failed vs Pending 分布，关联 Job 和节点
+- **Consul 服务健康**: passing/warning/critical 数量及具体服务名
+- **资源利用率**: 各节点 CPU/Memory/Disk 已分配与可用比率
+- **调度约束**: 是否有 Job 因约束 (constraint/affinity) 无法调度
 
-```bash
-curl -s "${NOMAD_ADDR}/v1/nodes" | jq '[.[] | {name: .Name, status: .Status, class: .NodeClass}]'
-curl -s "${NOMAD_ADDR}/v1/jobs" | jq '[.[] | select(.Status == "running") | {name: .Name, type: .Type, status: .Status}]'
-curl -s "${NOMAD_ADDR}/v1/allocations" | jq '[.[] | select(.ClientStatus == "failed") | {job: .JobID, node: .NodeName, status: .ClientStatus}]'
-curl -s "${CONSUL_HTTP_ADDR}/v1/health/state/critical" | jq 'length'
-```
+发现异常信号时，不要停在数字层面 -- 追踪具体原因。
 
 ---
 
 ### 服务详情（指定 job-name）
 
-建议覆盖的信息：
-- **Job 状态**: 类型、运行状态、当前版本、使用的镜像
-- **Allocations**: 各 allocation 的节点分布、状态、版本
-- **Consul 健康**: 服务实例地址、端口、健康状态
-- **部署历史**: 最近部署时间
+深入查看单个服务的完整状态，覆盖以下维度：
 
-常用查询：
-
-```bash
-curl -s "${NOMAD_ADDR}/v1/job/{job_id}" | jq '{name: .Name, type: .Type, status: .Status, version: .Version}'
-curl -s "${NOMAD_ADDR}/v1/job/{job_id}/allocations" | jq '[.[] | {id: .ID[:8], node: .NodeName, status: .ClientStatus, version: .JobVersion}]'
-curl -s "${CONSUL_HTTP_ADDR}/v1/health/service/{job_id}?passing" | jq '[.[] | {node: .Node.Node, address: .Service.Address, port: .Service.Port}]'
-```
+- **Job 元信息**: 类型、Status、当前版本号、TaskGroup 配置
+- **容器镜像**: 正在使用的镜像及 tag，是否与预期一致
+- **Allocation 分布**: 各 allocation 的节点位置、状态、版本号、健康检查结果
+- **Consul 服务实例**: 地址、端口、健康检查输出内容（不仅是 passing/critical）
+- **部署历史**: 最近版本变更时间线，是否有回滚记录
+- **网络与端口**: 动态端口分配、服务发现 DNS 记录
+- **资源实际使用**: allocation 的 CPU/Memory 实际使用 vs 分配值
 
 ---
 
 ### 失败的 Allocations（--failed）
 
-建议覆盖的信息：
-- 每个失败 allocation 的 **Job、TaskGroup、节点、失败时间**
-- **TaskStates** 中的退出码和事件详情
-- 如有重复失败模式（同一 Job 或同一节点反复失败），**指出模式**
+分析失败 allocation 的根因，覆盖以下维度：
 
-常用查询：
-
-```bash
-# 获取失败的 allocations 列表
-curl -s "${NOMAD_ADDR}/v1/allocations?filter=ClientStatus==failed"
-
-# 获取单个 allocation 详情
-curl -s "${NOMAD_ADDR}/v1/allocation/${alloc_id}"
-```
+- **失败清单**: 每个失败 allocation 的 Job、TaskGroup、节点、失败时间
+- **退出详情**: TaskStates 中的退出码、事件链、重启次数
+- **模式识别**: 同一 Job 反复失败？同一节点集中失败？特定时间段集中？
+- **资源相关**: 是否因 OOM 被 kill、磁盘空间不足、端口冲突
+- **镜像问题**: 是否因镜像拉取失败（registry 不可达、tag 不存在）
+- **依赖失败**: 是否因前置服务未就绪导致健康检查超时
 
 ---
 
 ### 最近部署（--recent）
 
-建议覆盖的信息：
-- 最近部署的 **Job 名称、状态、版本、更新时间**
-- 标注任何 **失败的部署**
+回顾近期部署活动，覆盖以下维度：
 
-常用查询：
-
-```bash
-curl -s "${NOMAD_ADDR}/v1/jobs" | jq '[.[] | {name: .Name, status: .Status, version: .Version, modify_index: .ModifyIndex}] | sort_by(-.modify_index) | .[0:10]'
-```
+- **部署时间线**: 最近部署的 Job 名称、版本、时间、状态
+- **失败部署**: 标注失败或回滚的部署，分析失败原因
+- **版本变更**: 对比部署前后的 Job spec 差异（镜像、资源、count）
+- **部署策略**: canary/rolling 部署的进度和健康判定
 
 ---
 
 ### 日志查看（--logs）
 
-建议覆盖的信息：
-- 目标服务 running allocation 的 **stdout 和 stderr**
-- 如果服务已失败，获取 **最近失败 allocation 的日志**
+获取服务日志用于诊断，覆盖以下维度：
 
-常用查询：
-
-```bash
-ALLOC_ID=$(curl -s "${NOMAD_ADDR}/v1/job/{job_id}/allocations" | jq -r '[.[] | select(.ClientStatus == "running") | .ID][0]')
-curl -s "${NOMAD_ADDR}/v1/client/fs/logs/${ALLOC_ID}?task={task}&type=stdout&plain=true" | tail -100
-curl -s "${NOMAD_ADDR}/v1/client/fs/logs/${ALLOC_ID}?task={task}&type=stderr&plain=true" | tail -100
-```
+- **运行中实例**: 获取 running allocation 的 stdout 和 stderr
+- **失败实例**: 如服务已失败，获取最近失败 allocation 的日志
+- **错误模式**: 识别日志中的异常模式（panic、connection refused、timeout）
+- **时间关联**: 将日志事件与 allocation 状态变更时间对应
 
 ---
 
@@ -143,15 +121,42 @@ curl -s "${NOMAD_ADDR}/v1/client/fs/logs/${ALLOC_ID}?task={task}&type=stderr&pla
 
 ## 深入调查指引
 
-在完成基本查询后，深入调查任何发现的异常。不要局限于上述查询模式 -- 以下是值得探索的方向：
+**核心原则**: 基础查询只是起点。发现任何异常信号时，主动深入追踪根因，覆盖用户请求的所有维度，并超越这些维度提供洞察。
 
-- **依赖链**: 如果某服务异常，检查它依赖的其他服务是否也有问题
-- **节点级别**: 如果多个服务在同一节点失败，调查节点本身的资源状况（CPU、内存、磁盘）
-- **历史模式**: 对比当前状态与近期部署历史，判断是新引入的问题还是长期存在
-- **日志关联**: 结合 stdout/stderr 日志和 allocation 事件，还原故障时间线
-- **Consul 健康检查详情**: 不仅看 passing/critical 数量，还看具体的检查输出内容
+### Consul 内部健康
 
-**核心原则**: 覆盖所有用户请求的维度，但不止步于此。发现异常信号时主动追踪根因。
+- **Raft 共识**: leader 是否稳定、commit index 是否一致、是否有 leadership 切换
+- **Serf 成员**: 所有成员是否 alive、是否有 failed/left 节点、网络分区迹象
+- **DNS 解析**: 服务 DNS 记录 (`<service>.service.consul`) 是否正确解析
+- **KV 依赖**: 服务是否依赖 Consul KV 中的配置，KV 中的值是否正确
+- **健康检查详情**: 不仅看 passing/critical 计数，查看具体检查的 Output 内容
+
+### 资源分析
+
+- **节点级资源**: 每个节点的 CPU/Memory/Disk 总量、已分配量、可用量
+- **过度分配**: 是否有节点分配率 >90%，存在资源争抢风险
+- **调度约束**: constraint/affinity/spread 策略是否导致资源不均衡
+- **资源趋势**: 对比当前资源使用与历史水平，预判容量瓶颈
+
+### 服务拓扑
+
+- **域名路由**: 从域名到 Traefik/反向代理到 Nomad Job 的完整路径
+- **服务间依赖**: 服务 A 依赖服务 B 时，B 的健康状况如何
+- **端口映射**: 动态端口分配、静态端口冲突检测
+- **跨节点通信**: 服务实例分布在不同节点时的网络连通性
+
+### 影响评估
+
+- **严重度分级**: Critical（用户可感知的服务中断）、Warning（降级但可用）、Info（潜在风险）
+- **影响范围**: 受影响的 Job 数量、用户面服务 vs 内部服务
+- **级联风险**: 当前问题是否可能导致其他服务连锁失败
+
+### 可行动建议
+
+- **HCL 优化**: 建议 constraint/spread/affinity 调整以改善调度
+- **扩缩容**: 基于资源分析建议 count 调整或节点扩容
+- **配置修复**: 具体的配置修改建议（镜像 tag、资源限制、健康检查参数）
+- **运维操作**: 需要执行的 drain/restart/redeploy 操作及其风险
 
 ---
 
@@ -212,6 +217,19 @@ GET ${CONSUL_HTTP_ADDR}/v1/health/service/{service_name}
 
 # 临界服务
 GET ${CONSUL_HTTP_ADDR}/v1/health/state/critical
+
+# Raft 状态
+GET ${CONSUL_HTTP_ADDR}/v1/status/leader
+GET ${CONSUL_HTTP_ADDR}/v1/status/peers
+
+# Serf 成员
+GET ${CONSUL_HTTP_ADDR}/v1/agent/members
+
+# KV 读取
+GET ${CONSUL_HTTP_ADDR}/v1/kv/{key}
+
+# DNS 查询
+dig @<consul-ip> <service>.service.consul
 ```
 
 ---
@@ -223,13 +241,16 @@ GET ${CONSUL_HTTP_ADDR}/v1/health/state/critical
 ### 配置读取
 
 ```bash
-# 1. 检查项目 .env
-if [ -f ".env" ]; then source .env; fi
+# 1. 检查项目配置
+if [ -f ".aether/config.yaml" ]; then
+  NOMAD_ADDR=$(yq '.cluster.nomad_addr' .aether/config.yaml)
+  CONSUL_HTTP_ADDR=$(yq '.cluster.consul_addr' .aether/config.yaml)
+fi
 
 # 2. 检查全局配置
 if [ -z "$NOMAD_ADDR" ] && [ -f "$HOME/.aether/config.yaml" ]; then
-  NOMAD_ADDR=$(yq '.endpoints.nomad' ~/.aether/config.yaml)
-  CONSUL_HTTP_ADDR=$(yq '.endpoints.consul' ~/.aether/config.yaml)
+  NOMAD_ADDR=$(yq '.cluster.nomad_addr' ~/.aether/config.yaml)
+  CONSUL_HTTP_ADDR=$(yq '.cluster.consul_addr' ~/.aether/config.yaml)
 fi
 
 # 3. 未配置则提示
@@ -243,81 +264,23 @@ fi
 
 ## 故障处理
 
-### 集群不可达
+### 连通性检查原则
 
-所有 API 调用前先检查连通性，设置超时防止长时间阻塞：
+- 所有 API 调用前先检查连通性，使用 `--max-time 5` 防止阻塞
+- 检查端点：Nomad `/v1/agent/health`，Consul `/v1/status/leader`
+- 连接失败时：确认地址、测试网络、检查服务状态、尝试 `/aether:setup`
 
-```bash
-# 检查 Nomad 可达性（5 秒超时）
-if ! curl -sf --max-time 5 "${NOMAD_ADDR}/v1/agent/health" > /dev/null 2>&1; then
-  echo "错误: 无法连接 Nomad API (${NOMAD_ADDR})"
-  echo ""
-  echo "修复建议:"
-  echo "  1. 确认地址正确: echo \$NOMAD_ADDR"
-  echo "  2. 测试网络连通: curl -v ${NOMAD_ADDR}/v1/agent/health"
-  echo "  3. 检查 Nomad 服务: ssh root@heavy-1 'systemctl status nomad'"
-  echo "  4. 重新配置: /aether:setup"
-  exit 1
-fi
+### 降级策略
 
-# 检查 Consul 可达性（5 秒超时）
-if ! curl -sf --max-time 5 "${CONSUL_HTTP_ADDR}/v1/status/leader" > /dev/null 2>&1; then
-  echo "错误: 无法连接 Consul API (${CONSUL_HTTP_ADDR})"
-  echo ""
-  echo "修复建议:"
-  echo "  1. 确认地址正确: echo \$CONSUL_HTTP_ADDR"
-  echo "  2. 测试网络连通: curl -v ${CONSUL_HTTP_ADDR}/v1/status/leader"
-  echo "  3. 检查 Consul 服务: ssh root@heavy-1 'systemctl status consul'"
-  echo "  4. 重新配置: /aether:setup"
-  exit 1
-fi
-```
+- **Nomad 可达 + Consul 不可达**：仅显示 Nomad 数据，标注服务健康信息不可用
+- **Consul 可达 + Nomad 不可达**：仅显示 Consul 数据，标注节点和 Job 信息不可用
+- **双不可达**：报错并建议检查集群配置
 
-### 部分可达（降级策略）
+### 超时建议
 
-当 Nomad 可达但 Consul 不可达（或反之），采用降级模式：
-
-```bash
-NOMAD_OK=false
-CONSUL_OK=false
-
-curl -sf --max-time 5 "${NOMAD_ADDR}/v1/agent/health" > /dev/null 2>&1 && NOMAD_OK=true
-curl -sf --max-time 5 "${CONSUL_HTTP_ADDR}/v1/status/leader" > /dev/null 2>&1 && CONSUL_OK=true
-
-if [ "$NOMAD_OK" = true ] && [ "$CONSUL_OK" = false ]; then
-  echo "⚠ Consul 不可达，仅显示 Nomad 数据（服务健康信息不可用）"
-  # 仅查询 Nomad 节点、Jobs、Allocations
-  # 跳过 Consul 服务健康查询
-
-elif [ "$NOMAD_OK" = false ] && [ "$CONSUL_OK" = true ]; then
-  echo "⚠ Nomad 不可达，仅显示 Consul 数据（节点和 Job 信息不可用）"
-  # 仅查询 Consul 服务状态
-
-elif [ "$NOMAD_OK" = false ] && [ "$CONSUL_OK" = false ]; then
-  echo "错误: Nomad 和 Consul 均不可达，无法查询状态"
-  echo "修复建议: 运行 /aether:setup 检查集群配置"
-  exit 1
-fi
-```
-
-### API 超时处理
-
-所有 API 请求添加 `--max-time` 防止阻塞：
-
-```bash
-# 标准查询（10 秒超时）
-RESPONSE=$(curl -sf --max-time 10 "${NOMAD_ADDR}/v1/nodes" 2>&1)
-if [ $? -ne 0 ]; then
-  echo "⚠ 查询节点状态超时，请检查网络或稍后重试"
-fi
-
-# 日志获取（30 秒超时，数据量较大）
-LOGS=$(curl -sf --max-time 30 "${NOMAD_ADDR}/v1/client/fs/logs/${ALLOC_ID}?task=api&type=stdout&plain=true" 2>&1)
-if [ $? -ne 0 ]; then
-  echo "⚠ 获取日志超时"
-  echo "  尝试直接获取: ssh root@<node> 'nomad alloc logs ${ALLOC_ID}'"
-fi
-```
+- 标准查询：10 秒超时
+- 日志获取：30 秒超时（数据量较大）
+- 超时后可尝试 SSH 直连节点获取日志
 
 ### 常见错误速查
 
@@ -345,6 +308,6 @@ aether-doctor (诊断层) - 环境诊断
 
 ---
 
-**Skill 版本**: 1.1.0
-**最后更新**: 2026-03-17
+**Skill 版本**: 1.2.0
+**最后更新**: 2026-03-19
 **维护者**: 10CG Infrastructure Team
