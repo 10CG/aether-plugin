@@ -2,6 +2,23 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.1.0] - 2026-03-19
+
+### Improved (AB test validated)
+- **aether-status**: Removed prescriptive curl/jq templates, added exploration dimension guidance. WITHOUT_BETTER → WITH_BETTER (2-0)
+- **aether-deploy**: Added registry API fallback when docker CLI unavailable, failure diagnosis guidance. MIXED → WITH_BETTER (2-0)
+- **aether-rollback**: Expanded to 3 rollback strategies (Nomad revert / Git resubmit / emergency deploy), added execution confirmation step, structured root cause analysis. MIXED → WITH_BETTER (2-0)
+- **aether-doctor**: Enhanced SSH diagnostics with 5-layer diagnostic framework (network → name resolution → auth → remote-side → application). MIXED → WITH_BETTER (2-0)
+- **aether-setup**: Streamlined from 410 to 213 lines, removed boilerplate bash functions, added connection failure diagnostic guide. MIXED → MIXED (stable)
+
+### Fixed
+- **Config schema**: All 5 skills corrected endpoints.* → cluster.* in config read sections
+
+### Quality
+- AB test: 9 Skills × 18 evals, WITH 94.4% win rate (up from 50%)
+- WITH_BETTER: 8/9 skills, MIXED: 1/9 (setup), WITHOUT_BETTER: 0/9
+- Zero regressions across two optimization rounds
+
 ## [1.0.0] - 2026-03-18
 
 ### Milestone
