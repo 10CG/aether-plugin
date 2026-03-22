@@ -14,7 +14,7 @@
       },
       "source": {
         "source": "url",
-        "url": "ssh://forgejo@forgejo.10cg.pub/10CG/aether-plugin.git"
+        "url": "https://github.com/10CG/aether-plugin.git"
       },
       "category": "infrastructure",
       "keywords": ["aether", "nomad", "consul", "deployment", "infrastructure", "devops"]
