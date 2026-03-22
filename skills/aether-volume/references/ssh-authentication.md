@@ -46,7 +46,7 @@ aether volume create --node heavy-1 --project test --volumes data
 
 3. 测试连接：
    ```bash
-   ssh root@192.168.69.80 "hostname"
+   ssh root@192.168.1.80 "hostname"
    ```
 
 ## 参考文档

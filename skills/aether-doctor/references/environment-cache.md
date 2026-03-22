@@ -22,27 +22,27 @@ cli_path: "/home/user/.aether/aether"
 
 config:
   source: "project"  # project | global | env
-  nomad: "http://192.168.69.70:4646"
-  consul: "http://192.168.69.70:8500"
+  nomad: "http://192.168.1.70:4646"
+  consul: "http://192.168.1.70:8500"
   registry: "forgejo.10cg.pub"
   validated: true
 
 cluster:
   nomad_version: "1.11.2"
   consul_version: "1.22.3"
-  current_leader: "192.168.69.71"
+  current_leader: "192.168.1.71"
   datacenter: "dc1"
   region: "global"
 
   servers:
     - name: "infra-server-1"
-      ip: "192.168.69.70"
+      ip: "192.168.1.70"
       http_port: 4646
       role: "follower"
 
   clients:
     - name: "heavy-1"
-      ip: "192.168.69.80"
+      ip: "192.168.1.80"
       class: "heavy_workload"
       drivers: ["docker", "exec"]
       status: "ready"
@@ -52,7 +52,7 @@ ssh:
   key_exists: true
   key_valid: true
   nodes_tested:
-    heavy-1: { ip: "192.168.69.80", status: "ok" }
+    heavy-1: { ip: "192.168.1.80", status: "ok" }
 ```
 
 ## 缓存有效期

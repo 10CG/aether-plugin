@@ -17,7 +17,7 @@ aether volume create --node heavy-1 --project test --volumes data
 aether volume create --node heavy-1 --project test --volumes data
 
 # 或使用 IP（直接连接）
-aether volume create --node 192.168.69.80 --project test --volumes data
+aether volume create --node 192.168.1.80 --project test --volumes data
 ```
 
 ## 3. 定期清理不用的 volume

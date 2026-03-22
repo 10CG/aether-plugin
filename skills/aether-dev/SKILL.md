@@ -75,7 +75,7 @@ docker push ${IMAGE}
 sed "s|__IMAGE__|${IMAGE}|g" deploy/nomad.hcl | nomad job run -
 
 # exec 模式
-rsync -avz --exclude '.git' ./ root@192.168.69.90:/opt/apps/${PROJECT}/
+rsync -avz --exclude '.git' ./ root@192.168.1.90:/opt/apps/${PROJECT}/
 nomad job run deploy/nomad.hcl
 ```
 

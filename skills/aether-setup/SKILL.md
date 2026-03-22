@@ -43,8 +43,8 @@ allowed-tools: Read, Write, Bash, AskUserQuestion
 
 | 配置项 | 环境变量 | 说明 |
 |--------|---------|------|
-| Nomad 地址 | `NOMAD_ADDR` | Nomad API 入口，如 `http://192.168.69.70:4646` |
-| Consul 地址 | `CONSUL_HTTP_ADDR` | Consul API 入口，如 `http://192.168.69.70:8500` |
+| Nomad 地址 | `NOMAD_ADDR` | Nomad API 入口，如 `http://192.168.1.70:4646` |
+| Consul 地址 | `CONSUL_HTTP_ADDR` | Consul API 入口，如 `http://192.168.1.70:8500` |
 | Registry 地址 | `AETHER_REGISTRY` | 容器镜像仓库，如 `forgejo.10cg.pub` |
 
 ### 自动发现（从 API 获取）
@@ -76,8 +76,8 @@ Aether 集群配置
 配置来源: ~/.aether/config.yaml
 
 入口地址:
-  Nomad:    http://192.168.69.70:4646 ✓ 可达
-  Consul:   http://192.168.69.70:8500 ✓ 可达
+  Nomad:    http://192.168.1.70:4646 ✓ 可达
+  Consul:   http://192.168.1.70:8500 ✓ 可达
   Registry: forgejo.10cg.pub
 
 集群信息 (从 API 发现):
@@ -100,8 +100,8 @@ Aether 集群配置
 创建全局配置 (~/.aether/config.yaml)
 此配置将被所有项目共享。
 
-请输入 Nomad 地址 [http://localhost:4646]: http://192.168.69.70:4646
-请输入 Consul 地址 [同 Nomad 主机]: http://192.168.69.70:8500
+请输入 Nomad 地址 [http://localhost:4646]: http://192.168.1.70:4646
+请输入 Consul 地址 [同 Nomad 主机]: http://192.168.1.70:8500
 请输入 Registry 地址: forgejo.10cg.pub
 
 验证连接...
@@ -118,8 +118,8 @@ Aether 集群配置
 # 由 /aether:setup 生成
 
 cluster:
-  nomad_addr: "http://192.168.69.70:4646"
-  consul_addr: "http://192.168.69.70:8500"
+  nomad_addr: "http://192.168.1.70:4646"
+  consul_addr: "http://192.168.1.70:8500"
   registry: "forgejo.10cg.pub"
 ```
 
@@ -136,8 +136,8 @@ cluster:
 # 覆盖全局配置中的对应字段
 
 cluster:
-  nomad_addr: "http://192.168.69.70:4646"
-  consul_addr: "http://192.168.69.70:8500"
+  nomad_addr: "http://192.168.1.70:4646"
+  consul_addr: "http://192.168.1.70:8500"
   registry: "forgejo.10cg.pub"
 ```
 
@@ -180,7 +180,7 @@ Skills 使用发现的信息（如 node_class）而非硬编码值。
 
 1. 尝试用户提供的地址
 2. 如已知 Nomad 地址，自动推导 Consul 地址：相同 IP + 端口 8500
-3. 常见候选：`localhost`、已知的 Infra 节点 IP（如 192.168.69.70~72）
+3. 常见候选：`localhost`、已知的 Infra 节点 IP（如 192.168.1.70~72）
 4. 逐一尝试，报告哪个可达
 
 ### 失败原因分类与处理

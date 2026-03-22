@@ -8,7 +8,7 @@
 
 ```bash
 # 添加 marketplace
-/plugin marketplace add 10CG/aether-plugin
+/plugin marketplace add ssh://forgejo@forgejo.10cg.pub/10CG/aether-plugin.git
 
 # 安装
 /plugin install aether@10CG-aether-plugin

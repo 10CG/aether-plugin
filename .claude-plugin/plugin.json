@@ -6,6 +6,6 @@
     "name": "10CG"
   },
   "license": "MIT",
-  "homepage": "https://github.com/10CG/aether-plugin",
-  "repository": "https://github.com/10CG/aether-plugin.git"
+  "homepage": "https://forgejo.10cg.pub/10CG/aether-plugin",
+  "repository": "ssh://forgejo@forgejo.10cg.pub/10CG/aether-plugin.git"
 }

@@ -24,8 +24,8 @@ When a node needs maintenance (reboot, update, hardware repair), you orchestrate
 
 ## Cluster Context
 
-- Nomad Server: http://192.168.69.70:4646
-- Consul Server: http://192.168.69.70:8500
+- Nomad Server: http://192.168.1.70:4646
+- Consul Server: http://192.168.1.70:8500
 - Heavy Nodes: heavy-1 (.80), heavy-2 (.81), heavy-3 (.82)
 - Light Nodes: light-1 (.90) through light-5 (.94)
 - PVE Nodes: pve-node1 (.11) through pve-node5 (.55)
@@ -96,7 +96,7 @@ Use AskUserQuestion to:
 
 请执行维护操作:
 - SSH: ssh root@${NODE_IP}
-- PVE: https://192.168.69.11:8006 → ${NODE_NAME}
+- PVE: https://192.168.1.11:8006 → ${NODE_NAME}
 
 维护完成后请确认。
 ```
