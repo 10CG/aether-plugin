@@ -52,7 +52,7 @@ REMOTE_URL=$(git remote get-url origin)
 #   ssh://forgejo@host/OWNER/REPO.git
 #   git@host:OWNER/REPO.git
 #   https://host/OWNER/REPO.git
-OWNER_REPO=$(echo "$REMOTE_URL" | sed -E 's#.*/([^/]+/[^/]+?)(\.git)?$#\1#')
+OWNER_REPO=$(echo "$REMOTE_URL" | sed 's/\.git$//' | sed -E 's#.*/([^/]+/[^/]+)$#\1#')
 ```
 
 ### Step 2: 查询 CI 状态
@@ -261,6 +261,99 @@ aether-ci (CI 状态层)
 
 ---
 
-**Skill 版本**: 1.0.0
-**最后更新**: 2026-03-22
+## 自动触发: Push 后自动监控
+
+### PostToolUse Hook (`ci-watch-hook.sh`)
+
+`scripts/ci-watch-hook.sh` 在每次 Bash 工具执行后运行，检测 `git push` 命令。
+
+**触发条件**: Bash 命令包含 `git push` 且非 `--dry-run`
+**自动操作**: 提取 SHA/repo → 写入状态文件 → 输出 systemMessage → Claude 启动 CronCreate 轮询
+
+```
+git push → Hook 检测 → systemMessage → Claude 创建 CronCreate
+  → 每 60s 轮询 commit status API
+  → pending: 继续等待
+  → success: 通知用户，CronDelete
+  → failure: 自动 --reproduce 诊断
+```
+
+### Hook 触发后 Claude 应执行的操作
+
+1. 通知用户 CI 监控已激活
+2. 使用 CronCreate 创建轮询任务（见下节）
+3. 继续当前对话，不阻塞用户
+
+---
+
+## CronCreate 自动轮询
+
+当 Hook 触发或用户指定 `--watch` 时，使用 CronCreate 创建轮询任务。
+
+### 轮询 Prompt 模板
+
+```
+Auto CI check for commit {SHA} in {OWNER_REPO}:
+1. Run: forgejo GET /repos/{OWNER_REPO}/commits/{SHA}/status | jq '{state, total_count}'
+2. Read .aether/ci-watch.state, increment poll_count, write back
+3. If state == "success": notify "CI passed ✓", CronDelete this job, delete state file
+4. If state == "failure": notify "CI failed ✗", CronDelete, run /aether:aether-ci {SHA} --reproduce
+5. If state == "pending" and poll_count < 15: update state file, wait for next poll
+6. If poll_count >= 15: notify "CI timeout (~15 min)", CronDelete, suggest manual check
+7. If API error (non-200): increment error_count, if >= 3 consecutive: notify + CronDelete
+```
+
+### CronCreate 参数
+
+- **cron**: `*/1 * * * *` (每分钟，实际间隔 ~60s + jitter)
+- **recurring**: `true`
+- **prompt**: 上述模板（替换实际 SHA 和 OWNER_REPO）
+
+### 终止条件
+
+| 条件 | 动作 |
+|------|------|
+| CI 成功 | 通知用户 + CronDelete + 删除状态文件 |
+| CI 失败 | 诊断报告 + CronDelete |
+| 超过 15 次轮询 (~15 min) | 超时警告 + CronDelete |
+| API 连续 3 次失败 | 错误报告 + CronDelete |
+| 新的 git push (Hook 再次触发) | CronDelete 旧任务，启动新轮询 |
+
+---
+
+## 状态管理与容错
+
+### 状态文件 `.aether/ci-watch.state`
+
+```yaml
+sha: abc1234...
+repo: 10CG/Aether
+branch: master
+started: 2026-03-23T10:00:00Z
+poll_count: 3
+```
+
+由 Hook 写入，CronCreate prompt 每次轮询时读取并更新 `poll_count`。
+
+### 多次 Push 处理
+
+当 Hook 再次触发时（状态文件已存在且 SHA 不同）：
+1. CronDelete 旧的轮询 cron（使用 CronList 找到旧任务）
+2. 状态文件被 Hook 覆盖为新 SHA
+3. 新的 CronCreate 自动启动
+
+### 认证失败处理
+
+API 返回 401/403 或 HTTP 302 (Cloudflare redirect)：
+- 停止轮询 + CronDelete
+- 提示检查 `FORGEJO_TOKEN`、`CF_ACCESS_CLIENT_ID`、`CF_ACCESS_CLIENT_SECRET`
+
+### 会话结束清理
+
+CronCreate 任务在会话结束时自动销毁（session-only）。状态文件保留但无害。
+
+---
+
+**Skill 版本**: 1.1.0
+**最后更新**: 2026-03-23
 **维护者**: 10CG Infrastructure Team
