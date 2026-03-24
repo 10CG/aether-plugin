@@ -4,6 +4,15 @@ All notable changes to aether-plugin will be documented in this file.
 
 ## [1.1.0] - 2026-03-19
 
+### Added (2026-03-24)
+- **aether-ci**: CI status query, failure diagnosis, and auto-monitoring skill
+  - Forgejo commit status API integration for CI state checking
+  - Local reproduction of failed CI jobs (go test / golangci-lint)
+  - Error pattern matching and fix suggestions
+  - Watch mode with CronCreate-based polling
+- **PostToolUse Hook** (`ci-watch-hook.sh`): Auto-detect `git push` and trigger CI monitoring
+- **hooks.json migrated** to standard Claude Code command format (both PreToolUse + PostToolUse)
+
 ### Improved (AB test validated)
 - **aether-status**: Removed prescriptive curl/jq templates, added exploration dimension guidance. WITHOUT_BETTER → WITH_BETTER (2-0)
 - **aether-deploy**: Added registry API fallback when docker CLI unavailable, failure diagnosis guidance. MIXED → WITH_BETTER (2-0)

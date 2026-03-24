@@ -56,6 +56,13 @@
 | `deploy-doctor` | 部署失败自动诊断 | 部署问题排查 |
 | `node-maintenance` | 节点维护流程编排 | 节点重启/更新 |
 
+### Hooks (2个)
+
+| Hook | 事件 | 用途 |
+|------|------|------|
+| `cli-guard-hook.sh` | PreToolUse | aether 命令前自动检测 CLI |
+| `ci-watch-hook.sh` | PostToolUse | git push 后自动监控 CI 状态 |
+
 ## 使用方式
 
 ### 配置集群
