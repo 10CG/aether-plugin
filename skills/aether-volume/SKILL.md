@@ -82,6 +82,32 @@ aether volume delete --node <node> --project <project> --volumes <list> --yes
 
 ---
 
+## 创建前后检查
+
+### 幂等性检查（创建前必做）
+
+创建前先确认目标 volume 不存在，避免重复 `host_volume` 配置导致 Nomad 重启失败：
+
+```bash
+# 检查已有 volume
+aether volume list --node heavy-1 --project my-api
+```
+
+如果目标 volume 已存在，提示用户跳过创建。
+
+### 创建后验证（SSH 目录检查）
+
+`aether volume list` 验证后，通过 SSH 直接检查目录确认实际状态：
+
+```bash
+# 验证目录存在和权限
+ssh root@heavy-1 "ls -la /opt/aether-volumes/my-api/"
+```
+
+预期输出每个 volume 子目录权限为 `drwxrwxrwx`。
+
+---
+
 ## 配置要求
 
 ### SSH 认证
@@ -116,14 +142,19 @@ Host heavy-* light-*
 
 ```
 创建 Volume:
-  1. 解析节点名 → IP
-  2. SSH 连接
-  3. 创建目录 + 设置权限
-  4. 备份配置
-  5. 插入 host_volume 到 client {} 块
-  6. 重启 Nomad
-  7. 验证服务
-  8. 清理备份 / 回滚
+  1. 幂等性检查 — 先用 aether volume list 确认目标 volume 是否已存在
+     → 已存在: 提示用户，跳过创建（避免重复 host_volume 配置）
+     → 不存在: 继续
+  2. 解析节点名 → IP
+  3. SSH 连接
+  4. 创建目录 + 设置权限
+  5. 备份配置
+  6. 插入 host_volume 到 client {} 块
+  7. 重启 Nomad
+  8. 验证服务
+  9. 清理备份 / 回滚
+  10. 创建后验证 — SSH 直接检查目录存在性和权限:
+      ssh root@<node> "ls -la /opt/aether-volumes/<project>/"
 
 删除 Volume:
   1. 确认操作

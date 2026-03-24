@@ -2,6 +2,22 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.2.0] - 2026-03-24
+
+### Added
+- **aether-ci**: CI status query, failure diagnosis, auto-monitoring (PostToolUse Hook + CronCreate polling)
+- **ci-watch-hook.sh**: PostToolUse Hook auto-detects `git push` and triggers CI monitoring
+- **hooks.json**: Migrated to standard Claude Code command format (PreToolUse + PostToolUse)
+
+### Improved
+- **aether-setup**: Added config priority chain explanation and richer cluster detail (Docker versions, host volumes per node)
+- **aether-volume**: Added idempotency check before create and post-create SSH directory verification
+
+### Quality
+- AB test: 10 Skills × 20 evals, WITH 90% win rate (18/20), zero regressions
+- WITH_BETTER: 8/10, MIXED: 2/10 (setup, volume — simple task ceiling), WITHOUT: 0/10
+- Hook E2E validation: 69/69 checks passed
+
 ## [1.1.0] - 2026-03-19
 
 ### Added (2026-03-24)

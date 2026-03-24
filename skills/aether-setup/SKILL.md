@@ -73,19 +73,25 @@ allowed-tools: Read, Write, Bash, AskUserQuestion
 ```
 Aether 集群配置
 ===============
-配置来源: ~/.aether/config.yaml
+配置来源: ~/.aether/config.yaml (全局)
+配置优先级: 环境变量 > 项目级 .aether/config.yaml > 全局 ~/.aether/config.yaml > 默认值
 
 入口地址:
-  Nomad:    http://192.168.1.70:4646 ✓ 可达
-  Consul:   http://192.168.1.70:8500 ✓ 可达
+  Nomad:    http://192.168.1.70:4646 ✓ 可达 (v1.11.2)
+  Consul:   http://192.168.1.70:8500 ✓ 可达 (v1.22.3)
   Registry: forgejo.10cg.pub
 
-集群信息 (从 API 发现):
-  节点类型:
-    - heavy_workload (3 nodes, docker driver)
-    - light_exec (5 nodes, exec driver)
+集群拓扑 (从 API 发现):
+  heavy_workload (3 nodes): Docker 29.2.1, exec, raw_exec
+    - heavy-1 (192.168.69.80) host_volumes: [data-vol, log-vol]
+    - heavy-2 (192.168.69.81) host_volumes: [data-vol]
+    - heavy-3 (192.168.69.82) host_volumes: [data-vol]
+  light_exec (5 nodes): exec only
+    - light-1~5 (192.168.69.90~94)
   总节点数: 8
   运行中 Jobs: 5
+
+其他 Skills (init, deploy, status, rollback, dev) 自动读取此配置连接集群。
 ```
 
 ### 创建全局配置
@@ -109,6 +115,15 @@ Aether 集群配置
   Consul: ✓ 连接成功 (v1.22.3)
 
 配置已保存到 ~/.aether/config.yaml
+
+配置层级说明:
+  优先级（高 → 低）:
+    1. 环境变量 (NOMAD_ADDR, CONSUL_HTTP_ADDR)
+    2. 项目级配置 (.aether/config.yaml)
+    3. 全局配置 (~/.aether/config.yaml)  ← 当前
+    4. 默认值（无）
+  → 项目级配置会覆盖全局配置的对应字段
+  → 其他 Skills (init, deploy, status...) 自动读取此配置连接集群
 ```
 
 生成的文件 `~/.aether/config.yaml`：
@@ -155,11 +170,35 @@ Skills 按优先级链读取配置：项目级 `.aether/config.yaml` → 全局 
 
 ## 集群信息发现
 
-配置入口地址后，skills 通过 API 发现集群详细信息：
+配置入口地址后，**必须**展示完整的集群拓扑信息，让用户了解集群全貌。
 
-- **节点拓扑**: `GET /v1/nodes` → 按 NodeClass 分组，提取各类节点数量和可用 Drivers
-- **Docker 节点**: 过滤 `Drivers.docker != null` 的节点，提取 NodeClass（通常为 `heavy_workload`）
-- **Exec 节点**: 过滤仅有 exec driver 的节点，提取 NodeClass（通常为 `light_exec`）
+### 发现步骤
+
+1. **节点拓扑**: `GET /v1/nodes` → 按 NodeClass 分组
+2. **逐节点详情**: 对每个节点 `GET /v1/node/{id}` → 提取详细属性
+
+### 必须展示的信息
+
+| 类别 | API 字段 | 输出示例 |
+|------|---------|---------|
+| 节点分类 | `NodeClass` | heavy_workload (3), light_exec (5) |
+| 可用 Drivers | `Drivers` | docker, exec, raw_exec |
+| Docker 版本 | `Attributes["driver.docker.version"]` | 29.2.1 |
+| Host Volumes | `HostVolumes` | data-vol → /opt/data, log-vol → /var/log |
+| 节点状态 | `Status` | ready / down |
+| 节点 IP | `Address` | 192.168.69.80 |
+
+### 输出格式（setup 完成后的集群概览）
+
+```
+集群拓扑:
+  heavy_workload (3 nodes): Docker 29.2.1, exec, raw_exec
+    - heavy-1 (192.168.69.80) host_volumes: [data-vol, log-vol]
+    - heavy-2 (192.168.69.81) host_volumes: [data-vol]
+    - heavy-3 (192.168.69.82) host_volumes: [data-vol]
+  light_exec (5 nodes): exec only
+    - light-1~5 (192.168.69.90~94)
+```
 
 Skills 使用发现的信息（如 node_class）而非硬编码值。
 
