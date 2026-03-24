@@ -108,6 +108,48 @@ ssh root@heavy-1 "ls -la /opt/aether-volumes/my-api/"
 
 ---
 
+## 安全保障机制
+
+| 保障 | 机制 | 触发条件 |
+|------|------|---------|
+| **幂等性** | 创建前检查 `aether volume list` | 每次创建 |
+| **原子性** | 修改前备份 `client.hcl → client.hcl.bak` | 每次写配置 |
+| **自动回滚** | Nomad 重启失败时恢复 `.bak` | `systemctl restart nomad` 失败 |
+| **创建后验证** | SSH 检查目录存在性和权限 | 每次创建 |
+
+**为什么幂等性检查重要**: Nomad `client.hcl` 不允许重复的 `host_volume` 块。重复插入会导致 Nomad 重启失败，需要手动恢复配置。
+
+---
+
+## 常见故障模式
+
+### SSH 连接问题
+
+| 症状 | 原因 | 修复 |
+|------|------|------|
+| `permission denied` | 密钥权限不是 600 | `chmod 600 ~/.ssh/id_ed25519` |
+| `host key verification failed` | known_hosts 冲突 | `ssh-keygen -R <node-ip>` |
+| `connection refused` | SSH 服务未运行 | `ping <node-ip>` 确认网络，检查 sshd |
+| `timeout` | 网络不可达 | 检查 VPN/防火墙/路由 |
+
+**SSH 诊断步骤** (逐步升级):
+1. `ssh -v root@heavy-1` — 查看详细握手过程
+2. `ssh-keygen -R <node-ip>` — 清除旧 host key
+3. `ls -la ~/.ssh/id_ed25519` — 确认权限为 `-rw-------`
+4. `ssh-add ~/.ssh/id_ed25519` — 手动加载密钥
+
+### Nomad 重启失败
+
+CLI 自动从 `.bak` 回滚配置。如果自动回滚也失败：
+
+```bash
+ssh root@<node> "mv /opt/nomad/config/client.hcl.bak /opt/nomad/config/client.hcl && systemctl restart nomad"
+```
+
+**根因排查**: `ssh root@<node> "journalctl -u nomad -n 50"` 查看 Nomad 日志。
+
+---
+
 ## 配置要求
 
 ### SSH 认证
