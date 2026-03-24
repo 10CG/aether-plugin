@@ -2,7 +2,7 @@
 
 > **Version**: 1.1.0 | **Released**: 2026-03-19
 >
-> Aether 基础设施部署插件 - 10个 Skills + 2个 Agents + 1个 Hook
+> Aether 基础设施部署插件 - 11个 Skills + 2个 Agents + 2个 Hooks
 
 ## 安装
 
@@ -34,13 +34,14 @@
 
 ## 包含内容
 
-### Skills (9个)
+### Skills (10个)
 
 | Skill | 用途 | 环境 |
 |-------|------|------|
 | `aether-doctor` | 环境诊断（CLI/配置/连接/SSH/CI） | 首次使用/故障排查 |
 | `aether-setup` | 配置集群入口地址 | 首次使用 |
 | `aether-init` | 新项目接入（两阶段：分析 → 生成） | dev + prod |
+| `aether-ci` | CI 状态查询、失败诊断、自动监控 | dev + prod |
 | `aether-volume` | Nomad host volume 管理 | dev + prod |
 | `aether-dev` | 开发测试部署、临时 Job、日志查看 | dev |
 | `aether-deploy` | 生产环境受控部署 | prod |
