@@ -2,6 +2,21 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.2.1] - 2026-03-25
+
+### Fixed
+- **cli-guard-hook.sh**: Platform-aware CLI download — auto-detect OS/arch via `uname`, no longer depends on `jq`. Fixes macOS users downloading wrong-platform (linux) binary.
+- **detect-cli.sh**: Same platform-aware fix for `print_install_guidance()`.
+- **cli-installation.md**: GitHub mirror as primary download (no CF auth needed), Forgejo as fallback. Manual install now covers both arm64 and amd64 for macOS.
+
+### Improved
+- **aether-volume SKILL.md**: Added safety guarantees table, common failure patterns with SSH diagnostics
+- **aether-setup SKILL.md**: Enhanced config priority chain visualization, Consul auto-derivation, diagnostic framework
+
+### Quality
+- AB test: 10 Skills × 20 evals, WITH **100%** win rate (20/20), up from 90%
+- volume e1: TIE → WITH_BETTER, setup e1: TIE → WITH_BETTER
+
 ## [1.2.0] - 2026-03-24
 
 ### Added
