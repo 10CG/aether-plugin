@@ -293,27 +293,22 @@ check_cli_version() {
 # print_install_guidance - 打印安装引导
 # ============================================
 print_install_guidance() {
-    cat << 'EOF'
+    local _os=$(uname -s | tr '[:upper:]' '[:lower:]')
+    local _arch=$(uname -m)
+    case "$_arch" in x86_64|amd64) _arch="amd64" ;; aarch64|arm64) _arch="arm64" ;; esac
+    local _bin="aether-${_os}-${_arch}"
+
+    cat << EOF
 ❌ aether CLI 未检测到
 
 请运行以下命令安装:
 /aether:doctor
 
-或手动安装:
+或手动安装 (检测到平台: ${_os}/${_arch}):
 
-Linux/macOS:
   mkdir -p ~/.aether
-  curl -sL https://forgejo.10cg.pub/api/v1/repos/10CG/Aether/releases/latest | \
-    jq -r '.assets[] | select(.name | test("aether-(linux|darwin)")) | .browser_download_url' | \
-    head -1 | xargs curl -sL -o ~/.aether/aether
-  chmod +x ~/.aether/aether
-
-Windows (PowerShell):
-  $dir = "$env:USERPROFILE\.aether"
-  New-Item -ItemType Directory -Path $dir -Force | Out-Null
-  $url = (Invoke-RestMethod https://forgejo.10cg.pub/api/v1/repos/10CG/Aether/releases/latest).assets | \
-    Where-Object { $_.name -like "aether-windows*" } | Select-Object -First 1 -ExpandProperty browser_download_url
-  Invoke-WebRequest -Uri $url -OutFile "$dir\aether.exe"
+  curl -fsSL "https://github.com/10CG/aether-cli/releases/latest/download/${_bin}" \\
+    -o ~/.aether/aether && chmod +x ~/.aether/aether
 
 安装完成后，运行以下命令验证:
   ~/.aether/aether version

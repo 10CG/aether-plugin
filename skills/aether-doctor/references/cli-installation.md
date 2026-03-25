@@ -120,16 +120,32 @@ detect_aether_cli() {
 | 0.8.x         | 0.7.0   | 0.7.0           |
 | 0.9.x         | 0.8.0   | 0.8.0           |
 
-## 方案 A: 自动安装（含 CF 认证）
+## 方案 A: 自动安装（推荐，GitHub 镜像，无需认证）
+
+```bash
+# 1. 检测系统 (macOS/Linux/Windows 自动识别)
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+ARCH=$(uname -m)
+case $ARCH in
+  x86_64|amd64) ARCH="amd64" ;;
+  aarch64|arm64) ARCH="arm64" ;;
+esac
+BINARY_NAME="aether-${OS}-${ARCH}"
+
+# 2. 从 GitHub 镜像下载 (无需认证)
+mkdir -p "$HOME/.aether"
+curl -fsSL "https://github.com/10CG/aether-cli/releases/latest/download/${BINARY_NAME}" \
+  -o "$HOME/.aether/aether"
+chmod +x "$HOME/.aether/aether"
+
+# 3. 验证
+"$HOME/.aether/aether" version
+```
+
+## 方案 A2: 从 Forgejo 源安装（需 CF 认证）
 
 ```bash
 RELEASE_API="https://forgejo.10cg.pub/api/v1/repos/10CG/Aether/releases/latest"
-
-# 0. 检测 CF Access 并获取 Token
-check_cf_access_required() {
-  local code=$(curl -s -o /dev/null -w "%{http_code}" "$RELEASE_API")
-  [ "$code" = "302" ] || [ "$code" = "401" ]
-}
 
 # 1. 检测系统
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -138,39 +154,26 @@ case $ARCH in
   x86_64|amd64) ARCH="amd64" ;;
   aarch64|arm64) ARCH="arm64" ;;
 esac
-EXT=""
-[ "$OS" = "windows" ] && EXT=".exe"
+BINARY_NAME="aether-${OS}-${ARCH}"
 
-# 2. 构建请求
-BINARY_NAME="aether-${OS}-${ARCH}${EXT}"
-CURL_OPTS="-s"
+# 2. CF Token (Forgejo 在 Cloudflare Access 后面)
+# export CF_ACCESS_TOKEN="your-token"  # 如未设置则执行:
+# 浏览器访问 https://forgejo.10cg.pub → F12 → Cookies → CF_Authorization
 
-# 3. 检查是否需要 CF 认证
-if check_cf_access_required; then
-  CF_TOKEN=$(detect_cf_access_token) || {
-    echo "❌ 需要 Cloudflare Access Token"
-    echo ""
-    echo "请先配置 CF Token:"
-    echo "  export CF_ACCESS_TOKEN=\"your-token\""
-    echo ""
-    echo "获取方法:"
-    echo "  1. 浏览器访问 https://forgejo.10cg.pub 并完成认证"
-    echo "  2. F12 → Application → Cookies → CF_Authorization"
-    exit 1
-  }
-  CURL_OPTS="$CURL_OPTS -H \"Authorization: Bearer $CF_TOKEN\" -H \"Cookie: CF_Authorization=$CF_TOKEN\""
-fi
-
-# 4. 获取下载 URL
-DOWNLOAD_URL=$(curl $CURL_OPTS "$RELEASE_API" | jq -r ".assets[] | select(.name == \"$BINARY_NAME\") | .browser_download_url" | head -n1)
-
-# 5. 安装
+# 3. 下载 (使用 grep 替代 jq，无额外依赖)
 mkdir -p "$HOME/.aether"
-curl -sL "$DOWNLOAD_URL" -o "$HOME/.aether/aether${EXT}"
-chmod +x "$HOME/.aether/aether${EXT}"
+DOWNLOAD_URL=$(curl -s \
+  -H "Authorization: Bearer $CF_ACCESS_TOKEN" \
+  -H "Cookie: CF_Authorization=$CF_ACCESS_TOKEN" \
+  "$RELEASE_API" | \
+  grep -o "\"browser_download_url\":\"[^\"]*${BINARY_NAME}[^\"]*\"" | \
+  head -1 | cut -d'"' -f4)
 
-# 6. 验证
-"$HOME/.aether/aether${EXT}" version
+curl -sL "$DOWNLOAD_URL" -o "$HOME/.aether/aether"
+chmod +x "$HOME/.aether/aether"
+
+# 4. 验证
+"$HOME/.aether/aether" version
 ```
 
 ## 方案 B: 从源码构建
@@ -185,42 +188,37 @@ rm -rf /tmp/aether-cli
 "$HOME/.aether/aether" version
 ```
 
-## 方案 C: 手动安装
+## 方案 C: 手动安装 (GitHub 镜像, 按平台选择)
 
-### Linux (amd64)
+### Linux
 ```bash
 mkdir -p ~/.aether
-# 如果有 CF Token:
-curl -s -H "Authorization: Bearer $CF_ACCESS_TOKEN" \
-  "https://forgejo.10cg.pub/api/v1/repos/10CG/Aether/releases/latest" | \
-  jq -r '.assets[] | select(.name == "aether-linux-amd64") | .browser_download_url' | \
-  xargs curl -sL -o ~/.aether/aether
-chmod +x ~/.aether/aether
-~/.aether/aether version
+# amd64:
+curl -fsSL https://github.com/10CG/aether-cli/releases/latest/download/aether-linux-amd64 \
+  -o ~/.aether/aether && chmod +x ~/.aether/aether
+# arm64:
+curl -fsSL https://github.com/10CG/aether-cli/releases/latest/download/aether-linux-arm64 \
+  -o ~/.aether/aether && chmod +x ~/.aether/aether
 ```
 
-### macOS (arm64)
+### macOS
 ```bash
 mkdir -p ~/.aether
-curl -s -H "Authorization: Bearer $CF_ACCESS_TOKEN" \
-  "https://forgejo.10cg.pub/api/v1/repos/10CG/Aether/releases/latest" | \
-  jq -r '.assets[] | select(.name == "aether-darwin-arm64") | .browser_download_url' | \
-  xargs curl -sL -o ~/.aether/aether
-chmod +x ~/.aether/aether
-~/.aether/aether version
+# Apple Silicon (M1/M2/M3):
+curl -fsSL https://github.com/10CG/aether-cli/releases/latest/download/aether-darwin-arm64 \
+  -o ~/.aether/aether && chmod +x ~/.aether/aether
+# Intel Mac:
+curl -fsSL https://github.com/10CG/aether-cli/releases/latest/download/aether-darwin-amd64 \
+  -o ~/.aether/aether && chmod +x ~/.aether/aether
 ```
 
 ### Windows (PowerShell)
 ```powershell
-$aetherDir = "$env:USERPROFILE\.aether"
-New-Item -ItemType Directory -Path $aetherDir -Force | Out-Null
-
-# 如果有 CF Token:
-$headers = @{ "Authorization" = "Bearer $env:CF_ACCESS_TOKEN" }
-$response = Invoke-RestMethod -Uri "https://forgejo.10cg.pub/api/v1/repos/10CG/Aether/releases/latest" -Headers $headers
-$downloadUrl = $response.assets | Where-Object { $_.name -eq "aether-windows-amd64.exe" } | Select-Object -First 1 -ExpandProperty browser_download_url
-Invoke-WebRequest -Uri $downloadUrl -OutFile "$aetherDir\aether.exe"
-& "$aetherDir\aether.exe" version
+$d = "$env:USERPROFILE\.aether"
+New-Item -ItemType Directory -Path $d -Force | Out-Null
+Invoke-WebRequest -Uri "https://github.com/10CG/aether-cli/releases/latest/download/aether-windows-amd64.exe" `
+  -OutFile "$d\aether.exe"
+& "$d\aether.exe" version
 ```
 
 ## 支持的平台
