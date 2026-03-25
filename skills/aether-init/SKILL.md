@@ -69,6 +69,24 @@ Phase 2: 生成文件 → 验证 → 完成
 - 已有配置 (Dockerfile, CI/CD)
 - 项目特征 (端口、数据库、文件写入)
 
+### Step 1.1b: 服务依赖发现
+
+项目扫描（Step 1.1）检测到 `DATABASE_URL`、`REDIS_URL`、`MONGO_URI` 等环境变量模式时，
+引导用户将连接地址迁移为 Consul DNS 格式：
+
+```
+检测到服务依赖:
+  DATABASE_URL → postgres://postgres.service.consul:5432/mydb
+  REDIS_URL    → redis://redis.service.consul:6379
+
+集群内服务通过 Consul DNS 自动发现，请使用 {service}.service.consul FQDN 格式。
+详见 Nomad 模板参考 → 服务连接（Consul DNS）
+```
+
+**检测规则**: 扫描 `.env*`、`docker-compose.yml`、应用配置中的
+`DATABASE`、`REDIS`、`MONGO`、`RABBITMQ`、`ELASTICSEARCH` 关键词。
+匹配到任一关键词时，在部署方案（Step 1.3）中追加服务连接建议。
+
 ### Step 1.2: 决策逻辑
 
 | 分析项 | 决策 |

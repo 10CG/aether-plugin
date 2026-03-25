@@ -347,14 +347,18 @@ fi
 ### 配置读取
 
 ```bash
-# 1. 检查项目 .env
-if [ -f ".env" ]; then source .env; fi
+# 1. 项目级配置
+if [ -f ".aether/config.yaml" ]; then
+  NOMAD_ADDR=$(yq '.cluster.nomad_addr' .aether/config.yaml)
+  CONSUL_HTTP_ADDR=$(yq '.cluster.consul_addr' .aether/config.yaml)
+  AETHER_REGISTRY=$(yq '.cluster.registry' .aether/config.yaml)
+fi
 
-# 2. 检查全局配置
+# 2. 全局配置 fallback
 if [ -z "$NOMAD_ADDR" ] && [ -f "$HOME/.aether/config.yaml" ]; then
-  NOMAD_ADDR=$(yq '.endpoints.nomad' ~/.aether/config.yaml)
-  CONSUL_HTTP_ADDR=$(yq '.endpoints.consul' ~/.aether/config.yaml)
-  AETHER_REGISTRY=$(yq '.endpoints.registry' ~/.aether/config.yaml)
+  NOMAD_ADDR=$(yq '.cluster.nomad_addr' ~/.aether/config.yaml)
+  CONSUL_HTTP_ADDR=$(yq '.cluster.consul_addr' ~/.aether/config.yaml)
+  AETHER_REGISTRY=$(yq '.cluster.registry' ~/.aether/config.yaml)
 fi
 
 # 3. 未配置则提示

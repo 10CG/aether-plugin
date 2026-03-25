@@ -80,6 +80,7 @@ Aether 集群配置
   Nomad:    http://192.168.1.70:4646 ✓ 可达 (v1.11.2)
   Consul:   http://192.168.1.70:8500 ✓ 可达 (v1.22.3)
   Registry: forgejo.10cg.pub
+  DNS:      ✓ .service.consul 可解析 (dnsmasq)
 
 集群拓扑 (从 API 发现):
   heavy_workload (3 nodes): Docker 29.2.1, exec, raw_exec

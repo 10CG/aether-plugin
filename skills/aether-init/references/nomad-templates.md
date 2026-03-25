@@ -326,6 +326,52 @@ job "__PROJECT_NAME__" {
 
 ---
 
+## 服务连接（Consul DNS）
+
+Aether 集群中所有通过 Nomad 部署的服务都会注册到 Consul，可通过 DNS 自动发现。
+应用连接其他服务时，应使用 Consul DNS 的 FQDN 格式而非硬编码 IP。
+
+### 连接地址规则
+
+| 格式 | 示例 | 说明 |
+|------|------|------|
+| `{name}.service.consul` (FQDN) | `postgres.service.consul` | **推荐** — 显式完整域名，不依赖 DNS search 配置 |
+| `{name}` (短名) | `postgres` | 不推荐 — 依赖节点 `/etc/resolv.conf` 中的 `search consul`，不可靠 |
+
+### HCL env 块示例
+
+在 Nomad job 的 `task` 中通过 `env {}` 注入服务地址：
+
+```hcl
+      env {
+        # 数据库 — Consul DNS 自动解析到当前健康实例
+        DATABASE_URL = "postgres://user:pass@postgres.service.consul:5432/__PROJECT_NAME__"
+
+        # Redis — 同理
+        REDIS_URL = "redis://redis.service.consul:6379/0"
+
+        # 其他常见服务
+        MONGO_URI           = "mongodb://mongo.service.consul:27017/__PROJECT_NAME__"
+        RABBITMQ_URL        = "amqp://guest:guest@rabbitmq.service.consul:5672"
+        ELASTICSEARCH_URL   = "http://elasticsearch.service.consul:9200"
+      }
+```
+
+### 工作原理
+
+1. 服务通过 Nomad job 中的 `service { provider = "consul" }` 块注册到 Consul
+2. Consul 在集群 DNS（端口 8600）中为每个健康服务创建 `{name}.service.consul` 记录
+3. 集群节点上的 dnsmasq 将 `.consul` 域名转发到 Consul DNS
+4. 应用代码无需修改，只需将连接地址改为 `.service.consul` 后缀
+
+### 前置条件
+
+- 集群 infra 节点需配置 dnsmasq 转发 `.consul` 查询（参见 `scripts/setup-consul-dns.sh`）
+- 目标服务必须已部署且 Consul 健康检查通过
+- 使用 FQDN（`{svc}.service.consul`）而非短名，避免 DNS search domain 不一致导致解析失败
+
+---
+
 ## dev vs prod 对照表
 
 | 配置项 | dev | prod |

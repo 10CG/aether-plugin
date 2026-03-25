@@ -2,6 +2,21 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.2.2] - 2026-03-25
+
+### Added
+- **aether-init**: Consul DNS service discovery guidance — detect DATABASE/REDIS/MONGO deps, recommend `{svc}.service.consul` FQDN
+- **aether-init/references**: HCL env block examples with `.service.consul` connection strings
+- **aether-doctor**: DNS resolution diagnostic step (`dig consul.service.consul`)
+- **aether-setup**: DNS status line in `--show` output
+
+### Fixed
+- **aether-dev**: Complete v1.1.0 config migration — replaced `.env` + `endpoints.*` with `.aether/config.yaml` + `cluster.*` two-tier pattern (lines 349-368)
+
+### Quality
+- All 4 modified Skills pass static-benchmark (init: 315 lines, dev: 383, setup: 293, doctor: 147)
+- OpenSpec: consul-dns-service-discovery (US-013)
+
 ## [1.2.1] - 2026-03-25
 
 ### Fixed

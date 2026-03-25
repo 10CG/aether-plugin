@@ -109,6 +109,15 @@ curl -s "${CONSUL_ADDR}/v1/status/leader"
 curl -s "${CONSUL_ADDR}/v1/agent/self" | jq '.Config.Version'
 ```
 
+### DNS 解析 (Consul DNS)
+
+```bash
+# 测试 Consul DNS 解析
+dig @${CONSUL_NODE} consul.service.consul +short
+# 成功: [✓] DNS 解析: consul.service.consul → {IPs}
+# 失败: [!] DNS 解析不可用（建议运行 scripts/setup-consul-dns.sh）
+```
+
 ## 连接问题排查
 
 | 错误 | 原因 | 解决方案 |
