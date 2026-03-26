@@ -2,8 +2,8 @@
 # 此文件是版本要求的单一事实来源 (Single Source of Truth)
 
 cli:
-  min_version: "0.7.0"
-  recommended_version: "0.8.0"
+  min_version: "0.9.0"
+  recommended_version: "0.9.0"
   # 安装位置 (与 config.yaml 同目录)
   install_dir: "~/.aether"
   install_path:
@@ -81,23 +81,23 @@ dependent_skills:
 
   - name: aether-init
     cli_required: true
-    min_version: "0.7.0"
+    min_version: "0.9.0"
 
   - name: aether-volume
     cli_required: true
-    min_version: "0.7.0"
+    min_version: "0.9.0"
 
   - name: aether-deploy
     cli_required: true
-    min_version: "0.7.0"
+    min_version: "0.9.0"
 
   - name: aether-dev
     cli_required: true
-    min_version: "0.7.0"
+    min_version: "0.9.0"
 
   - name: aether-rollback
     cli_required: true
-    min_version: "0.7.0"
+    min_version: "0.9.0"
 
   - name: aether-status
     cli_required: false

@@ -2,6 +2,15 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.3.0] - 2026-03-26
+
+### Changed
+- **cli.min_version**: 0.7.0 → 0.9.0 (CLI deploy execution now functional)
+- **cli.recommended_version**: 0.8.0 → 0.9.0
+
+### Note
+- v1.2.2 contained new features (Consul DNS guidance) that should have been a MINOR bump. Per VERSIONING.md, already-published version numbers are not modified. v1.3.0 corrects the version sequence.
+
 ## [1.2.2] - 2026-03-25
 
 ### Added
