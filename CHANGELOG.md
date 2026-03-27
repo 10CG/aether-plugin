@@ -2,6 +2,12 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.3.1] - 2026-03-27
+
+### Added
+- **aether-init**: Phase 2 自动注入部署监控规则到项目 CLAUDE.md (Closes aether-plugin#1)
+- **aether-init/references**: deploy-monitoring-rules.md 模板 (含占位符替换规则)
+
 ## [1.3.0] - 2026-03-26
 
 ### Changed

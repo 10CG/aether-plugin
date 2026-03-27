@@ -126,6 +126,7 @@ Phase 2: 生成文件 → 验证 → 完成
 project/
 ├── Dockerfile
 ├── .dockerignore
+├── CLAUDE.md              ← 注入部署监控规则
 ├── .forgejo/
 │   └── workflows/
 │       └── deploy.yaml
@@ -143,6 +144,14 @@ project/
 - `__DOCKER_IMAGE__` → 镜像地址
 - `__PORT__` → 服务端口
 - `__NODE_CLASS__` → 节点类型
+
+### Step 2.2b: 注入部署监控规则到 CLAUDE.md
+
+检查项目是否有 `CLAUDE.md`：
+- **存在**: 追加部署监控规则段落（如果尚未包含）
+- **不存在**: 创建包含部署监控规则的 `CLAUDE.md`
+
+注入内容模板见 [deploy-monitoring-rules.md](references/deploy-monitoring-rules.md)
 
 ### Step 2.3: 验证
 
