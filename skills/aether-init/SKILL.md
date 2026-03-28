@@ -87,6 +87,26 @@ Phase 2: 生成文件 → 验证 → 完成
 `DATABASE`、`REDIS`、`MONGO`、`RABBITMQ`、`ELASTICSEARCH` 关键词。
 匹配到任一关键词时，在部署方案（Step 1.3）中追加服务连接建议。
 
+### Step 1.1c: 已有项目的 CLAUDE.md 补充检查
+
+如果 Step 1.1 检测到项目**已有完整部署配置** (Dockerfile + HCL + CI)，跳过 Phase 2 文件生成，
+但仍检查 CLAUDE.md 是否包含部署监控规则：
+
+```
+检测到已有部署配置，跳过文件生成。
+
+检查 CLAUDE.md 部署监控规则:
+  ✓ 已包含 → 无需操作
+  ✗ 未包含 → 自动注入部署监控规则（见 deploy-monitoring-rules.md）
+```
+
+**判断逻辑**:
+- `grep -q "部署监控规则" CLAUDE.md` → 已包含，跳过
+- 否则 → 追加规则段落到 CLAUDE.md（如不存在则创建）
+- 注入后提示用户确认内容
+
+此步骤确保所有 Aether 项目（无论新旧）都具备部署监控能力。
+
 ### Step 1.2: 决策逻辑
 
 | 分析项 | 决策 |
