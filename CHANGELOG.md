@@ -2,6 +2,13 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.5.0] - 2026-03-31
+
+### Added
+- **aether-report**: New skill for reporting bugs and feature requests to Aether
+  maintainers. Auto-routes to Forgejo (internal users) or GitHub (external users).
+  Collects environment context, enforces privacy review before submission.
+
 ## [1.4.0] - 2026-03-31
 
 ### Changed
