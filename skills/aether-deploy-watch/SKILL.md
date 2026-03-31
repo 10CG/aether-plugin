@@ -19,7 +19,7 @@ dependencies:
 
 # Aether 部署监控 (aether-deploy-watch)
 
-> **版本**: 2.0.0 | **优先级**: P0
+> **版本**: 2.1.0 | **优先级**: P0
 
 ## 1. 概述
 
@@ -113,7 +113,40 @@ docker manifest inspect "${REGISTRY}/${IMAGE_PATH}:${TARGET_TAG}" > /dev/null 2>
 ### 判定
 
 - **镜像存在**: 推进到 Step 2。
-- **镜像不存在**: 报告 "CI passed but image not found in registry"，建议检查 CI 构建日志和 registry push 步骤。
+- **镜像不存在**: **执行 CI 状态诊断** (见下方)，根据诊断结果报告原因。
+
+### CI 状态诊断 (镜像未找到时)
+
+当 Mode A 镜像不存在时，**必须**查询 CI 状态后再给出结论：
+
+```bash
+# 1. 聚合状态
+CI_STATUS=$(forgejo GET "/repos/${OWNER_REPO}/commits/${TARGET_TAG}/status" 2>/dev/null)
+AGG_STATE=$(echo "$CI_STATUS" | jq -r '.state // "unknown"')
+
+# 2. 如果聚合状态为 failure，进一步区分 cancelled vs 真正失败
+if [ "$AGG_STATE" = "failure" ]; then
+  TASKS=$(forgejo GET "/repos/${OWNER_REPO}/actions/tasks?limit=10&page=1" 2>/dev/null)
+  # 筛选匹配 SHA 的任务
+  MATCH=$(echo "$TASKS" | jq --arg sha "${TARGET_TAG}" '
+    [.workflow_runs // [] | .[] | select(.head_sha == $sha)]')
+  CANCELLED=$(echo "$MATCH" | jq '[.[] | select(.status == "cancelled")] | length')
+  FAILED=$(echo "$MATCH" | jq '[.[] | select(.status == "failure")] | length')
+fi
+```
+
+**根据诊断结果报告**:
+
+| CI 状态 | 含义 | 报告与建议 |
+|---------|------|-----------|
+| `pending` | CI 仍在排队或运行中 | "CI 尚未完成，镜像尚未构建。等待 CI 完成后重试，或使用 `/aether:aether-ci` 查看进度" |
+| `failure` + 全部 cancelled | 被新 push 取代 (正常行为) | "此 commit 的 CI 已被取消（可能被更新的 push 取代）。这是正常行为，请对最新 commit 运行 deploy-watch" |
+| `failure` + 有真正 failure | 构建/测试真正失败 | "CI 构建失败，镜像未推送。使用 `/aether:aether-ci` 诊断失败原因" |
+| `success` | CI 通过但镜像不在 registry | "CI 通过但镜像未在 registry 中找到。检查 CI workflow 是否包含 docker push 步骤" |
+| `unknown` / API 失败 | 无法获取 CI 状态 | "无法查询 CI 状态，请手动检查 Forgejo Web UI" |
+
+**关键**: `cancelled` 状态在 Forgejo commit status API 中表现为 `status: "failure", description: "Has been cancelled"`，
+必须通过 Actions Tasks API 的 `status` 字段区分。**不要**将 cancelled 误判为构建失败。
 
 ---
 
@@ -213,6 +246,22 @@ for i in $(seq 1 $MAX_ITER); do
   sleep $INTERVAL
 done
 ```
+
+### Step 2 超时处理 (Mode A)
+
+当 Step 2 轮询耗尽仍未收敛时，**不要凭空猜测原因**。按以下诊断链排查：
+
+```
+镜像版本对比 → CI 状态诊断 → Nomad 调度诊断 → 给出结论
+```
+
+1. **检查 Nomad 当前运行的镜像 tag 是否与 target_tag 一致**。如果不一致，说明新版本从未被 Nomad 拉取。
+2. **执行 CI 状态诊断** (与 Step 1 相同的 API 调用)，区分 cancelled / pending / failure / success。
+3. **检查 Nomad evaluations** (`GET /v1/job/${JOB_NAME}/evaluations`)，排查调度问题。
+4. 根据诊断结果给出**针对性**建议。
+
+**禁止行为**: 不要在没有证据的情况下建议 `docker network prune`、`docker system prune` 或任何 Docker 清理命令。
+这类操作可能破坏正在运行的构建。只有在日志明确显示 Docker 网络/存储问题时才可建议。
 
 ---
 
@@ -381,6 +430,13 @@ Claude Code Bash tool 单次调用约 120 秒超时。Step 2 (18x10s) 和 Step 3
 - Forgejo Actions API 无 step 级别日志 (Aether#8，等待上游支持)。
 - 健康检查器在 rolling update grace period 期间可能短暂看到错误的 allocation 数量，Step 3 的 consecutive_pass 机制用于缓解。
 - Canary 部署: deploy-watch 报告状态但**不会**自动 promote，需用户手动执行或通过 `/aether:deploy` 完成。
+- Forgejo commit status API 将 `cancelled` 表现为 `status: "failure"`，必须通过 Actions Tasks API 区分 (Aether#9)。
+
+### 诊断安全原则
+
+- **不要**在无直接证据时建议 destructive Docker 命令 (`docker network prune`, `docker system prune`, `docker rm -f` 等)。
+- **不要**将 "镜像未更新" 直接推断为 "Runner 资源泄漏"。正确的诊断链是：检查 CI 状态 → 区分 pending/cancelled/failed → 针对性建议。
+- 超时诊断必须遵循 **证据链**: 先收集数据，再给结论。不要从表面现象跳跃到破坏性操作建议。
 
 ### 依赖工具
 
@@ -393,6 +449,6 @@ Claude Code Bash tool 单次调用约 120 秒超时。Step 2 (18x10s) 和 Step 3
 
 ---
 
-**Skill 版本**: 2.0.0
+**Skill 版本**: 2.1.0
 **最后更新**: 2026-03-31
 **维护者**: 10CG Infrastructure Team

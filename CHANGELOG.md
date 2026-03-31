@@ -2,6 +2,17 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.5.1] - 2026-03-31
+
+### Fixed
+- **aether-deploy-watch**: Add CI status diagnostic when image not found or deploy
+  times out (Aether#9). Distinguishes cancelled CI (superseded by newer push) from
+  real failures via Forgejo Actions Tasks API. Prevents false "Runner resource leak"
+  diagnosis and destructive `docker network prune` suggestions.
+
+### Added
+- **AB eval**: New eval-6 `rapid-push-cancelled-ci-misdiagnosis` for deploy-watch
+
 ## [1.5.0] - 2026-03-31
 
 ### Added
