@@ -2,6 +2,30 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.4.0] - 2026-03-31
+
+### Changed
+- **aether-deploy-watch**: Complete v2.0.0 rewrite — 4-step pipeline orchestrator
+  with direct Nomad/Consul API calls for control flow
+  - Step 0: Context resolution (job name, SHA, registry)
+  - Step 1: Image verification via forgejo wrapper
+  - Step 2: Deploy convergence via Nomad deployments API
+  - Step 3: Health verification via Consul health API (2 consecutive checks)
+  - Two modes: post-push pipeline (--version) and spot-check
+- **ci-watch-hook**: Added job_name + expected_image to state file; CI success
+  now triggers deploy-watch automatically
+- **aether-ci**: CronCreate prompt updated to invoke deploy-watch on CI success
+- **cli.recommended_version**: 0.9.0 → 1.0.0
+
+### Fixed
+- **IP addresses**: Fixed 60+ hardcoded 192.168.1.x → 192.168.69.x across 16 files
+  (agents, skills, references). PVE address 192.168.1.11 preserved.
+
+## [1.3.2] - 2026-03-28
+
+### Fixed
+- **aether-init**: Inject CLAUDE.md rules for existing projects (not just new ones)
+
 ## [1.3.1] - 2026-03-27
 
 ### Added

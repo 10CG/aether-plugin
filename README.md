@@ -1,6 +1,6 @@
 # Aether Plugin
 
-> **Version**: 1.3.2 | **Released**: 2026-03-26
+> **Version**: 1.4.0 | **Released**: 2026-03-31
 >
 > Aether 基础设施部署插件 - 11个 Skills + 2个 Agents + 2个 Hooks
 

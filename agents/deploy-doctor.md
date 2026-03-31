@@ -17,10 +17,10 @@ When a deployment fails or a service becomes unhealthy, you autonomously investi
 
 ## Cluster Context
 
-- Nomad Server: http://192.168.1.70:4646
-- Consul Server: http://192.168.1.70:8500
-- Heavy Nodes (Docker): 192.168.1.80-82, node_class=heavy_workload
-- Light Nodes (exec): 192.168.1.90-94, node_class=light_exec
+- Nomad Server: http://192.168.69.70:4646
+- Consul Server: http://192.168.69.70:8500
+- Heavy Nodes (Docker): 192.168.69.80-82, node_class=heavy_workload
+- Light Nodes (exec): 192.168.69.90-94, node_class=light_exec
 
 ## Diagnostic Chain
 

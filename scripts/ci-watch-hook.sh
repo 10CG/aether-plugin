@@ -41,6 +41,18 @@ SHORT_SHA="${SHA:0:8}"
 
 [ -z "$OWNER_REPO" ] && exit 0
 
+# --- Resolve job name and registry from config ---
+JOB_NAME=""
+REGISTRY=""
+if [ -f ".aether/config.yaml" ]; then
+  JOB_NAME=$(yq -r '.watch.job_name // empty' .aether/config.yaml 2>/dev/null || true)
+  REGISTRY=$(yq -r '.cluster.registry // empty' .aether/config.yaml 2>/dev/null || true)
+fi
+# Fallback: derive job name from repo basename
+if [ -z "$JOB_NAME" ]; then
+  JOB_NAME=$(echo "$OWNER_REPO" | sed 's#.*/##' | tr '[:upper:]' '[:lower:]')
+fi
+
 # --- Write state file ---
 
 STATE_DIR=".aether"
@@ -51,13 +63,15 @@ repo: ${OWNER_REPO}
 branch: ${BRANCH}
 started: $(date -u +%Y-%m-%dT%H:%M:%SZ)
 poll_count: 0
+job_name: ${JOB_NAME}
+expected_image: ${REGISTRY}/${OWNER_REPO}:${SHA}
 EOF
 
 # --- Output: try JSON systemMessage first, fallback to plain text ---
 
 if [ -n "$INPUT" ]; then
   # Standard format: JSON output with systemMessage
-  MSG="[aether-ci-watch] git push detected: ${SHORT_SHA} on ${OWNER_REPO}/${BRANCH}. CI pipeline triggered. Automatically create a CronCreate job (cron: */1 * * * *, recurring: true) to poll CI status. Poll prompt: Check CI for ${SHA} in ${OWNER_REPO} — run forgejo GET /repos/${OWNER_REPO}/commits/${SHA}/status and parse state. If success: notify user + CronDelete. If failure: notify + run /aether:aether-ci ${SHA} --reproduce. If pending: wait. Max 15 polls then timeout."
+  MSG="[aether-ci-watch] git push detected: ${SHORT_SHA} on ${OWNER_REPO}/${BRANCH}. CI pipeline triggered. Automatically create a CronCreate job (cron: */1 * * * *, recurring: true) to poll CI status. Poll prompt: Check CI for ${SHA} in ${OWNER_REPO} — run forgejo GET /repos/${OWNER_REPO}/commits/${SHA}/status and parse state. If success: notify user + CronDelete + IMMEDIATELY invoke /aether:deploy-watch ${JOB_NAME} --version ${SHA} to verify deployment. If failure: notify + run /aether:aether-ci ${SHA} --reproduce. If pending: wait. Max 15 polls then timeout."
   echo "{\"systemMessage\":$(echo "$MSG" | jq -Rs .)}"
 else
   # Env var format: plain text output

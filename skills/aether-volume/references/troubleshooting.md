@@ -6,7 +6,7 @@
 
 **解决方案**:
 1. 检查 SSH 密钥配置：`ls -la ~/.ssh/id_ed25519`
-2. 测试连接：`ssh root@192.168.1.80 "hostname"`
+2. 测试连接：`ssh root@192.168.69.80 "hostname"`
 3. 使用 `--ssh-key` 指定密钥路径
 4. 或设置 `AETHER_SSH_PASSWORD` 环境变量
 
@@ -31,13 +31,13 @@
 aether volume list --node heavy-1
 
 # 2. 确认目录存在
-ssh root@192.168.1.80 "ls -la /opt/aether-volumes/"
+ssh root@192.168.69.80 "ls -la /opt/aether-volumes/"
 
 # 3. 确认 Nomad 识别
-ssh root@192.168.1.80 "nomad node status -self | grep -A 10 'Host Volumes'"
+ssh root@192.168.69.80 "nomad node status -self | grep -A 10 'Host Volumes'"
 
 # 4. 查看 Nomad 配置
-ssh root@192.168.1.80 "grep -A 3 'host_volume' /opt/nomad/config/client.hcl"
+ssh root@192.168.69.80 "grep -A 3 'host_volume' /opt/nomad/config/client.hcl"
 ```
 
 ## 常见错误信息

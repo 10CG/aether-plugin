@@ -133,11 +133,11 @@ HEAVY_NODES=$(yq '.cluster.clients[] | select(.class == "heavy_workload") | .ip'
 aether version
 
 # 检查集群
-curl -s http://192.168.1.70:4646/v1/status/leader
-curl -s http://192.168.1.70:4646/v1/nodes
+curl -s http://192.168.69.70:4646/v1/status/leader
+curl -s http://192.168.69.70:4646/v1/nodes
 
 # 测试 SSH
-ssh -o ConnectTimeout=5 root@192.168.1.80 "hostname"
+ssh -o ConnectTimeout=5 root@192.168.69.80 "hostname"
 ```
 
 ---

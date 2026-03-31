@@ -1,0 +1,8 @@
+# Aether 项目级配置
+# 覆盖全局配置中的对应字段
+# 由 /aether:setup --project 生成
+
+cluster:
+  nomad_addr: "http://192.168.69.70:4646"
+  consul_addr: "http://192.168.69.70:8500"
+  registry: "ghcr.io"

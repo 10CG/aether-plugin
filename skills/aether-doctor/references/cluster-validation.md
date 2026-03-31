@@ -7,7 +7,7 @@
 ```bash
 # 返回 RPC 端口 (4647)，不是 HTTP 端口 (4646)
 NOMAD_LEADER=$(curl -s "${NOMAD_ADDR}/v1/status/leader")
-# 示例: "192.168.1.71:4647"
+# 示例: "192.168.69.71:4647"
 ```
 
 ### 获取 Server 节点列表
@@ -40,7 +40,7 @@ curl -s "${NOMAD_ADDR}/v1/nodes" | jq '[.[] | {
 
 ```bash
 # 用户配置的地址
-CONFIG_NOMAD="192.168.1.70:4646"
+CONFIG_NOMAD="192.168.69.70:4646"
 
 # 获取 Server 列表（HTTP 端口）
 SERVER_HTTP_ADDRS=$(curl -s "${NOMAD_ADDR}/v1/agent/self" | \

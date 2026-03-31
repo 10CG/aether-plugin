@@ -26,7 +26,7 @@ aether volume create --node heavy-1 --project my-api --volumes data,logs
 aether volume create --node heavy-1 --project my-api --volumes data --dry-run
 
 # 使用 IP 地址
-aether volume create --node 192.168.1.80 --project my-api --volumes data
+aether volume create --node 192.168.69.80 --project my-api --volumes data
 
 # 指定 SSH 密钥
 aether volume create --node heavy-1 --project my-api --volumes data \
@@ -46,7 +46,7 @@ aether volume create --node heavy-1 --project my-api --volumes data \
 
 **输出示例**:
 ```
-🔧 准备在节点 192.168.1.80 上创建 volume...
+🔧 准备在节点 192.168.69.80 上创建 volume...
    项目: my-api
    Volumes: data, logs
 
@@ -87,7 +87,7 @@ aether volume list --node heavy-1 --json
 
 **输出示例**:
 ```
-节点 192.168.1.80 上的 host volume:
+节点 192.168.69.80 上的 host volume:
 
   • my-api-data
     路径: /opt/aether-volumes/my-api/data

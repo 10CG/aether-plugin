@@ -296,7 +296,7 @@ git push → Hook 检测 → systemMessage → Claude 创建 CronCreate
 Auto CI check for commit {SHA} in {OWNER_REPO}:
 1. Run: forgejo GET /repos/{OWNER_REPO}/commits/{SHA}/status | jq '{state, total_count}'
 2. Read .aether/ci-watch.state, increment poll_count, write back
-3. If state == "success": notify "CI passed ✓", CronDelete this job, delete state file
+3. If state == "success": notify "CI passed ✓", CronDelete this job, then IMMEDIATELY invoke /aether:deploy-watch {JOB_NAME} --version {SHA} for deployment verification. Read job_name from .aether/ci-watch.state.
 4. If state == "failure": notify "CI failed ✗", CronDelete, run /aether:aether-ci {SHA} --reproduce
 5. If state == "pending" and poll_count < 15: update state file, wait for next poll
 6. If poll_count >= 15: notify "CI timeout (~15 min)", CronDelete, suggest manual check
@@ -313,7 +313,7 @@ Auto CI check for commit {SHA} in {OWNER_REPO}:
 
 | 条件 | 动作 |
 |------|------|
-| CI 成功 | 通知用户 + CronDelete + 删除状态文件 |
+| CI 成功 | 通知用户 + CronDelete + 调用 /aether:deploy-watch 验证部署 |
 | CI 失败 | 诊断报告 + CronDelete |
 | 超过 15 次轮询 (~15 min) | 超时警告 + CronDelete |
 | API 连续 3 次失败 | 错误报告 + CronDelete |

@@ -234,7 +234,7 @@ jobs:
 
 | Secret | 说明 | 如何获取 |
 |--------|------|---------|
-| `NOMAD_ADDR` | Nomad API 地址 | 如 `http://192.168.1.70:4646` |
+| `NOMAD_ADDR` | Nomad API 地址 | 如 `http://192.168.69.70:4646` |
 | `NOMAD_TOKEN` | Nomad 访问令牌 | 从 Nomad ACL 生成 |
 
 **注意**：`FORGEJO_USER` 和 `FORGEJO_TOKEN` 由 Forgejo 自动注入，无需手动配置。
