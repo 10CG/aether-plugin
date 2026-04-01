@@ -2,6 +2,13 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.6.1] - 2026-04-01
+
+### Changed
+- **aether-status**: Complete SKILL.md redesign (v2.0.0). Investigation-first approach
+  replaces checklist-driven format. 314→118 lines. Adds mandatory Consul depth checks,
+  severity grading, investigation signal mapping. AB test: WITH win rate 0%→100%.
+
 ## [1.6.0] - 2026-04-01
 
 ### Added
