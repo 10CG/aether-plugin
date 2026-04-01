@@ -46,6 +46,22 @@ Common issues:
 - `pending` → Constraint mismatch or insufficient resources
 - `failed` → Task startup failure (image pull, port conflict, crash)
 - `lost` → Node went down
+- `running` but unhealthy → **Phantom alloc detection** (see below)
+
+#### Phantom Alloc Detection (Issue #12)
+
+For each allocation with `ClientStatus == "running"`, verify TaskStates depth:
+
+```bash
+curl -s "${NOMAD_ADDR}/v1/allocation/${ALLOC_ID}" | \
+  jq '{client: .ClientStatus, tasks: [.TaskStates | to_entries[] | {name: .key, state: .value.State}]}'
+```
+
+If `ClientStatus=running` but `TaskStates[*].State=dead`:
+- This is a **phantom allocation** — Nomad lost Docker event stream
+- Container is dead but Nomad never received the exit event
+- Fix: `nomad alloc stop ${ALLOC_ID}` to force reschedule
+- If multiple phantoms on same node: drain the node (`nomad node drain -enable <node-id>`)
 
 ### 3. Task Events
 

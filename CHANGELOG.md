@@ -2,6 +2,16 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.6.0] - 2026-04-01
+
+### Added
+- **aether-deploy-watch**: Phantom alloc detection in Step 3 timeout path.
+  When health checks time out, fetches TaskStates for each "running" alloc
+  to detect containers dead at Docker level but reported running by Nomad (Issue #12).
+- **deploy-doctor**: Phantom alloc detection in allocation analysis step.
+  Verifies TaskStates depth for running allocations, identifies Docker event
+  stream disconnection as root cause, suggests alloc stop or node drain.
+
 ## [1.5.1] - 2026-03-31
 
 ### Fixed
