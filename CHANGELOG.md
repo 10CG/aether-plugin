@@ -2,6 +2,13 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.6.2] - 2026-04-03
+
+### Added
+- **benchmark-aggregate-hook**: PostToolUse hook that detects AB test result commits
+  and reminds to run `aggregate-results.py` to update OVERALL_BENCHMARK_SUMMARY.md.
+  Prevents summary staleness after AB testing sessions.
+
 ## [1.6.1] - 2026-04-01
 
 ### Changed
