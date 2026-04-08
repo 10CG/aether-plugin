@@ -285,10 +285,11 @@ if [ $STATUS -ne 0 ] || echo "$TASKS" | jq -e '.workflow_runs == null' > /dev/nu
 fi
 
 echo "$TASKS" | jq -r '
-  ["Run ID", "Status", "Branch", "Commit", "Triggered"],
+  ["Run ID", "Status", "Branch", "Commit", "Duration", "Triggered"],
   (.workflow_runs[] | [
-    (.run_number | tostring), .status, (.head_sha[:8]),
-    .display_title[:40], .name
+    (.run_number | tostring), .status,
+    (.head_branch // "-"), (.head_sha[:8]),
+    (if .duration then "\(.duration)s" else "-" end), .name
   ]) | @tsv' | column -t -s $'\t'
 ```
 
