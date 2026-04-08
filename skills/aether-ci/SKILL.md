@@ -1,11 +1,13 @@
 ---
 name: aether-ci
 description: |
-  CI/CD 状态查询与失败诊断工具。自动检测 Forgejo Actions 运行状态，
-  获取失败信息，本地复现错误并提供修复建议。
+  CI/CD 状态查询与失败诊断工具。三层策略链：API → SSH 日志 → 本地复现。
+  自动检测 Forgejo Actions 运行状态，展示 run 列表，读取远程日志，
+  本地复现错误并提供修复建议。覆盖 15 种失败模式。
 
   使用场景："查看 CI 状态"、"CI 失败了"、"检查构建结果"、"CI 挂了"、
-  "push 后检查"、"为什么 CI 红了"、"检查测试是否通过"、"查看 CI 日志"
+  "push 后检查"、"为什么 CI 红了"、"检查测试是否通过"、"查看 CI 日志"、
+  "CI run 列表"、"读取 CI 日志"、"CI 诊断"
 argument-hint: "[sha] [--watch] [--reproduce]"
 disable-model-invocation: false
 user-invocable: true
@@ -18,15 +20,16 @@ dependencies:
 
 # Aether CI 状态查询与诊断 (aether-ci)
 
-> **版本**: 1.0.0 | **优先级**: P1
+> **版本**: 2.1.0 | **优先级**: P1
 
 ## 快速开始
 
 ### 使用场景
 
-- 查看最近一次 CI 运行状态
-- CI 失败后自动诊断原因
-- 本地复现 CI 失败的测试/lint 错误
+- 查看最近 CI runs 的状态列表（表格化输出）
+- CI 失败后自动诊断原因（15 种失败模式识别）
+- 读取远程 CI 日志（SSH 策略链，授权开发机）
+- 本地复现 CI 失败的测试/lint/docker 错误
 - push 后主动检查 CI 结果
 
 ### 命令参数
@@ -78,6 +81,29 @@ aether ci status --json --branch master
 | `data.runs[].commit_sha` | 触发 commit |
 | `data.runs[].duration_seconds` | 耗时（秒） |
 
+**Run list 格式化输出**
+
+将 JSON 渲染为对齐表格，便于快速扫读：
+
+```bash
+aether ci status --json | jq -r '
+  ["Run ID", "Status", "Branch", "Commit", "Duration", "Triggered"],
+  (.data.runs[] | [
+    .id, .status, .branch, (.commit_sha[:8]),
+    (if .duration_seconds then "\(.duration_seconds)s" else "-" end),
+    .name
+  ]) | @tsv' | column -t -s $'\t'
+```
+
+示例输出：
+
+```
+Run ID  Status   Branch   Commit    Duration  Triggered
+1042    success  master   a3f9c12b  192s      test
+1041    failure  master   a3f9c12b  47s       lint
+1039    success  feat/x   9d1b4e7a  210s      test
+```
+
 **Fallback** — CLI 未安装时，直接调 commit status API：
 
 ```bash
@@ -85,9 +111,35 @@ SHA="${1:-$(git rev-parse HEAD)}"
 forgejo GET "/repos/${OWNER_REPO}/commits/${SHA}/status"
 ```
 
-### Step 2a: 读取 CI 日志（CLI v1.5.0+）
+### Step 2a: 日志获取策略链
 
-当 CI 失败时，优先读取远程日志（比本地复现更直接）：
+CI 失败时，按以下优先级获取日志，任一层成功即停止：
+
+```
+Tier 1: Forgejo API 原生日志（Phase 2/3，API 就绪后启用）
+         → 无机器限制，任何环境均可用
+         → 当前状态: 等待上游 API 支持 (Aether#8)
+
+Tier 2: SSH via `aether ci logs`（Phase 1，当前实现）
+         → 通过配置的 ci.ssh_host 读取服务端日志
+         → 受限于授权开发机；CLI 内部处理 SSH 连接和超时
+
+Tier 3: 本地复现（最终回退）
+         → 在本地执行相同命令复现 CI 环境
+         → 详见 Step 4
+```
+
+**Tier 2 执行流程（当前优先路径）：**
+
+**2a-1. 探测 CLI 可用性**
+
+```bash
+aether ci status --json
+```
+
+命令成功（exit 0）→ CLI 可用，继续 2a-2。失败或未安装 → 跳至 Step 4（本地复现）。
+
+**2a-2. 读取日志**
 
 ```bash
 # 从 Step 2 获取失败 run 的 task ID
@@ -98,9 +150,21 @@ aether ci logs $TASK_ID
 
 # 读取最近 200 行（通常足够定位错误）
 aether ci logs $TASK_ID -n 200
+
+# 快速定位错误行（推荐先用此命令缩小范围）
+aether ci logs $TASK_ID --search "ERROR"
+aether ci logs $TASK_ID --search "FAIL:"
 ```
 
-**注意**: `aether ci logs` 需要 `ci.ssh_host` 配置。未配置时自动降级到 Step 4（本地复现）。
+**约束**:
+- Skill 不得自行构造日志路径（路径规则封装在服务端）
+- SSH 超时由 CLI 内部控制（默认 5s），Skill 无需额外超时设置
+- 日志解压（zstd）在服务端完成，客户端不需要 zstd 二进制
+- API 返回 500/429 或网络超时，统一视为"不可用"
+
+**2a-3. 降级行为**
+
+当 `aether ci logs` 返回非零退出码时，输出提示（非错误）：`"完整日志需在授权开发机上查看。当前进行本地复现..."`，然后继续 Step 4，不中断诊断流程。
 
 ### Step 3: 状态判断与响应
 
@@ -128,7 +192,7 @@ total_count == 0    → 该 commit 无 CI 运行记录（可能未触发或 SHA 
 
 ### Step 4: 失败诊断 — 本地复现
 
-**本地复现作为日志读取的补充**: 当 `aether ci logs` 可用时（Step 2a），优先看日志。当 CLI 未配置或需要交互式调试时，本地复现仍有价值。
+**本地复现作为 Tier 3 回退**: 当策略链的 Tier 1/2 均不可用（API 未就绪、SSH 未配置、连接失败）时执行。也可通过 `--reproduce` 参数直接触发，跳过日志读取。
 
 **4.1 识别失败 Job**
 
@@ -140,6 +204,8 @@ total_count == 0    → 该 commit 无 CI 运行记录（可能未触发或 SHA 
 |-------------|-------------|---------|
 | `CI / test (push)` | `go test -v -race ./...` | `aether-cli/` |
 | `CI / lint (push)` | `golangci-lint run --timeout=5m` | `aether-cli/` |
+| `CI / build (push)` | `docker build -f Dockerfile .` | 项目根目录 |
+| 依赖异常 | `go mod download && go mod verify` | `aether-cli/` |
 
 ```bash
 # 示例: test 失败时
@@ -158,17 +224,23 @@ cd aether-cli && golangci-lint run --timeout=5m 2>&1
 
 解析本地复现输出，匹配错误模式：
 
-| 错误模式 | 匹配特征 | 原因 | 建议 |
-|----------|---------|------|------|
-| 测试失败 | `--- FAIL:` | 测试断言不通过 | 定位失败测试，修复逻辑 |
-| 编译错误 | `cannot\|undefined\|undeclared` | 代码语法/类型错误 | 修复编译错误 |
-| 数据竞争 | `DATA RACE` | 并发安全问题 | 添加同步机制 |
-| Lint 错误 | 文件名:行号:列号 格式 | 代码风格/质量问题 | 按 lint 建议修复 |
-| 测试超时 | `test timed out after\|context deadline` | 单测或集成测试超时 | 优化性能或增加 `-timeout` |
-| Lint 超时 | `deadline exceeded.*golangci` | golangci-lint 超时 | 增加 `--timeout` 或排查大文件 |
-| 依赖缺失 | `missing go.sum entry\|go mod download` | Go module 问题 | 运行 `go mod tidy` |
-| Docker 构建失败 | `docker: Error\|COPY failed\|cannot connect to.*Docker` | Dockerfile 或 daemon 问题 | 检查 Dockerfile 语法和 Docker 服务 |
-| 依赖安装失败 | `npm ERR!\|pip.*error\|apt-get.*Unable` | 包管理器失败 | 检查包名、版本、网络 |
+| 类别 | 错误模式 | 匹配特征 | 原因 | 建议 |
+|------|----------|---------|------|------|
+| compile | 编译错误 | `cannot\|undefined\|undeclared` | 代码语法/类型错误 | 修复编译错误 |
+| test | 测试失败 | `--- FAIL:` | 测试断言不通过 | 定位失败测试，修复逻辑 |
+| test | 数据竞争 | `DATA RACE` | 并发安全问题 | 添加同步机制 |
+| test | 测试超时 | `test timed out after\|context deadline` | 单测或集成测试超时 | 优化性能或增加 `-timeout` |
+| lint | Lint 错误 | 文件名:行号:列号 格式 | 代码风格/质量问题 | 按 lint 建议修复 |
+| lint | Lint 超时 | `deadline exceeded.*golangci` | golangci-lint 超时 | 增加 `--timeout` 或排查大文件 |
+| dep | 依赖缺失 | `missing go.sum entry\|go mod download` | Go module 问题 | 运行 `go mod tidy` |
+| dep | 依赖安装失败 | `npm ERR!\|pip.*error\|apt-get.*Unable` | 包管理器失败 | 检查包名、版本、网络 |
+| docker | Docker 构建失败 | `docker: Error\|COPY failed\|cannot connect to.*Docker` | Dockerfile 或 daemon 问题 | 检查 Dockerfile 语法和 Docker 服务 |
+| infra | Job 超时 | `panic: test timed out\|killed.*timeout\|Job was cancelled` | CI runner 强制终止 | 检查 runner 资源，分拆耗时任务 |
+| infra | Runner 离线 | `runner.*offline\|no suitable runner\|Job timed out` | 无可用 runner | 检查 runner 状态，联系 infra 团队 |
+| config | Secret/配置缺失 | `secret.*not found\|variable.*undefined\|env.*not set` | 环境变量未配置 | 检查 CI secrets 和 Nomad Variables |
+| config | 网络超时 | `dial tcp.*i/o timeout\|TLS handshake timeout` | 外部网络不可达 | 检查代理配置和外部服务可用性 |
+| config | Registry 认证失败 | `unauthorized.*registry\|authentication required\|403 Forbidden.*pull` | Registry token 过期 | 刷新 registry credentials |
+| resource | OOM/资源耗尽 | `signal: killed\|out of memory\|cannot allocate` | 内存不足 | 降低并发度，检查 runner 内存限制 |
 
 ---
 
@@ -185,39 +257,48 @@ Jobs: 2/2 passed (test: 3m12s, lint: 1m45s)
 
 ### 失败 (含诊断)
 
-```markdown
-## CI 诊断报告
-
-**Commit**: abc1234 — "feat: add volume backup"
-**状态**: ✗ 失败 (1/2 jobs failed)
-**链接**: https://forgejo.10cg.pub/10CG/Aether/actions/runs/160
-
-### 失败 Job: CI / test (push)
-
-**耗时**: 12m27s
-**错误类型**: 测试失败
-
-**本地复现输出** (关键段落):
+```
+CI 诊断报告
+Commit: abc1234 — "feat: add volume backup"
+状态: ✗ 失败 (1/2 jobs failed)
+失败 Job: CI / test (push) | 耗时: 12m27s | 类别: test failure
 
 --- FAIL: TestVolumeCreate (0.05s)
     manager_test.go:45: expected volume "data" to exist, got nil
-FAIL    github.com/10CG/aether-cli/internal/volume  0.312s
 
-**修复建议**:
-1. 检查 `internal/volume/manager.go` 中 volume 创建逻辑
-2. 确认测试 fixture 是否正确初始化
-3. 修复后运行 `cd aether-cli && go test -v -race ./internal/volume/...` 验证
+修复建议: 检查 internal/volume/manager.go 中 volume 创建逻辑
 ```
 
 ---
 
-## 补充信息: Actions Tasks API
+## 补充信息: Actions Tasks API (CLI Fallback)
 
-除 commit status API 外，可用 actions/tasks 获取更多运行信息：
+当 `aether ci` CLI 不可用时，直接调用 actions/tasks 端点并渲染 run list：
 
 ```bash
-forgejo GET "/repos/${OWNER_REPO}/actions/tasks?limit=5&page=1"
+TASKS=$(forgejo GET "/repos/${OWNER_REPO}/actions/tasks?limit=5&page=1")
+STATUS=$?
+
+if [ $STATUS -ne 0 ] || echo "$TASKS" | jq -e '.workflow_runs == null' > /dev/null 2>&1; then
+  echo "CI run list 不可用: API 返回异常 (可能是 500/429/超时)"
+  echo "请检查 forgejo 连通性或直接访问 Web UI"
+fi
+
+echo "$TASKS" | jq -r '
+  ["Run ID", "Status", "Branch", "Commit", "Triggered"],
+  (.workflow_runs[] | [
+    (.run_number | tostring), .status, (.head_sha[:8]),
+    .display_title[:40], .name
+  ]) | @tsv' | column -t -s $'\t'
 ```
+
+**错误处理规则**:
+
+| 响应 | 行为 |
+|------|------|
+| 非 200 (含 500/429/timeout) | 输出"不可用"提示，不中断主流程 |
+| `workflow_runs` 字段缺失 | 视为 API 异常，同上 |
+| 空列表 | 输出"无近期 CI 运行记录" |
 
 **注意**: 必须同时提供 `limit` 和 `page` 参数，否则返回全部记录。
 
@@ -304,12 +385,12 @@ git push → Hook 检测 → CronCreate (每 60s 轮询)
 
 ## Related Issues
 
-- [aether-plugin#7](https://forgejo.10cg.pub/10CG/aether-plugin/issues/7) — CI 日志读取 (Phase 1 完成)
-- [Aether#8](https://forgejo.10cg.pub/10CG/Aether/issues/8) — Forgejo API 上游跟踪 (Phase 2/3 等待)
+- [aether-plugin#7](https://forgejo.10cg.pub/10CG/aether-plugin/issues/7) — CI 日志读取 (Phase 1: SSH via CLI 完成; Phase 2/3: Forgejo API 待就绪)
+- [Aether#8](https://forgejo.10cg.pub/10CG/Aether/issues/8) — Forgejo API 上游跟踪（Tier 1 日志策略的前置依赖）
 - [US-024](../../../docs/requirements/user-stories/US-024.md) — `aether ci` CLI 命令
 
 ---
 
-**Skill 版本**: 2.0.0
+**Skill 版本**: 2.1.0
 **最后更新**: 2026-04-08
 **维护者**: 10CG Infrastructure Team
