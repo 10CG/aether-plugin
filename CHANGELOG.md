@@ -2,6 +2,14 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.6.3] - 2026-04-08
+
+### Changed
+- **aether-ci Skill v2.0.0**: Step 2 uses `aether ci status --json` (CLI v1.5.0+),
+  new Step 2a remote log reading via `aether ci logs`, expanded error patterns
+  (docker build, dependency install, timeout split). AB tested: WITH_BETTER (20/20 vs 17/20).
+- Compacted CronCreate section (359→315 lines, under 400 guard).
+
 ## [1.6.2] - 2026-04-03
 
 ### Added
