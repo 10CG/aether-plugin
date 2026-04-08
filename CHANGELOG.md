@@ -2,6 +2,14 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.6.4] - 2026-04-08
+
+### Changed
+- **aether-ci Skill v2.1.0**: Three-tier strategy chain (API → SSH → local repro),
+  run list table display, 15 failure patterns (was 9) with 7 categories,
+  SSH degradation handling, `--search` log capability.
+  AB tested: WITH_BETTER (3/3 evals, 60/60 vs 51/60).
+
 ## [1.6.3] - 2026-04-08
 
 ### Changed
