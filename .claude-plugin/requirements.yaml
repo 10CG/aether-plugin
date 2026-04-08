@@ -2,8 +2,8 @@
 # 此文件是版本要求的单一事实来源 (Single Source of Truth)
 
 cli:
-  min_version: "0.9.0"
-  recommended_version: "1.0.0"
+  min_version: "1.0.0"
+  recommended_version: "1.5.0"
   # 安装位置 (与 config.yaml 同目录)
   install_dir: "~/.aether"
   install_path:
