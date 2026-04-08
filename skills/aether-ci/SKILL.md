@@ -5,7 +5,7 @@ description: |
   获取失败信息，本地复现错误并提供修复建议。
 
   使用场景："查看 CI 状态"、"CI 失败了"、"检查构建结果"、"CI 挂了"、
-  "push 后检查"、"为什么 CI 红了"、"检查测试是否通过"
+  "push 后检查"、"为什么 CI 红了"、"检查测试是否通过"、"查看 CI 日志"
 argument-hint: "[sha] [--watch] [--reproduce]"
 disable-model-invocation: false
 user-invocable: true
@@ -57,30 +57,50 @@ OWNER_REPO=$(echo "$REMOTE_URL" | sed 's/\.git$//' | sed -E 's#.*/([^/]+/[^/]+)$
 
 ### Step 2: 查询 CI 状态
 
-使用 commit status API 获取聚合状态：
+**优先方式** — 使用 `aether ci` CLI（v1.5.0+，自动处理 API 调用和认证）：
+
+```bash
+# 结构化 JSON 输出
+aether ci status --json
+
+# 按分支过滤
+aether ci status --json --branch master
+```
+
+**JSON 返回字段：**
+
+| 字段 | 含义 |
+|------|------|
+| `data.runs[].id` | Task ID（用于 Step 2a 日志读取） |
+| `data.runs[].status` | `success` / `failure` / `running` |
+| `data.runs[].name` | Job 名称 (test, lint) |
+| `data.runs[].branch` | 分支名 |
+| `data.runs[].commit_sha` | 触发 commit |
+| `data.runs[].duration_seconds` | 耗时（秒） |
+
+**Fallback** — CLI 未安装时，直接调 commit status API：
 
 ```bash
 SHA="${1:-$(git rev-parse HEAD)}"
-
-# 聚合状态（去重，每个 context 只保留最新）
 forgejo GET "/repos/${OWNER_REPO}/commits/${SHA}/status"
 ```
 
-**返回字段解读：**
+### Step 2a: 读取 CI 日志（CLI v1.5.0+）
 
-| 字段 | 含义 | 值 |
-|------|------|-----|
-| `state` | 聚合状态 | `pending` / `success` / `failure` / `error` |
-| `total_count` | 检查项总数 | 通常 2 (test + lint) |
-| `statuses[].context` | Job 名称 | `CI / test (push)`, `CI / lint (push)` |
-| `statuses[].status` | 单项状态 | `pending` / `success` / `failure` |
-| `statuses[].description` | 耗时描述 | `Failing after 12m27s` |
-| `statuses[].target_url` | 运行链接 (相对路径) | `/10CG/Aether/actions/runs/160/jobs/0` |
+当 CI 失败时，优先读取远程日志（比本地复现更直接）：
 
-**注意**: `target_url` 是相对路径，需要拼接 Forgejo 基地址：
+```bash
+# 从 Step 2 获取失败 run 的 task ID
+TASK_ID=$(aether ci status --json | jq -r '.data.runs[] | select(.status=="failure") | .id' | head -1)
+
+# 读取完整日志
+aether ci logs $TASK_ID
+
+# 读取最近 200 行（通常足够定位错误）
+aether ci logs $TASK_ID -n 200
 ```
-https://forgejo.10cg.pub${target_url}
-```
+
+**注意**: `aether ci logs` 需要 `ci.ssh_host` 配置。未配置时自动降级到 Step 4（本地复现）。
 
 ### Step 3: 状态判断与响应
 
@@ -108,7 +128,7 @@ total_count == 0    → 该 commit 无 CI 运行记录（可能未触发或 SHA 
 
 ### Step 4: 失败诊断 — 本地复现
 
-**为什么本地复现而非拉日志**: Forgejo 11.0.6 没有 job 日志 API 端点。但 CI 命令可在本地执行，输出更丰富且 AI 可直接分析。
+**本地复现作为日志读取的补充**: 当 `aether ci logs` 可用时（Step 2a），优先看日志。当 CLI 未配置或需要交互式调试时，本地复现仍有价值。
 
 **4.1 识别失败 Job**
 
@@ -144,8 +164,11 @@ cd aether-cli && golangci-lint run --timeout=5m 2>&1
 | 编译错误 | `cannot\|undefined\|undeclared` | 代码语法/类型错误 | 修复编译错误 |
 | 数据竞争 | `DATA RACE` | 并发安全问题 | 添加同步机制 |
 | Lint 错误 | 文件名:行号:列号 格式 | 代码风格/质量问题 | 按 lint 建议修复 |
-| 超时 | `timeout\|deadline exceeded` | 测试/lint 超时 | 优化性能或增加超时 |
-| 依赖缺失 | `missing go.sum entry` | Go module 问题 | 运行 `go mod tidy` |
+| 测试超时 | `test timed out after\|context deadline` | 单测或集成测试超时 | 优化性能或增加 `-timeout` |
+| Lint 超时 | `deadline exceeded.*golangci` | golangci-lint 超时 | 增加 `--timeout` 或排查大文件 |
+| 依赖缺失 | `missing go.sum entry\|go mod download` | Go module 问题 | 运行 `go mod tidy` |
+| Docker 构建失败 | `docker: Error\|COPY failed\|cannot connect to.*Docker` | Dockerfile 或 daemon 问题 | 检查 Dockerfile 语法和 Docker 服务 |
+| 依赖安装失败 | `npm ERR!\|pip.*error\|apt-get.*Unable` | 包管理器失败 | 检查包名、版本、网络 |
 
 ---
 
@@ -265,95 +288,28 @@ aether-ci (CI 状态层)
 
 ### PostToolUse Hook (`ci-watch-hook.sh`)
 
-`scripts/ci-watch-hook.sh` 在每次 Bash 工具执行后运行，检测 `git push` 命令。
-
-**触发条件**: Bash 命令包含 `git push` 且非 `--dry-run`
-**自动操作**: 提取 SHA/repo → 写入状态文件 → 输出 systemMessage → Claude 启动 CronCreate 轮询
+`scripts/ci-watch-hook.sh` 检测 `git push` → 写入 `.aether/ci-watch.state` → systemMessage 触发 CronCreate 轮询。
 
 ```
-git push → Hook 检测 → systemMessage → Claude 创建 CronCreate
-  → 每 60s 轮询 commit status API
-  → pending: 继续等待
-  → success: 通知用户，CronDelete
-  → failure: 自动 --reproduce 诊断
+git push → Hook 检测 → CronCreate (每 60s 轮询)
+  → success: 通知 + CronDelete + /aether:deploy-watch
+  → failure: 诊断 + CronDelete
+  → 15 次超时: 警告 + CronDelete
 ```
 
-### Hook 触发后 Claude 应执行的操作
-
-1. 通知用户 CI 监控已激活
-2. 使用 CronCreate 创建轮询任务（见下节）
-3. 继续当前对话，不阻塞用户
+轮询使用 `aether ci status --json` 查询状态，终态时 CronDelete 清理。
+多次 push 自动 CronDelete 旧任务并启动新轮询。会话结束时 cron 自动销毁。
 
 ---
 
-## CronCreate 自动轮询
+## Related Issues
 
-当 Hook 触发或用户指定 `--watch` 时，使用 CronCreate 创建轮询任务。
-
-### 轮询 Prompt 模板
-
-```
-Auto CI check for commit {SHA} in {OWNER_REPO}:
-1. Run: forgejo GET /repos/{OWNER_REPO}/commits/{SHA}/status | jq '{state, total_count}'
-2. Read .aether/ci-watch.state, increment poll_count, write back
-3. If state == "success": notify "CI passed ✓", CronDelete this job, then IMMEDIATELY invoke /aether:deploy-watch {JOB_NAME} --version {SHA} for deployment verification. Read job_name from .aether/ci-watch.state.
-4. If state == "failure": notify "CI failed ✗", CronDelete, run /aether:aether-ci {SHA} --reproduce
-5. If state == "pending" and poll_count < 15: update state file, wait for next poll
-6. If poll_count >= 15: notify "CI timeout (~15 min)", CronDelete, suggest manual check
-7. If API error (non-200): increment error_count, if >= 3 consecutive: notify + CronDelete
-```
-
-### CronCreate 参数
-
-- **cron**: `*/1 * * * *` (每分钟，实际间隔 ~60s + jitter)
-- **recurring**: `true`
-- **prompt**: 上述模板（替换实际 SHA 和 OWNER_REPO）
-
-### 终止条件
-
-| 条件 | 动作 |
-|------|------|
-| CI 成功 | 通知用户 + CronDelete + 调用 /aether:deploy-watch 验证部署 |
-| CI 失败 | 诊断报告 + CronDelete |
-| 超过 15 次轮询 (~15 min) | 超时警告 + CronDelete |
-| API 连续 3 次失败 | 错误报告 + CronDelete |
-| 新的 git push (Hook 再次触发) | CronDelete 旧任务，启动新轮询 |
+- [aether-plugin#7](https://forgejo.10cg.pub/10CG/aether-plugin/issues/7) — CI 日志读取 (Phase 1 完成)
+- [Aether#8](https://forgejo.10cg.pub/10CG/Aether/issues/8) — Forgejo API 上游跟踪 (Phase 2/3 等待)
+- [US-024](../../../docs/requirements/user-stories/US-024.md) — `aether ci` CLI 命令
 
 ---
 
-## 状态管理与容错
-
-### 状态文件 `.aether/ci-watch.state`
-
-```yaml
-sha: abc1234...
-repo: 10CG/Aether
-branch: master
-started: 2026-03-23T10:00:00Z
-poll_count: 3
-```
-
-由 Hook 写入，CronCreate prompt 每次轮询时读取并更新 `poll_count`。
-
-### 多次 Push 处理
-
-当 Hook 再次触发时（状态文件已存在且 SHA 不同）：
-1. CronDelete 旧的轮询 cron（使用 CronList 找到旧任务）
-2. 状态文件被 Hook 覆盖为新 SHA
-3. 新的 CronCreate 自动启动
-
-### 认证失败处理
-
-API 返回 401/403 或 HTTP 302 (Cloudflare redirect)：
-- 停止轮询 + CronDelete
-- 提示检查 `FORGEJO_TOKEN`、`CF_ACCESS_CLIENT_ID`、`CF_ACCESS_CLIENT_SECRET`
-
-### 会话结束清理
-
-CronCreate 任务在会话结束时自动销毁（session-only）。状态文件保留但无害。
-
----
-
-**Skill 版本**: 1.1.0
-**最后更新**: 2026-03-23
+**Skill 版本**: 2.0.0
+**最后更新**: 2026-04-08
 **维护者**: 10CG Infrastructure Team
