@@ -2,6 +2,11 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.6.5] - 2026-04-09
+
+### Changed
+- **requirements.yaml**: Update `cli.recommended_version` from 1.6.0 to 1.6.1.
+
 ## [1.6.4] - 2026-04-08
 
 ### Changed
