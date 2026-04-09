@@ -1,5 +1,5 @@
 {
-  "version": "1.6.5",
+  "version": "1.6.6",
   "description": "Aether 基础设施部署 Hooks 配置 - 12个 Skills + 2个 Agents + 3个 Hooks",
   "enabled": true,
   "hooks": {

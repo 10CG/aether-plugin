@@ -2,6 +2,14 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.6.6] - 2026-04-09
+
+### Changed
+- **aether-deploy-watch**: SKILL.md optimized from 486→393 lines. Extracted
+  4 procedural sections to `references/` directory (CI diagnosis, phantom alloc,
+  polling patterns, CronCreate integration). No content changes. [skip-benchmark]
+- **requirements.yaml**: `cli.recommended_version` updated to 1.7.0.
+
 ## [1.6.5] - 2026-04-09
 
 ### Changed
