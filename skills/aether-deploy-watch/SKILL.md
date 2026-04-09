@@ -117,36 +117,10 @@ docker manifest inspect "${REGISTRY}/${IMAGE_PATH}:${TARGET_TAG}" > /dev/null 2>
 
 ### CI 状态诊断 (镜像未找到时)
 
-当 Mode A 镜像不存在时，**必须**查询 CI 状态后再给出结论：
+当 Mode A 镜像不存在时，必须查询 CI 状态后再给出结论。
+区分 pending/cancelled/failure/success/unknown 五种状态，针对性报告。
 
-```bash
-# 1. 聚合状态
-CI_STATUS=$(forgejo GET "/repos/${OWNER_REPO}/commits/${TARGET_TAG}/status" 2>/dev/null)
-AGG_STATE=$(echo "$CI_STATUS" | jq -r '.state // "unknown"')
-
-# 2. 如果聚合状态为 failure，进一步区分 cancelled vs 真正失败
-if [ "$AGG_STATE" = "failure" ]; then
-  TASKS=$(forgejo GET "/repos/${OWNER_REPO}/actions/tasks?limit=10&page=1" 2>/dev/null)
-  # 筛选匹配 SHA 的任务
-  MATCH=$(echo "$TASKS" | jq --arg sha "${TARGET_TAG}" '
-    [.workflow_runs // [] | .[] | select(.head_sha == $sha)]')
-  CANCELLED=$(echo "$MATCH" | jq '[.[] | select(.status == "cancelled")] | length')
-  FAILED=$(echo "$MATCH" | jq '[.[] | select(.status == "failure")] | length')
-fi
-```
-
-**根据诊断结果报告**:
-
-| CI 状态 | 含义 | 报告与建议 |
-|---------|------|-----------|
-| `pending` | CI 仍在排队或运行中 | "CI 尚未完成，镜像尚未构建。等待 CI 完成后重试，或使用 `/aether:aether-ci` 查看进度" |
-| `failure` + 全部 cancelled | 被新 push 取代 (正常行为) | "此 commit 的 CI 已被取消（可能被更新的 push 取代）。这是正常行为，请对最新 commit 运行 deploy-watch" |
-| `failure` + 有真正 failure | 构建/测试真正失败 | "CI 构建失败，镜像未推送。使用 `/aether:aether-ci` 诊断失败原因" |
-| `success` | CI 通过但镜像不在 registry | "CI 通过但镜像未在 registry 中找到。检查 CI workflow 是否包含 docker push 步骤" |
-| `unknown` / API 失败 | 无法获取 CI 状态 | "无法查询 CI 状态，请手动检查 Forgejo Web UI" |
-
-**关键**: `cancelled` 状态在 Forgejo commit status API 中表现为 `status: "failure", description: "Has been cancelled"`，
-必须通过 Actions Tasks API 的 `status` 字段区分。**不要**将 cancelled 误判为构建失败。
+详见 [CI 状态诊断流程](references/ci-diagnosis.md)
 
 ---
 
@@ -228,24 +202,9 @@ fi
 
 ### 容错与轮询结构
 
-- 每次 `curl` 使用 `--max-time 10 --connect-timeout 3`。
-- 维护 `api_fail_count` 计数器，成功调用重置为 0，连续 3 次失败 → 终止。
+每次 API 调用使用 `--max-time 10 --connect-timeout 3`，维护失败计数器，连续 3 次 API 失败终止并报告。
 
-```bash
-MAX_ITER=18; INTERVAL=10; api_fail_count=0
-for i in $(seq 1 $MAX_ITER); do
-  # ... 执行 Deployment/Allocation 检查 ...
-  if [ $? -ne 0 ]; then
-    api_fail_count=$((api_fail_count + 1))
-    [ $api_fail_count -ge 3 ] && echo "❌ Nomad API 连续不可达，运行 /aether:doctor" && exit 1
-  else
-    api_fail_count=0
-  fi
-  # 终端状态 (successful/failed/all-running) 判定后 break
-  echo "[Step 2] Deployment converging... (attempt ${i}/${MAX_ITER})"
-  sleep $INTERVAL
-done
-```
+详见 [轮询模式与容错](references/polling-patterns.md)
 
 ### Step 2 超时处理 (Mode A)
 
@@ -326,35 +285,10 @@ done
 
 ### Phantom Alloc 诊断 (超时时执行)
 
-当 Step 3 超时且 `PASSING < DESIRED` 时，执行 phantom alloc 检测：
+当 Step 3 超时且 `PASSING < DESIRED` 时，检测 Nomad 报告 running 但 Docker 已退出的 phantom allocation。
+仅在超时路径执行，不影响正常部署监控。
 
-```bash
-# 获取所有 Nomad 报告为 running 的 alloc
-RUNNING_ALLOCS=$(curl -sf --max-time 10 \
-  "${NOMAD_ADDR}/v1/job/${JOB_NAME}/allocations" | \
-  jq -r '.[] | select(.ClientStatus == "running" and .DesiredStatus == "run") | .ID')
-
-PHANTOM_COUNT=0
-for alloc_id in $RUNNING_ALLOCS; do
-  TASK_STATES=$(curl -sf --max-time 10 \
-    "${NOMAD_ADDR}/v1/allocation/${alloc_id}" | \
-    jq -r '[.TaskStates // {} | to_entries[] | .value.State] | unique | .[]')
-  if echo "$TASK_STATES" | grep -q "dead"; then
-    PHANTOM_COUNT=$((PHANTOM_COUNT + 1))
-    echo "  ⚠️ Phantom alloc: ${alloc_id:0:8} (Nomad=running, TaskState=dead)"
-    echo "    Fix: nomad alloc stop ${alloc_id}"
-  fi
-done
-
-if [ "$PHANTOM_COUNT" -gt 0 ]; then
-  echo ""
-  echo "❌ ${PHANTOM_COUNT} phantom allocation(s) detected"
-  echo "  Cause: Docker daemon lost container lifecycle event (Issue #12)"
-  echo "  Fix: Stop phantom allocs to trigger rescheduling, or drain the affected node"
-fi
-```
-
-此检测仅在超时路径执行，不影响正常部署的性能。
+详见 [Phantom Alloc 诊断](references/phantom-alloc-diagnosis.md)
 
 ---
 
@@ -402,50 +336,23 @@ fi
 
 ## 7. CronCreate 集成 (ci-watch-hook 触发链)
 
-deploy-watch 是 CI 推送后监控链的终端环节。完整链路：
+deploy-watch 是 CI 推送后监控链的终端环节：
+`git push → ci-watch-hook → CronCreate → CI success → deploy-watch`
 
-```
-git push
-  → ci-watch-hook 检测推送，写入状态文件
-  → CronCreate 创建定时轮询 CI 状态
-  → CI 成功
-  → CronCreate 触发 deploy-watch
-```
+支持状态文件跟踪 (`.aether/deploy-watch.state`) 和直接调用两种模式。
 
-### 触发方式
+详见 [CronCreate 集成详情](references/croncreate-integration.md)
 
-ci-watch-hook 在 CI 成功后，CronCreate 的 prompt 包含命令式指令：
+---
 
-```
-IMMEDIATELY invoke /aether:deploy-watch {JOB_NAME} --version {SHA}
-Do not summarize. Invoke the skill now.
-```
+## 参考文档
 
-### 状态文件
-
-路径: `.aether/deploy-watch.state`
-
-```yaml
-sha: abc1234def567890abc1234def567890abc1234d
-repo: 10CG/my-project
-job_name: my-project
-expected_image: forgejo.10cg.pub/10cg/my-project:abc1234def567890abc1234def567890abc1234d
-phase: image | deploy | health | done | failed
-started: 2026-03-31T10:00:00Z
-```
-
-### 阶段更新
-
-deploy-watch 在每个 Step 转换时更新 `phase` 字段：
-
-```bash
-yq -i ".phase = \"deploy\"" .aether/deploy-watch.state
-```
-
-状态流转: `image → deploy → health → done` (正常) 或任意阶段 → `failed` (异常)。
-
-用户也可以不依赖 ci-watch-hook，直接调用：
-`/aether:deploy-watch my-api --version abc1234def567890abc1234def567890abc1234d`
+| 主题 | 文档 |
+|------|------|
+| CI 状态诊断 | [ci-diagnosis.md](references/ci-diagnosis.md) |
+| Phantom Alloc 诊断 | [phantom-alloc-diagnosis.md](references/phantom-alloc-diagnosis.md) |
+| 轮询模式与容错 | [polling-patterns.md](references/polling-patterns.md) |
+| CronCreate 集成 | [croncreate-integration.md](references/croncreate-integration.md) |
 
 ---
 
