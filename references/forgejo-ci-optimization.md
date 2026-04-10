@@ -50,6 +50,80 @@ If you are `/aether:ci`, use this guide to interpret failures and propose fixes.
 
 ---
 
+## CI Monitoring Policy (the most important rule)
+
+**The single most common operational mistake** in Aether projects is
+stopping at "I pushed it". A successful `git push` only means the git
+server accepted the bytes — it says nothing about whether CI ran,
+whether the build succeeded, whether the image was pushed, whether
+Nomad scheduled the allocation, or whether the service is actually
+healthy. Between `git push` and "it's running" there are ~6 failure
+modes that `git push`'s exit code cannot see.
+
+**Policy for any Claude session or engineer working in an Aether project**:
+after every `git push` that triggers CI/deploy, walk the full
+**push → CI → image → deploy → health** chain before reporting back:
+
+1. **CI verification** — Use `/aether:aether-ci [sha]` to wait for and
+   confirm the CI pipeline reaches `success` state. Never assume; never
+   just check `git push` exit code.
+
+2. **Failure diagnosis** — If CI fails, run
+   `/aether:aether-ci [sha] --reproduce` to reproduce the failure locally.
+   For Aether-environment-specific failure modes (TLS / EIDLETIMEOUT /
+   `operation not supported` / missing `docker.1ms.run` tag /
+   `invalid pkt-len` / broken Forgejo runner cache timeout), look up the
+   error keyword in this guide's § Troubleshooting decision tree.
+
+3. **Deployment monitoring** — After CI reaches `success`, run
+   `/aether:aether-deploy-watch <job_name>` (or
+   `/aether:aether-deploy-watch <job_name> --version <sha>`) to confirm
+   the Nomad allocation reaches `running` status and health checks pass.
+   CI success ≠ deployment success — the image might fail to pull, the
+   container might crash on startup, the health check might fail.
+
+4. **Report only after health is confirmed.** Only when the deployment
+   is observed in a healthy `running` state may you tell the user the
+   work is "deployed" or "live". If at any step the chain breaks, report
+   the exact failure and what you will try next — not "should be fine".
+
+### Anti-shortcuts to avoid
+
+- ❌ `sleep N` followed by a single `nomad job status` — blind, brittle,
+  produces false positives.
+- ❌ "Should be deploying now" without verification — the user ends up
+  finding broken deploys in production.
+- ❌ Trusting `git push` exit code alone — it only means the push
+  reached the git server, nothing about CI.
+- ❌ Trusting CI green without `deploy-watch` — the image might not
+  have been pulled yet by Nomad, the allocation might be stuck pending.
+- ❌ Hand-rolling polling loops in the same bash script — use the
+  standard `/aether:aether-deploy-watch` which knows when to give up
+  and which signals mean what.
+
+### Policy vs. automation layer
+
+The Aether plugin ships a PostToolUse hook (`scripts/ci-watch-hook.sh`)
+that detects `git push` via the Bash tool, writes
+`.aether/ci-watch.state`, and nudges Claude to set up a `CronCreate`
+poller. This hook is the **automation** layer — it tries to make the
+policy happen without Claude having to remember.
+
+The hook is not sufficient on its own, however, because it only fires
+when the push happens through Claude's Bash tool, when hooks are not
+disabled, and when the plugin is installed. The policy in this section
+is the **documentation** layer — it encodes the expected behavior so
+that Claude and engineers know what to do even when the hook isn't
+available.
+
+Both layers should exist. If you are writing a new project's CLAUDE.md,
+copy the condensed version of this policy into that file (see
+`docs/guides/forgejo-ci-optimization.md` for the canonical condensed
+form, or the four Aether-deployed projects SilkNode / Nexus / Kairos /
+Kino for working examples).
+
+---
+
 ## Environment facts (why these rules exist)
 
 Know these once, then every rule below makes sense:
@@ -741,4 +815,5 @@ Match the error keyword to find the relevant section.
 
 | Version | Date | Change |
 |---------|------|--------|
+| 1.1.0 | 2026-04-10 | Added § CI Monitoring Policy — the push → CI → deploy-watch → report chain. Codified as the single most important operational rule for Aether projects. |
 | 1.0.0 | 2026-04-10 | Initial version — extracted from 4-project optimization effort (SilkNode, Nexus, Kairos, Kino). All patterns verified with measured data. |

@@ -2,6 +2,25 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.7.1] - 2026-04-10
+
+### Added
+- **`references/forgejo-ci-optimization.md` § CI Monitoring Policy** — new
+  mandatory section codifying the push → CI → deploy-watch → report chain
+  as the single most important operational rule for Aether projects.
+  Documents the 4-step workflow, anti-shortcuts to avoid, and explains
+  the policy vs. automation layer separation (CLAUDE.md policy +
+  ci-watch-hook.sh automation).
+
+### Rationale
+Audit of 4 production projects (SilkNode / Nexus / Kairos / Kino) revealed
+inconsistent coverage: only 1 project had a real policy statement, 1 just
+listed commands, and 2 had zero mentions. The hook alone is insufficient
+because it only fires under specific conditions (Bash tool, hooks enabled,
+plugin installed). This section + upcoming CLAUDE.md updates across the
+4 projects encode the policy in both the authoritative reference and in
+each project's always-loaded context.
+
 ## [1.7.0] - 2026-04-10
 
 ### Added
