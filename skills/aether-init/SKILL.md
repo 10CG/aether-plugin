@@ -195,6 +195,12 @@ nomad job validate deploy/nomad-dev.hcl
 | Dockerfile 模板 | [dockerfile-templates.md](references/dockerfile-templates.md) |
 | Nomad 模板 | [nomad-templates.md](references/nomad-templates.md) |
 | Workflow 模板 | [workflow-templates.md](references/workflow-templates.md) |
+| **CI 优化 + 故障诊断 (跨 skill 权威参考)** | `${CLAUDE_PLUGIN_ROOT}/references/forgejo-ci-optimization.md` |
+
+> 模板背后的设计决策（为什么用 `driver: docker`、为什么要轮询 verify、
+> 为什么 Dockerfile 内 npm 要加国内镜像 + 重试等）见上表最后一行的
+> 跨 skill 权威参考。如果生成的项目 CI 出现 TLS/EIDLETIMEOUT 等问题，
+> 先读那份 guide 的 Troubleshooting decision tree。
 
 ---
 

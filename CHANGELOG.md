@@ -2,6 +2,45 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.7.0] - 2026-04-10
+
+### Added
+- **New plugin-level `references/` directory** — authoritative cross-skill
+  reference resources, accessible via `${CLAUDE_PLUGIN_ROOT}/references/`.
+- **`references/forgejo-ci-optimization.md`** — comprehensive Forgejo CI
+  optimization and troubleshooting guide for the Aether environment. Covers
+  10 anti-patterns (with real error messages), 10 best practices, 4 real
+  project case studies (SilkNode 25m→10m41s, Nexus 9m30s→6m43s, Kairos
+  13m→4m39s cold, Kino api 6m→2m14s + web 4m46s→1m51s), and an
+  error-keyword-driven troubleshooting decision tree.
+- Symlink `docs/guides/forgejo-ci-optimization.md` in the main Aether repo
+  pointing to the plugin-level guide (single source of truth).
+
+### Changed
+- **aether-init / workflow-templates.md**: substantial rewrite (242→477
+  lines). All Docker templates now include: explicit `driver: docker` in
+  buildx, DNS fix for internal registry, build+push split pattern, polling
+  deployment verification. Documents why each pattern is necessary.
+- **aether-init / dockerfile-templates.md**: substantial rewrite (91→250
+  lines). Node templates: npm mirror (`registry.npmmirror.com`) + 3x retry
+  loop + `# syntax=docker/dockerfile:1`. Python templates: pip mirror
+  (`mirrors.aliyun.com`) + retry. All templates use `COPY --chown` instead
+  of `RUN chown -R`. Added multi-stage + proper layer caching for every
+  language. Node default version aligned to 22.
+- **aether-init/SKILL.md**: added cross-skill reference row in the 详细参考
+  table pointing to `${CLAUDE_PLUGIN_ROOT}/references/forgejo-ci-optimization.md`.
+- **aether-ci/SKILL.md**: added 1-line blockquote in 故障处理 section
+  pointing to the optimization guide for Aether-specific error modes
+  (TLS / EIDLETIMEOUT / operation not supported / docker.1ms.run tag missing
+  / invalid pkt-len). Pure additive change — [skip-benchmark qualified].
+
+### Quality verification
+- AB benchmark for aether-init: **WITH skill wins decisively** (3/3 critical,
+  5/5 aether-specific vs WITHOUT 1/3 critical, 1/5 aether-specific). No
+  regression. Results in `ab-results/2026-04-10/aether-init/`.
+- Static benchmark: aether-init 344→350 lines (OK), aether-ci 397→399 lines
+  (OK, 1 line under warning threshold).
+
 ## [1.6.6] - 2026-04-09
 
 ### Changed

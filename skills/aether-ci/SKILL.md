@@ -364,6 +364,8 @@ aether-ci (CI 状态层)
 | 本地复现结果与 CI 不同 | Go 版本或环境差异 | 对齐 Go 版本 (CI: 1.22)，加 `-race` flag |
 | `jq: command not found` | jq 未安装 | `apt install jq` |
 
+> **Aether 环境特有的 CI 故障模式** (TLS cert / EIDLETIMEOUT / operation not supported / docker.1ms.run tag 缺失 / invalid pkt-len) 见 `${CLAUDE_PLUGIN_ROOT}/references/forgejo-ci-optimization.md` § Troubleshooting decision tree。
+
 ---
 
 ## 自动触发: Push 后自动监控
