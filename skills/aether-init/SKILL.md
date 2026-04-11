@@ -87,25 +87,38 @@ Phase 2: 生成文件 → 验证 → 完成
 `DATABASE`、`REDIS`、`MONGO`、`RABBITMQ`、`ELASTICSEARCH` 关键词。
 匹配到任一关键词时，在部署方案（Step 1.3）中追加服务连接建议。
 
-### Step 1.1c: 已有项目的 CLAUDE.md 补充检查
+### Step 1.1c: 已有项目的 CLAUDE.md CI Monitoring Policy 检查
 
 如果 Step 1.1 检测到项目**已有完整部署配置** (Dockerfile + HCL + CI)，跳过 Phase 2 文件生成，
-但仍检查 CLAUDE.md 是否包含部署监控规则：
+但仍检查 CLAUDE.md 是否包含 CI Monitoring Policy：
 
+**检测（triple-fallback grep，只针对目标 CLAUDE.md 文件）**:
+```bash
+if [ -f CLAUDE.md ] && grep -qE "(<!-- aether-ci-policy -->|部署监控规则|CI/CD Monitoring Policy)" CLAUDE.md; then
+  echo "Already has policy, skipping"
+else
+  # AskUserQuestion: 是否 append Policy 章节到 CLAUDE.md EOF?
+  # 用户同意 → append；用户拒绝 → skip
+fi
 ```
-检测到已有部署配置，跳过文件生成。
 
-检查 CLAUDE.md 部署监控规则:
-  ✓ 已包含 → 无需操作
-  ✗ 未包含 → 自动注入部署监控规则（见 deploy-monitoring-rules.md）
+**注入时解析 `__JOB_NAME__`** (优先从已存在的 `deploy/nomad-dev.hcl` parse):
+```bash
+JOB_NAME=""
+if [ -f deploy/nomad-dev.hcl ]; then
+  JOB_NAME=$(grep -m1 -E '^job ' deploy/nomad-dev.hcl | sed -E 's/job +"([^"]+)".*/\1/')
+fi
+: "${JOB_NAME:=${PROJECT_NAME}-dev}"
 ```
 
-**判断逻辑**:
-- `grep -q "部署监控规则" CLAUDE.md` → 已包含，跳过
-- 否则 → 追加规则段落到 CLAUDE.md（如不存在则创建）
-- 注入后提示用户确认内容
+**Append 规则** (确定性 EOF):
+1. 读取 `${CLAUDE_PLUGIN_ROOT}/skills/aether-init/references/deploy-monitoring-rules.md`
+2. 把 `__JOB_NAME__` 替换为解析出的 job name
+3. 追加到 CLAUDE.md 末尾，前置 blank line + `---` + blank line
+4. 注入后提示用户确认内容
 
-此步骤确保所有 Aether 项目（无论新旧）都具备部署监控能力。
+此步骤确保所有 Aether 项目（无论新旧）都具备 CI Monitoring Policy。
+See `references/file-generation.md` § Step 1.1c for implementation details.
 
 ### Step 1.2: 决策逻辑
 
@@ -155,7 +168,7 @@ project/
     └── nomad-prod.hcl
 ```
 
-### Step 2.2: 填充模板
+### Step 2.2: 填充模板（文件生成顺序强制断言）
 
 详见 [文件生成参考](references/file-generation.md)
 
@@ -164,14 +177,33 @@ project/
 - `__DOCKER_IMAGE__` → 镜像地址
 - `__PORT__` → 服务端口
 - `__NODE_CLASS__` → 节点类型
+- `__JOB_NAME__` → Nomad job name（从已生成的 nomad-dev.hcl parse）
 
-### Step 2.2b: 注入部署监控规则到 CLAUDE.md
+**文件生成顺序（MUST）** — CLAUDE.md 必须在 nomad HCL 之后生成，以便 parse 出 `__JOB_NAME__`：
+
+```
+1. Dockerfile
+2. deploy/nomad-dev.hcl
+3. deploy/nomad-prod.hcl
+4. .forgejo/workflows/deploy.yaml
+5. CLAUDE.md              ← 在 #2 之后，依赖 nomad-dev.hcl 解析 __JOB_NAME__
+```
+
+### Step 2.2b: 注入 CI Monitoring Policy 到 CLAUDE.md
 
 检查项目是否有 `CLAUDE.md`：
-- **存在**: 追加部署监控规则段落（如果尚未包含）
-- **不存在**: 创建包含部署监控规则的 `CLAUDE.md`
+- **存在**: 按 Step 1.1c 流程走（triple-fallback grep + AskUserQuestion + EOF append）
+- **不存在**: 创建新 CLAUDE.md 骨架并**直接包含** Policy 章节（无需询问，属默认生成内容）
 
-注入内容模板见 [deploy-monitoring-rules.md](references/deploy-monitoring-rules.md)
+**`__JOB_NAME__` 解析**（从刚生成的 `deploy/nomad-dev.hcl`）:
+```bash
+JOB_NAME=$(grep -m1 -E '^job ' deploy/nomad-dev.hcl | sed -E 's/job +"([^"]+)".*/\1/')
+# 若解析失败：fallback 到 ${PROJECT_NAME}-dev
+```
+
+注入内容模板见 [deploy-monitoring-rules.md](references/deploy-monitoring-rules.md)（首行为 HTML
+marker `<!-- aether-ci-policy -->`，内容与 SilkNode CLAUDE.md lines 152-184 在应用 AC1a 的
+4 项已知转换后逐字一致）
 
 ### Step 2.3: 验证
 

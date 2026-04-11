@@ -2,6 +2,53 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.7.2] - 2026-04-11
+
+### Changed — aether-init CLAUDE.md policy injection (US-030)
+- **`references/deploy-monitoring-rules.md` 内容重写**: 从中文 "部署监控规则" 整合为与 v1.7.1
+  在 4 项目 (SilkNode/Nexus/Kairos/Kino) 标准化一致的**英文** `### CI/CD Monitoring Policy
+  (MANDATORY)` 段。内容与 SilkNode CLAUDE.md lines 152-184 经 AC1a 的 4 项已知转换后
+  **逐字一致**（heading 级别 `####` → `###`、HTML marker 前缀、incident history 句 generic 化、
+  `__JOB_NAME__` 占位符）。
+- **首行新增 HTML marker `<!-- aether-ci-policy -->`**: 语言无关的稳定 sentinel，future-proof
+  markdown processing。
+- **`SKILL.md` Step 1.1c/2.2b 升级**:
+  - 检测改为 **triple-fallback grep** `(<!-- aether-ci-policy -->|部署监控规则|CI/CD Monitoring Policy)`
+    识别新 marker + legacy Chinese 段 + v1.7.1 英文段
+  - 注入位置改为**确定性 EOF append** (blank line + `---` + 章节)，移除"部署节后"启发式
+  - **已有 CLAUDE.md 改为 `AskUserQuestion` 询问**再 append，绝不静默覆盖
+- **`__JOB_NAME__` 解析从 nomad HCL**: 优先从已生成的 `deploy/nomad-dev.hcl` parse
+  `job "<name>" {` 头部（multi-job 用 `grep -m1`），失败时 fallback 到 `${PROJECT_NAME}-dev`
+- **文件生成顺序断言**: CLAUDE.md 必须在 `deploy/nomad-dev.hcl` 之后生成（file-generation.md 记录）
+- **`SKILL.md` 行数**: 350 → 382 (within 400 warning threshold)
+
+### Quality verification (US-030)
+- **4 轮 post_spec audit** by `aria:tech-lead` + `aria:backend-architect` + `aria:qa-engineer`
+  (reports in `.aria/audit-reports/post_spec-2026-04-11-round{1,2,3,4}.md`):
+  - Round 1: REVISE 3/3 — caught critical dual-injection-path architectural issue (fixed)
+  - Round 2: REVISE 2/3 — caught precision issues (R2-A/B/C/D fixed)
+  - Round 3: REVISE 2/3 — caught mechanical line-number + heading-level errors (R3-A fixed)
+  - Round 4: PASS 2/3 — caught sub-mechanical 2-line wrap defect (R4-1) fixed inline by user override
+- **Mechanical Phase 1.4 diff verification**: template + 4 reverse transformations produces
+  0-byte diff against SilkNode lines 152-184 (executed pre-release, passed)
+- **AB benchmark eval case 3** (new, `ab-suite/aether-init.json`): WITH skill passes 3/3
+  critical expectations (HTML marker, 4-step wording, HCL-parsed job name) + medium (EOF
+  horizontal rule); WITHOUT skill fails all 3 critical + medium. No regression on existing
+  eval case 1 and 2.
+- **Drift check** (`check_template_drift` in `static-benchmark.sh`) wired to CI gate — runs
+  on every `static-benchmark --skill aether-init` invocation.
+
+### Version (aria spec: PATCH per "现有能力整合升级")
+- Scope is strictly "rewrite 1 template + update 2 existing skill files" — no new skill steps,
+  no new reference files, no new user-facing capability. MINOR 1.8.0 would over-version.
+- VERSION, plugin.json, marketplace.json, hooks.json, requirements.yaml, README.md,
+  CHANGELOG.md 全部 7 个文件同步至 1.7.2.
+
+### Related
+- **OpenSpec change**: `openspec/changes/2026-04-10-init-inject-ci-policy/` (to be archived
+  post-release)
+- **User Story**: [US-030](../../docs/requirements/user-stories/US-030.md)
+
 ## [1.7.1] - 2026-04-10
 
 ### Added

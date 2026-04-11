@@ -2,13 +2,15 @@
 
 ## Phase 2 概述
 
-用户确认部署方案后，生成部署文件：
+用户确认部署方案后，按**此顺序**生成部署文件（**US-030 约束**: CLAUDE.md 必须在 nomad HCL 之后生成，
+以便 `__JOB_NAME__` 占位符能从已生成的 nomad-dev.hcl parse 出来）：
 
 1. Dockerfile
 2. .dockerignore
 3. deploy/nomad-dev.hcl
 4. deploy/nomad-prod.hcl
 5. .forgejo/workflows/deploy.yaml
+6. CLAUDE.md (如不存在则创建；如存在则按 Step 1.1c 流程判断是否 append)
 
 ## Dockerfile 生成
 
@@ -83,3 +85,72 @@ ls -la deploy/ .forgejo/
 1. 检查 Dockerfile 语法: `docker build --check .`
 2. 检查 Nomad HCL 语法: `nomad job validate deploy/nomad-dev.hcl`
 3. 检查 Workflow 语法: `actionlint .forgejo/workflows/deploy.yaml`
+
+---
+
+## CLAUDE.md CI Monitoring Policy 注入 (US-030)
+
+> **Source**: [US-030](../../../../docs/requirements/user-stories/US-030.md) |
+> [proposal.md](../../../../openspec/changes/2026-04-10-init-inject-ci-policy/proposal.md)
+
+### 插入行为
+
+新项目（无 CLAUDE.md）或已有项目（有 CLAUDE.md 但无 Policy 章节）都会注入 CI Monitoring Policy。
+注入内容来自 [`deploy-monitoring-rules.md`](deploy-monitoring-rules.md)，该文件首行为
+HTML marker `<!-- aether-ci-policy -->`（语言无关 sentinel）。
+
+### 检测逻辑 (triple-fallback grep，仅针对目标 CLAUDE.md)
+
+```bash
+# R2-I: grep 必须仅针对目标 CLAUDE.md，不要把 deploy-monitoring-rules.md 模板本身读入
+if [ -f CLAUDE.md ] && grep -qE "(<!-- aether-ci-policy -->|部署监控规则|CI/CD Monitoring Policy)" CLAUDE.md; then
+  # 3 种历史/当前 sentinel 命中任一即跳过：
+  #   <!-- aether-ci-policy -->  (v1.7.2+ HTML marker — 推荐)
+  #   部署监控规则               (v1.7.1 之前的 Chinese 注入)
+  #   CI/CD Monitoring Policy    (v1.7.1 手动添加到 4 项目的英文段)
+  echo "Already has policy, skipping"
+else
+  # 注入流程继续
+fi
+```
+
+### 占位符替换
+
+| 占位符 | 解析顺序 |
+|--------|---------|
+| `__JOB_NAME__` | (1) 从已生成的 `deploy/nomad-dev.hcl` parse `job "<name>" {`（用 `grep -m1` 取首个匹配 — multi-job 时取第一个）<br>(2) 失败时 fallback 到 `${PROJECT_NAME}-dev` |
+
+**关键 (R2-B)**: 文件生成顺序必须保证 `deploy/nomad-dev.hcl` 在 `CLAUDE.md` 之前生成
+（见 Phase 2 顺序表），否则 parse 失败将退回 fallback 命名。
+
+### 注入位置（确定性 EOF append）
+
+不使用"插入到部署节后"启发式（在 Round 1 audit 中被认定为模型层不确定）。注入位置**始终为**:
+
+```
+<CLAUDE.md 原有内容>
+<blank line>
+---
+<blank line>
+<deploy-monitoring-rules.md 内容，__JOB_NAME__ 已替换>
+```
+
+### 已存在 CLAUDE.md 的处理 (AskUserQuestion 保守策略)
+
+如果目标项目有 CLAUDE.md 且未命中 triple-fallback grep：
+1. 通过 `AskUserQuestion` 询问用户是否 append Policy 章节
+2. 用户同意 → append 到 EOF
+3. 用户拒绝 → 跳过，记录到 generation report
+4. **绝不静默覆盖或修改用户已有内容**
+
+### HTML marker durability (R2-H)
+
+HTML marker `<!-- aether-ci-policy -->` **MUST NOT** be stripped by future markdown
+processing tools. If a markdown linter (prettier, markdownlint, remark) is added to CI
+in the future, configure it to preserve HTML comments. The drift check function in
+`static-benchmark.sh` (`check_template_drift`) relies on this marker being the first line.
+
+### Monorepo 暂不支持
+
+当前 `__JOB_NAME__` 是单一占位符，只支持 single-image 项目。monorepo 多镜像场景：
+`# TODO(US-031): support monorepo via __JOB_NAMES_LIST__`
