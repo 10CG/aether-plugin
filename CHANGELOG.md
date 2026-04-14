@@ -2,6 +2,17 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.7.3] - 2026-04-14
+
+### Changed — metadata sync (no skill content changes)
+- **`.claude-plugin/requirements.yaml`**: bumped `cli.recommended_version` from
+  `1.8.1` → `1.8.2` to track the CLI v1.8.2 release (test coverage boost + health
+  checks). Previously Plugin referenced 1.8.1 for 3 commits after CLI shipped 1.8.2,
+  misdirecting users during install/upgrade.
+
+No SKILL.md content changed — AB testing skipped per CLAUDE.md "纯格式/注释修改:
+可跳过" rule.
+
 ## [1.7.2] - 2026-04-11
 
 ### Changed — aether-init CLAUDE.md policy injection (US-030)
