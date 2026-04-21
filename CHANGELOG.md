@@ -2,6 +2,15 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.7.4] - 2026-04-21
+
+### Changed — metadata sync (no skill content changes)
+- **`.claude-plugin/requirements.yaml`**: bumped `cli.recommended_version`
+  from `1.8.2` to `1.8.4` to track CLI releases for issues
+  [#29](https://forgejo.10cg.pub/10CG/Aether/issues/29) (env set credential
+  redaction) and [#28](https://forgejo.10cg.pub/10CG/Aether/issues/28)
+  (dev run HCL parsing).
+
 ## [1.7.3] - 2026-04-14
 
 ### Changed — metadata sync (no skill content changes)
