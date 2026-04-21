@@ -2,6 +2,14 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.7.5] - 2026-04-21
+
+### Changed — metadata sync (no skill content changes)
+- **`.claude-plugin/requirements.yaml`**: bumped `cli.recommended_version`
+  from `1.8.4` to `1.8.5` to track CLI release for
+  [#38](https://forgejo.10cg.pub/10CG/Aether/issues/38)
+  (doctor phantom_allocations false-positive fix + new failed_allocations check).
+
 ## [1.7.4] - 2026-04-21
 
 ### Changed — metadata sync (no skill content changes)
