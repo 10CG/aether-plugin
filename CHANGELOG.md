@@ -2,6 +2,28 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.8.0] - 2026-04-23
+
+### Changed — aether-init SKILL references (security fix)
+- **`skills/aether-init/references/workflow-templates.md`**: removed the
+  3 `sed -i "s|__REGISTRY_TOKEN__|${{ secrets.FORGEJO_TOKEN }}|g"` and
+  `__REGISTRY_USER__` injection lines from both dev and prod CI
+  workflow templates. New projects onboarded via `/aether:init` no
+  longer propagate hardcoded PATs into their Nomad job HCLs.
+- **`skills/aether-init/references/nomad-templates.md`**: new "私有
+  Registry Auth" section shows the `template { env=true }` + `nomadVar`
+  + `config.auth.${VAR}` pattern as the canonical credential injection
+  model. Closes [#42](https://forgejo.10cg.pub/10CG/Aether/issues/42)
+  template-layer propagation.
+- **`.claude-plugin/requirements.yaml`**: bumped `cli.recommended_version`
+  from `1.8.5` to `1.9.0` to pick up the new `hardcoded_docker_auth`
+  doctor check.
+
+### Validation
+- Static benchmark: aether-init 382 lines, 1127 words (no regression)
+- Functional diff verified: 0 `REGISTRY_TOKEN` sed injections remain;
+  5 occurrences of the new `nomadVar` / `DOCKER_AUTH_*` pattern in refs.
+
 ## [1.7.5] - 2026-04-21
 
 ### Changed — metadata sync (no skill content changes)

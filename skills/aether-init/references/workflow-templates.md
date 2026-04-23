@@ -123,14 +123,15 @@ jobs:
           unzip -q nomad_1.9.7_linux_amd64.zip
           sudo mv nomad /usr/local/bin/
 
+      # 凭据管理: Docker registry auth 来自 Nomad Variables (非 sed 注入),
+      # 首次部署前必须预置: aether env set --sensitive --job <project-name> docker_auth_{user,password}
+      # 详见: docs/guides/nomad-variables-docker-auth.md
       - name: Deploy to Nomad
         env:
           NOMAD_TOKEN: ${{ secrets.NOMAD_TOKEN }}
         run: |
           IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
           sed "s|__IMAGE__|${IMAGE}|g" deploy/nomad-dev.hcl > /tmp/job.hcl
-          sed -i "s|__REGISTRY_USER__|${{ secrets.FORGEJO_USER }}|g" /tmp/job.hcl
-          sed -i "s|__REGISTRY_TOKEN__|${{ secrets.FORGEJO_TOKEN }}|g" /tmp/job.hcl
           nomad job run -output /tmp/job.hcl > /tmp/job.json
           curl -sf -X POST "${NOMAD_ADDR}/v1/jobs" \
             -H "Content-Type: application/json" \
@@ -248,14 +249,13 @@ jobs:
           unzip -q nomad_1.9.7_linux_amd64.zip
           sudo mv nomad /usr/local/bin/
 
+      # Docker registry auth 来自 Nomad Variables (非 sed 注入, 见 dev workflow 同名步骤)
       - name: Deploy to Nomad
         env:
           NOMAD_TOKEN: ${{ secrets.NOMAD_TOKEN }}
         run: |
           IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.version }}"
           sed "s|__IMAGE__|${IMAGE}|g" deploy/nomad-prod.hcl > /tmp/job.hcl
-          sed -i "s|__REGISTRY_USER__|${{ secrets.FORGEJO_USER }}|g" /tmp/job.hcl
-          sed -i "s|__REGISTRY_TOKEN__|${{ secrets.FORGEJO_TOKEN }}|g" /tmp/job.hcl
           nomad job run -output /tmp/job.hcl > /tmp/job.json
           curl -sf -X POST "${NOMAD_ADDR}/v1/jobs" \
             -H "Content-Type: application/json" \
