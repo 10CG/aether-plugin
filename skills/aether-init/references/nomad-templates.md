@@ -468,6 +468,71 @@ config {
 
 **验证**: `aether doctor hardcoded_docker_auth` 应返回 0 findings。详见 `docs/guides/nomad-variables-docker-auth.md`。
 
+## Consul Template 渲染抖动缓解 (Render Flap Mitigation)
+
+> **Canonical source**: [docs/guides/consul-template-render-flap-mitigation.md](../../../../docs/guides/consul-template-render-flap-mitigation.md) (随 CLI v1.11.0 发布)
+>
+> 本章节仅列要点 — 语义细节、完整示例、边界分析以 canonical guide 为准。
+
+### 为什么需要
+
+当 template 块使用 `{{ range service "X" }}` 引导**必选** env 变量时, upstream 在 Consul 中短暂 0 healthy 实例会让整行不渲染 → 应用 env-check fast-fail。
+
+**真实案例**: SilkNode 项目 silknode-web 于 2026-04-24 在 heavy-3 观察到 ~30s 自愈重启循环 (详见上游 issue 与本项目 issue #61)。
+
+### 三件套 (required env 变量必选)
+
+| 组件 | 作用 |
+|---|---|
+| `wait { min = "10s"; max = "30s" }` | debounce 渲染本身, 吞掉 <10s 闪失 — 这是**唯一**延迟/合并上游变更的机制 |
+| `change_mode = "noop"` | 文件**仍会被重写**但**不触发任务重启** — 保护运行中进程内存中的老 env |
+| `{{ if gt (len $svc) 0 }}` 守卫 | 0 实例时整行**不写入**, 避免 `REDIS_URL=` 空值 |
+
+### 保护边界 (重要)
+
+| 场景 | 本方案保护? |
+|---|---|
+| 上游 <10s 闪失 | ✅ wait 吸收, 不重渲染 |
+| 上游 10-30s 闪失 | ✅ 文件缺行 + noop 不重启, 运行进程保留内存老值 |
+| 任务本身重启期间上游 0 实例 | ❌ 冷启动读新文件失败 — 应用端负责启动重试 |
+| 首次部署, 上游从未健康 | ❌ 等同裸 range — 用 Nomad 依赖排序先起 upstream |
+
+**关键**: 本方案保护"运行中进程", 不保护"冷启动或任务重启读新文件"。应用端对必选 env 仍应实现启动重试或健康检查 back-off。
+
+### `wait` vs `splay` 语义对比
+
+| 机制 | 作用时机 | 对闪失 | 何时生效 |
+|---|---|---|---|
+| `wait { min max }` | **渲染前** debounce | ✅ 直接吞掉窗口内闪失 | 任何 `change_mode` |
+| `splay` | **渲染后**的**重启时机**随机化 | ❌ 不影响渲染频率 | 仅 `change_mode = "restart"` 或 `"signal"` |
+
+`splay = "5s"` 在 `change_mode = "noop"` 时无实际作用, 但保留声明无害 (便于未来切换 change_mode 时不再改)。
+
+### `{{ env }}` ≠ 上次渲染值 (反直觉陷阱)
+
+`{{ env "REDIS_URL" }}` 读 **consul-template daemon 的进程环境**, 不是上次渲染的文件内容。冷启动或任务重启后进程 env 不含渲染产出的值, 返回空串 — 与裸 range 行为**等价失败**。
+
+**永远不要**把 `{{ env "X" }}` 当作 fallback 使用。
+
+### 两种模板写法并存: `env {}` + FQDN vs `template {}` + 守卫
+
+Aether 支持两种服务依赖写法, 各有适用场景:
+
+| 写法 | 适用场景 | 优点 | 局限 |
+|---|---|---|---|
+| `env { REDIS_URL = "redis://redis.service.consul:6379" }` + Consul DNS | 服务 IP/端口固定或由 DNS 解析, docker 网络可用 | 最简单, 无 template 渲染开销 | 端口动态分配时不适用; 依赖 Consul DNS |
+| `template { ... {{ range service "X" }} ... }` + 三件套 | 动态端口或需要 `nomadVar` 注入 credentials | 灵活, 完整 Nomad Var + Consul service 集成 | 写错会抖动, 必须加守卫 |
+
+新项目若 upstream 端口固定, 优先 `env {}` + FQDN; 若需要动态端口或合并 `nomadVar`, 用 `template {}` + 三件套。
+
+### 进一步阅读
+
+完整语义推导、诊断流程、已知限制详见 canonical guide (上方链接), 同时参考:
+- 项目 issue [#61](https://forgejo.10cg.pub/10CG/Aether/issues/61) (触发背景)
+- `aether doctor template_bare_range` — 检测既有部署是否有裸 range 模式
+
+---
+
 ## dev vs prod 对照表
 
 | 配置项 | dev | prod |
