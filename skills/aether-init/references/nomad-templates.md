@@ -132,9 +132,21 @@ job "__PROJECT_NAME__" {
 }
 ```
 
-## Docker 服务 + 持久化存储 — prod
+## Docker 服务 + 持久化存储 — prod (NFS-virtiofs 共享卷)
 
 `deploy/nomad-prod.hcl` (有状态变体):
+
+> **前置要求**: volume 必须在**所有** heavy 节点上都已注册 — 单节点注册
+> 会变成 blast-radius trap (任一节点宕机即服务不可用)。Aether 集群的
+> `/opt/aether-volumes/` 是 NFS-virtiofs 共享挂载，物理上已在所有 heavy 节点,
+> 只需 Nomad 注册全覆盖即可。详见 [`docs/guides/nfs-virtiofs-host-volumes.md`](../../../../docs/guides/nfs-virtiofs-host-volumes.md)。
+>
+> 注册命令 (**对每个 heavy 节点**都执行):
+> ```bash
+> aether volume create --node heavy-1 --project __PROJECT_NAME__ --volumes data
+> aether volume create --node heavy-2 --project __PROJECT_NAME__ --volumes data
+> aether volume create --node heavy-3 --project __PROJECT_NAME__ --volumes data
+> ```
 
 ```hcl
 job "__PROJECT_NAME__" {
@@ -142,6 +154,8 @@ job "__PROJECT_NAME__" {
   datacenters = ["dc1"]
   type        = "service"
 
+  # node.class 值由集群实际配置决定, 常见: heavy_workload / light_exec
+  # (查询: curl $NOMAD_ADDR/v1/nodes | jq '.[].NodeClass')
   constraint {
     attribute = "${node.class}"
     value     = "__DOCKER_NODE_CLASS__"
@@ -156,6 +170,15 @@ job "__PROJECT_NAME__" {
 
   group "app" {
     count = 1  # 有状态服务单副本
+
+    # stop-before-start migration: 保护 lockfile (postgres postmaster.pid) +
+    # 避免并发写入者 (redis AOF). drain-not-partition 是必须的操作纪律。
+    migrate {
+      max_parallel     = 1
+      health_check     = "checks"
+      min_healthy_time = "30s"
+      healthy_deadline = "5m"    # 慢冷启动 (WAL recovery, RDB load) 可调至 10-15m
+    }
 
     volume "data" {
       type   = "host"
@@ -200,6 +223,22 @@ job "__PROJECT_NAME__" {
   }
 }
 ```
+
+**部署后验证**:
+
+```bash
+# 确认 volume 在所有 heavy 节点都已注册 (期望: 0 条 dev-db 相关的 finding)
+aether doctor --check host_volume_parity --json | jq '.data.checks[0].detailed_findings[] | select(.consumer=="__PROJECT_NAME__")'
+
+# 验证 constraint 不再将服务锁死在单节点
+nomad job inspect __PROJECT_NAME__ | jq '.Job.Constraints'
+```
+
+**反模式** (不要这样做):
+
+- ❌ `constraint { attribute = "${node.unique.name}"; value = "heavy-1" }` — 单节点 pin, 2026-04-24 `dev-db` 事故模式
+- ❌ 省略 `migrate` stanza — drain 时新旧 alloc 可能并行写入, corrupt redis AOF
+- ❌ 只在 heavy-1 注册 volume 而 constraint 是 `node.class` — 调度器选中 h-2/h-3 会报 "computed class ineligible"
 
 ## exec 服务 — dev
 
