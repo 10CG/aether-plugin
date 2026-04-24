@@ -40,6 +40,9 @@
 
 详见 [Nomad 模板](nomad-templates.md)
 
+> 📌 涉及 Consul service 依赖的 `template {}` 写法（三件套: `wait` + `change_mode=noop` + `if` 守卫），
+> 见 [nomad-templates.md § Consul Template 渲染抖动缓解](./nomad-templates.md#consul-template-渲染抖动缓解-render-flap-mitigation)。
+
 ## Workflow 生成
 
 ### 变量
