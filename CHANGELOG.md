@@ -2,6 +2,35 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.9.0] - 2026-04-24
+
+### Changed — aether-init SKILL references (NFS-virtiofs stateful pattern)
+
+- **`skills/aether-init/references/nomad-templates.md`**: "Docker 服务 +
+  持久化存储 — prod" section rewritten to the canonical 3-node
+  NFS-virtiofs pattern delivered by Aether [#56](https://forgejo.10cg.pub/10CG/Aether/issues/56):
+  prerequisite block with explicit `aether volume create` commands for
+  all 3 heavy nodes, `node.class = heavy_workload` constraint guidance,
+  `migrate` stanza (`max_parallel=1, health_check=checks, min_healthy_time=30s`)
+  for stop-before-start protection, post-deploy verification section,
+  explicit antipatterns (`node.unique.name` pin, missing `migrate`,
+  class-scope without all-node volume registration).
+
+### AB test result
+
+Blind AB comparison (2026-04-24 session): WITH reference subagent produced
+deployable HCL with `node.class = "heavy_workload"`; WITHOUT reference
+subagent produced NON-DEPLOYABLE HCL with `node.class = "heavy"` (would
+fail scheduling with "computed class ineligible"). See
+`aether-plugin-benchmarks/ab-results/2026-04-24/aether-init-issue56/`.
+
+### Changed — requirements
+
+- **`.claude-plugin/requirements.yaml`**: `cli.recommended_version` bumped
+  from `1.9.0` to `1.10.0` to pick up the new `host_volume_parity` +
+  `orphan_jobs` doctor checks (required by the stateful-job template for
+  post-deploy verification).
+
 ## [1.8.0] - 2026-04-23
 
 ### Changed — aether-init SKILL references (security fix)

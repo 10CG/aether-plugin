@@ -1,6 +1,6 @@
 {
-  "version": "1.8.0",
-  "description": "Aether 基础设施部署 Hooks 配置 - 12个 Skills + 2个 Agents + 3个 Hooks",
+  "version": "1.9.0",
+  "description": "Aether \u57fa\u7840\u8bbe\u65bd\u90e8\u7f72 Hooks \u914d\u7f6e - 12\u4e2a Skills + 2\u4e2a Agents + 3\u4e2a Hooks",
   "enabled": true,
   "hooks": {
     "PreToolUse": [

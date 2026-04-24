@@ -7,8 +7,8 @@
   "plugins": [
     {
       "name": "aether",
-      "description": "Aether 基础设施部署插件 - 12个 Skills + 2个 Agents + 2个 Hooks (环境诊断/配置发现/项目接入/Volume管理/部署监控/开发测试/生产部署/故障诊断/CI状态查询/Issue报告)",
-      "version": "1.8.0",
+      "description": "Aether \u57fa\u7840\u8bbe\u65bd\u90e8\u7f72\u63d2\u4ef6 - 12\u4e2a Skills + 2\u4e2a Agents + 2\u4e2a Hooks (\u73af\u5883\u8bca\u65ad/\u914d\u7f6e\u53d1\u73b0/\u9879\u76ee\u63a5\u5165/Volume\u7ba1\u7406/\u90e8\u7f72\u76d1\u63a7/\u5f00\u53d1\u6d4b\u8bd5/\u751f\u4ea7\u90e8\u7f72/\u6545\u969c\u8bca\u65ad/CI\u72b6\u6001\u67e5\u8be2/Issue\u62a5\u544a)",
+      "version": "1.9.0",
       "author": {
         "name": "10CG"
       },
@@ -17,7 +17,14 @@
         "url": "https://github.com/10CG/aether-plugin.git"
       },
       "category": "infrastructure",
-      "keywords": ["aether", "nomad", "consul", "deployment", "infrastructure", "devops"]
+      "keywords": [
+        "aether",
+        "nomad",
+        "consul",
+        "deployment",
+        "infrastructure",
+        "devops"
+      ]
     }
   ]
 }
