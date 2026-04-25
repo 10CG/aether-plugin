@@ -3,7 +3,7 @@
 
 cli:
   min_version: "1.0.0"
-  recommended_version: "1.10.0"
+  recommended_version: "1.11.0"
   # 安装位置 (与 config.yaml 同目录)
   install_dir: "~/.aether"
   install_path:

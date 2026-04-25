@@ -2,6 +2,56 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.10.0] - 2026-04-25
+
+### Changed — aether-init Consul Template hardening (Aether [#61](https://forgejo.10cg.pub/10CG/Aether/issues/61))
+
+- **`skills/aether-init/references/nomad-templates.md`**: all `template {}`
+  examples now ship with the **三件套** (three-piece) hardening pattern:
+  `wait { min = "10s"; max = "30s" }` + `change_mode = "noop"` +
+  `{{ if gt (len $svc) 0 }}` guard. Bare `{{ range service "X" }}` writes
+  rendered the integration vulnerable to upstream catalog flaps (root cause
+  of SilkNode#207 — REDIS_URL line vanishing during sidecar redis 0-instance
+  windows → application restart loop).
+- **New brief subsection** "Consul Template 渲染抖动缓解": problem
+  statement + three-piece pattern (4 lines) + canonical-guide link.
+  Per Round 2 audit canonical-source principle: subsection does NOT
+  re-expand noop semantics; defers all detail to canonical guide.
+- **`skills/aether-init/references/file-generation.md` +
+  `workflow-templates.md`**: cross-references updated to point at
+  canonical guide for any template-flap-related guidance.
+
+### AB test result (Phase 3 GATE)
+
+Live cluster GATE PASS (2026-04-25): three-piece pattern empirically
+validated. `ab-test-old` (bare range) accrued **77 task restarts** during
+10x flap loop; `ab-test-new` (three-piece) accrued **0 restarts**.
+Pre-flight self-check (`old_delta=7 ≥ 1`) confirmed flap method drives
+the system. Verdict:
+`aether-plugin-benchmarks/ab-results/aether-init-hardened-template-2026-04-25/verdict.md`.
+
+### Changed — requirements
+
+- **`.claude-plugin/requirements.yaml`**: `cli.recommended_version` bumped
+  from `1.10.0` to `1.11.0` to pick up the new `template_bare_range`
+  doctor check shipped in CLI v1.11.0.
+
+### Spec
+
+- `openspec/changes/harden-aether-init-consul-template/`
+- post_spec audit converged Round 3 PASS after 3 challenge-mode rounds
+  (Round 1: 5 Critical → Round 2: 2 Critical, 7 Major → Round 3: 0)
+- Phase ordering: `1 → 3 (GATE) → 2 → 4 → 5` (AB test gates release per
+  CLAUDE.md Skill-change rule)
+
+### Cross-repo follow-up
+
+- Aether [#59](https://forgejo.10cg.pub/10CG/Aether/issues/59): external
+  repo HCL migration unblocked once this version ships. Detection via
+  `aether doctor template_bare_range --json` (CLI v1.11.0+).
+- SilkNode [#207](https://forgejo.10cg.pub/10CG/SilkNode/issues/207):
+  erratum + archive comments queued for post-release.
+
 ## [1.9.0] - 2026-04-24
 
 ### Changed — aether-init SKILL references (NFS-virtiofs stateful pattern)
