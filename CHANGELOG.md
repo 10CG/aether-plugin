@@ -2,6 +2,32 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.10.1] - 2026-04-26
+
+### Changed — `requirements.yaml` `cli.recommended_version` 1.11.0 → 1.13.0
+
+Bumps the recommended CLI version so users on autopilot pick up two new
+`aether doctor` checks shipped against Aether [#67](https://forgejo.10cg.pub/10CG/Aether/issues/67):
+
+- **`aether doctor docker_root_on_nfs`** (CLI v1.12.0, WARN-level) — leading
+  indicator: probes each ready Nomad node's docker daemon `data-root` and
+  warns when it sits on the NFS/virtiofs share (`/opt/aether-volumes/`),
+  the root cause of the #67 sillyrename trap.
+- **`aether doctor docker_disk_pressure`** (CLI v1.13.0, WARN/FAIL) — lagging
+  trigger: grades each node by Docker dead-container count.
+  WARN ≥ 10, FAIL ≥ 100 (heavy-1 hit 193 on the 2026-04-25 canary).
+
+Together these bracket the #67 maintenance window: leading indicator
+surfaces the *exposure* baseline, lagging trigger surfaces the
+*symptom* if migration regresses or rollback path is taken. Operators
+running the full `aether doctor` report get both signals automatically.
+
+`min_version` unchanged at 1.0.0 (no API breakage; old CLI still works,
+just lacks the two new checks).
+
+[skip-benchmark] — informational version-bump only; no Skill content
+rewrite, no AB-relevant change. Per CLAUDE.md "纯格式/注释修改: 可跳过".
+
 ## [1.10.0] - 2026-04-25
 
 ### Changed — aether-init Consul Template hardening (Aether [#61](https://forgejo.10cg.pub/10CG/Aether/issues/61))
