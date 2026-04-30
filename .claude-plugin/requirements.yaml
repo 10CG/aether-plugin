@@ -3,7 +3,7 @@
 
 cli:
   min_version: "1.0.0"
-  recommended_version: "1.13.0"
+  recommended_version: "1.13.2"
   # 安装位置 (与 config.yaml 同目录)
   install_dir: "~/.aether"
   install_path:
@@ -72,6 +72,11 @@ compatibility:
     cli_min: "0.8.0"
     cli_recommended: "0.8.0"
     notes: "TBD"
+
+  - plugin_version: "1.10.x"
+    cli_min: "1.0.0"
+    cli_recommended: "1.13.2"
+    notes: "doctor heuristic refinements (Aether #47); migrate-script timestamp tightening (#48); host_volume_parity / docker_disk_pressure / docker_root_on_nfs driver-filter (Aether #67)"
 
 # 依赖 CLI 的 Skills
 dependent_skills:

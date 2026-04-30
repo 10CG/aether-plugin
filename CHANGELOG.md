@@ -2,6 +2,26 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.10.2] - 2026-04-30
+
+### Changed — `requirements.yaml` `cli.recommended_version` 1.13.0 → 1.13.2
+
+Tracks aether-cli v1.13.2 (Aether main repo PR #70, commit fbd5967, tag
+`cli-v1.13.2`):
+
+- `aether doctor hardcoded_docker_auth` heuristic refinement: `looksLikeCredential`
+  length threshold raised 16 → 20 to drop service-account false positive
+  `dockerhub_svc001` (Aether #47, partial close).
+- `scripts/migrate-hardcoded-docker-auth.sh` verify-loop timestamp tightening
+  (10s grace → 1s clock-skew tolerance) — Aether #48 timestamp portion;
+  JobVersion-index portion tracked in Aether #71.
+
+### Added — compatibility matrix row for plugin 1.10.x
+
+`requirements.yaml` `compatibility` matrix extended with explicit `1.10.x`
+row: `cli_min: "1.0.0"` / `cli_recommended: "1.13.2"`. Notes summarize the
+cumulative doctor enhancements (Aether #47 + #48 + #67 driver filters).
+
 ## [1.10.1] - 2026-04-26
 
 ### Changed — `requirements.yaml` `cli.recommended_version` 1.11.0 → 1.13.0
