@@ -2,6 +2,23 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.10.3] - 2026-05-02
+
+### Changed — `requirements.yaml` `cli.recommended_version` 1.13.2 → 1.14.0
+
+Tracks aether-cli v1.14.0 (Aether main repo PR #73, commit 6bc243c, tag
+`cli-v1.14.0`):
+
+- New `aether volume create --read-only` flag — emits `host_volume.read_only = true`
+- New `aether volume create --perms <octal>` flag — applies `chmod -R <perms>`
+  (default 777 preserved for backward compat)
+- Closes Aether#31 (chmod-pgdata-bricking trap for fresh volumes)
+- 5-round 4-agent convergence audit; R4 ≡ R5 verbatim stability
+- Backward compatible — pre-#31 users get identical 1.13.2 behavior when
+  flags omitted
+
+Plugin functionality unchanged in this release. Recommendation bump only.
+
 ## [1.10.2] - 2026-04-30
 
 ### Changed — `requirements.yaml` `cli.recommended_version` 1.13.0 → 1.13.2
