@@ -2,6 +2,23 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.10.4] - 2026-05-02
+
+### Changed — `requirements.yaml` `cli.recommended_version` 1.14.0 → 1.15.0
+
+Tracks aether-cli v1.15.0 (Aether main repo PR #76, commit 549b016, tag
+`cli-v1.15.0`):
+
+- New `aether volume create --register-only` flag — closes chmod-pgdata
+  -bricking residual gap from #31 (v1.14.0)
+- Operator opt-in mode skips mkdir+chmod for existing populated volumes
+- bash `test -d` guard catches operator-typo at script-execution time
+- Mutual exclusion with `--perms`; compatible with `--read-only`
+- 4-round 4-agent convergence audit; R3 ≡ R4 verbatim stability
+- Backward compatible
+
+Plugin functionality unchanged.
+
 ## [1.10.3] - 2026-05-02
 
 ### Changed — `requirements.yaml` `cli.recommended_version` 1.13.2 → 1.14.0
