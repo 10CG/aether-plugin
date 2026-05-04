@@ -157,6 +157,21 @@ Know these once, then every rule below makes sense:
    log reading uses the `aether-reader` SSH channel
    (see `docs/guides/aether-reader-ssh-setup.md`).
 
+7. **All 3 heavy runners (heavy-1/2/3) inject an aliyun apt mirror into
+   every job container.** `archive.ubuntu.com` is unreachable from these
+   nodes (cross-border SYN timeouts, observed SilkNode CI 871, nexus runs
+   2304/2306). Each runner bind-mounts its local
+   `/opt/forgejo-runner/ubuntu.sources` (deb822, noble + security,
+   `https://mirrors.aliyun.com/ubuntu/`) over
+   `/etc/apt/sources.list.d/ubuntu.sources` via `container.options` in
+   `/opt/forgejo-runner/data/config.yaml`. Workflows do **not** need to
+   `sed`-swap mirrors themselves. Only valid for `noble` (ubuntu-24.04 /
+   ubuntu-latest); jammy jobs would need an additional `jammy.sources`
+   entry — none currently use it. Mirror picked 2026-05-04 after
+   benchmarking tuna/ustc/aliyun/huaweicloud/sjtu/tencent
+   (aliyun won on TCP connect + TTFB + throughput; tuna/ustc/tencent all
+   hit 5.3s SYN-retry from these networks). See B11 for usage notes.
+
 ---
 
 ## Anti-patterns (do NOT use these in Aether)
@@ -670,6 +685,45 @@ doesn't invalidate the deps install layer.
 
 For push events, skip the host build — the deploy Docker build is the
 source of truth. Saves 4+ minutes per push event.
+
+---
+
+### B11. Don't swap apt mirrors in workflows — runners do it
+
+**Don't write this**:
+
+```yaml
+- name: Configure apt mirror
+  run: |
+    sudo sed -i 's|archive.ubuntu.com|mirrors.aliyun.com|g' \
+      /etc/apt/sources.list.d/ubuntu.sources
+```
+
+The runners (heavy-1/2/3) already bind-mount an aliyun-backed
+`ubuntu.sources` over the job container's file. Per-workflow swaps are
+redundant and would have to be maintained in every project — drifting out
+of sync the moment the runner-side mirror changes (e.g. aliyun degrades
+and we move to huaweicloud).
+
+**Just call apt directly**:
+
+```yaml
+- name: Install build tools
+  run: |
+    sudo apt-get update -qq
+    sudo apt-get install -y --no-install-recommends python3-dev build-essential
+```
+
+**When you would still need a workflow-level swap**:
+- The job runs on a non-noble base (e.g. `container: ubuntu:22.04`) — the
+  runner's mount only covers noble.
+- The job runs on a runner outside heavy-1/2/3 (none today, but
+  if `aria-runner-template` ever spawns one elsewhere).
+
+In those cases, do the swap inside the Dockerfile (B5/B6 pattern) rather
+than as a workflow step, so it benefits from layer cache.
+
+See Environment fact #7 for the runner-side mechanism.
 
 ---
 

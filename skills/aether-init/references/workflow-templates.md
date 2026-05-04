@@ -46,6 +46,11 @@
 5. **不使用** `cache-from/to: type=registry` 和 `--mount=type=cache` —
    在当前 runner 环境（overlay 文件系统 + 自签证书）都会失败，详见
    `${CLAUDE_PLUGIN_ROOT}/references/forgejo-ci-optimization.md § Anti-patterns`。
+6. **不要在 workflow 里 sed 切 apt 源** — heavy-1/2/3 三个 runner 都已经
+   bind-mount 了 aliyun 镜像到 job 容器的 `/etc/apt/sources.list.d/ubuntu.sources`
+   (`archive.ubuntu.com` 跨境路由不可达)。直接调 `apt-get install` 即可。
+   仅当 workflow 用非 noble 基础镜像或在 heavy 之外的 runner 上跑时才需自行处理。
+   详见 `forgejo-ci-optimization.md § Environment fact #7 + B11`。
 
 ---
 

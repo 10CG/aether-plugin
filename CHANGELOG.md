@@ -2,6 +2,32 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.10.5] - 2026-05-04
+
+### Documented — runner-side aliyun apt mirror (no plugin functionality change)
+
+Aether ops applied a fix on all 3 heavy runners (heavy-1/2/3): job
+containers now get `/etc/apt/sources.list.d/ubuntu.sources` bind-mounted
+to a local aliyun-backed file via `container.options` in
+`/opt/forgejo-runner/data/config.yaml`. Reason: `archive.ubuntu.com`
+unreachable from these nodes (cross-border SYN timeouts; observed
+SilkNode CI 871, nexus runs 2304/2306). Mirror picked after benchmarking
+tuna/ustc/aliyun/huaweicloud/sjtu/tencent — aliyun won on TCP connect +
+TTFB + throughput; tuna/ustc/tencent all hit 5.3s SYN-retry.
+
+This release just documents that fact so projects (and the AI helpers
+this plugin wires up) stop adding redundant per-workflow `sed` swaps:
+
+- `references/forgejo-ci-optimization.md`:
+  - + Environment fact #7 (the runner-side mechanism, scope, mirror
+    selection rationale)
+  - + B11 best practice (don't swap apt mirrors in workflows; when a
+    workflow-level swap would still be needed)
+- `skills/aether-init/references/workflow-templates.md`:
+  - + design decision #6 (cross-reference to the above)
+
+No runtime/template changes; existing workflows unaffected.
+
 ## [1.10.4] - 2026-05-02
 
 ### Changed — `requirements.yaml` `cli.recommended_version` 1.14.0 → 1.15.0
