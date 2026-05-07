@@ -2,6 +2,48 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.10.6] - 2026-05-07
+
+### Added — `aether-rotate-pat` skill (#45 Phase 2 GA)
+
+New user-invocable skill `aether-rotate-pat` (204 lines) covering the full
+Forgejo PAT (Personal Access Token) rotation lifecycle via `aether
+registry-auth list / rotate / resume / cleanup`. Provides AI guidance for:
+
+- 5-step `nomad-variables` backend rotation (dry-run → confirm → 24h grace
+  → cleanup → web UI revoke) with expected stdout per step
+- 5 failure-mode recovery paths (chaos kill / fingerprint mismatch /
+  cleanup-refused / bootstrap class / generic rolled_back) keyed off
+  journal state at `.aether/tmp/rotation-state-<pat-id>.json`
+- `forgejo-secrets` backend status (TASK-2.7b deferred → emergency runbook
+  fallback at `docs/guides/forgejo-pat-emergency-rotation.md`)
+- Operator print-checklist (D-0 / D+1) + canonical runbook cross-reference
+  (`docs/guides/forgejo-pat-rotation.md`)
+
+Triggers: `轮换 PAT`, `rotate token`, `PAT 即将过期`, `doctor pat_age 报警`,
+`registry-auth`, `Forgejo token 过期`, `凭据轮换`, `renew PAT`,
+`credential rotation`, `rotation drill`, `cleanup _OLD`.
+
+**AB benchmark**: 3/3 evals WITH_BETTER (blind compare),
+all 15 critical+high expectations PASS both arms,
+content+structure scores 30 vs 25 (+20%). Results at
+`aether-plugin-benchmarks/ab-results/2026-05-07/aether-rotate-pat/`.
+
+### Changed
+
+- `requirements.yaml`: `cli.recommended_version` 1.15.0 → 1.16.9 (sync to
+  current CLI release; the new skill's `aether registry-auth` subcommands
+  require `min_version: 1.16.7`).
+- Plugin metadata (plugin.json / hooks.json / marketplace.json / README.md)
+  skill count description: 12 Skills → 13 Skills.
+
+### Spec / Issue
+
+- Aether #45 Phase 2 TASK-2.10 (T2.7) — completes `SKILL.md drafted →
+  AB pending` partial state. detailed-tasks TASK-019 maps to this entry.
+- Per CLAUDE.md `§Skill 变更强制流程`: static benchmark PASS (204 lines
+  < 400 warn threshold) + AB benchmark PASS → version bump unblocked.
+
 ## [1.10.5] - 2026-05-04
 
 ### Documented — runner-side aliyun apt mirror (no plugin functionality change)
