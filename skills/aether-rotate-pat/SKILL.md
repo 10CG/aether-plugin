@@ -21,7 +21,8 @@ dependencies:
 
 # Aether Forgejo PAT 凭换 (aether-rotate-pat)
 
-> **版本**: 0.1.0 (DRAFT — AB pending) | **Spec**: #45 Phase 2 | **优先级**: P1
+> **版本**: 0.2.0 (GA) | **Spec**: #45 Phase 2 | **优先级**: P1
+> **AB Benchmark**: 3/3 evals WITH_BETTER (2026-05-07; eval-3 deprecated 2026-05-09 per TASK-2.7b GA — re-AB tracked as follow-up)
 
 ## 快速决策
 
@@ -32,8 +33,9 @@ PAT 即将过期或已过期?
   └─ 例行预防性轮换 → 走本 Skill
 ```
 
-**决策核心**: 当前可用的 backend 是 `nomad-variables` (runtime class).
-`forgejo-secrets` (ci-build class) 走 emergency runbook 直到 TASK-2.7b 完成。
+**决策核心**: 双 backend 全部 GA (2026-05-08 nomad-variables + 2026-05-09 forgejo-secrets).
+- `nomad-variables` (runtime class) — 5-step + atomic rollback + 24h grace, chaos-kill 可 resume
+- `forgejo-secrets` (ci-build class) — 2-step + best-effort rollback, chaos-kill 必须走 emergency runbook (单 slot 语义不能 auto-resume)
 
 ---
 
@@ -161,12 +163,62 @@ token scope / 排空节点) → 删 journal → 重新 rotate.
 
 ---
 
-## forgejo-secrets backend 状态
+## forgejo-secrets backend 流程 (TASK-2.7b GA, 2026-05-09)
 
-⚠️ **TASK-2.7b 待实施** — 当前对 `forgejo-secrets` backend (ci-build class
-PAT) 返回 `FORGEJO_BACKEND_NOT_YET_IMPLEMENTED`.
+ci-build class PAT (例如 `forgejo-actions-ci-2026-Q2`) 走单 slot 2-step 流程, 与 nomad-variables 5-step 显著不同。
 
-**Workaround**: ci-build PAT 走 emergency runbook 手动 web UI 流程.
+### 关键差异
+
+| Aspect | nomad-variables | forgejo-secrets |
+|--------|-----------------|-----------------|
+| Sub-steps | 5 | **2** (DELETE + PUT_NEW) |
+| `*_OLD` sibling | 有 (24h grace) | **无** |
+| Atomic rollback | 完整 | **best-effort in-process** |
+| OldToken 来源 | cluster 自动读 | **必须 `--old-token-file`** (Forgejo Actions 写-only API) |
+| Chaos-kill resume | 支持 | **拒绝** → emergency runbook |
+| Bootstrap 凭据 | `cluster.NomadToken` | **`AETHER_FORGEJO_TOKEN` env** (write:user) |
+
+### 用法
+
+```bash
+# ENV (按需)
+export AETHER_FORGEJO_ADDR="http://192.168.69.200:3000"   # 默认值
+export AETHER_FORGEJO_TOKEN="<bootstrap PAT, write:user>"  # 必需
+
+chmod 600 /tmp/new.pat /tmp/old.pat   # 注意: 必须双 token 文件
+
+aether registry-auth rotate --pat-id forgejo-actions-ci-2026-Q2 \
+  --new-token-file /tmp/new.pat \
+  --old-token-file /tmp/old.pat \
+  --dry-run    # 预览: N repos × 2 sub-steps
+
+aether registry-auth rotate --pat-id forgejo-actions-ci-2026-Q2 \
+  --new-token-file /tmp/new.pat \
+  --old-token-file /tmp/old.pat \
+  --confirm    # 真执行
+
+# 完成后立即可 cleanup (无 24h grace, 无 _OLD sibling)
+aether registry-auth cleanup --pat-id forgejo-actions-ci-2026-Q2
+
+# Forgejo web UI revoke 旧 PAT, 删本地文件
+rm /tmp/new.pat /tmp/old.pat
+```
+
+### 中断恢复 (chaos kill / SSH 断)
+
+```bash
+aether registry-auth resume --pat-id <id> --new-token-file /tmp/new.pat --old-token-file /tmp/old.pat
+# → exit 4 + FORGEJO_MANUAL_RECOVERY_REQUIRED
+```
+
+forgejo backend 设计上拒绝 auto-resume (单 slot 无 _OLD 备份, OldToken 不持久化, 无 fingerprint guard). 必须走 emergency runbook 手动逐 repo 确认 secret 状态后修复. 详见 [docs/guides/forgejo-pat-emergency-rotation.md](https://forgejo.10cg.pub/10CG/Aether/src/branch/master/docs/guides/forgejo-pat-emergency-rotation.md)。
+
+### 失败模式 (forgejo-specific)
+
+- **MISSING_OLD_TOKEN_FILE**: 没传 `--old-token-file` → 必须给 (单 slot 无法 cluster 自读)
+- **MISSING_FORGEJO_TOKEN**: `AETHER_FORGEJO_TOKEN` env 未设 → 设为 bootstrap PAT
+- **FORGEJO_MANUAL_RECOVERY_REQUIRED**: chaos-kill 后 resume → 走 emergency runbook
+- **CLEANUP_REFUSED_INCOMPLETE**: journal status 非 complete → resume 推到 complete (会触发 emergency 路径)
 
 ---
 
@@ -201,4 +253,4 @@ PAT) 返回 `FORGEJO_BACKEND_NOT_YET_IMPLEMENTED`.
 
 ---
 
-**Last updated**: 2026-05-08 (DRAFT — AB benchmark pending; not yet GA)
+**Last updated**: 2026-05-09 (GA — both backends shipped; forgejo-secrets eval re-AB tracked as follow-up)

@@ -2,6 +2,57 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.10.7] - 2026-05-09
+
+### Changed — `aether-rotate-pat` skill v0.1.0 → v0.2.0 (DRAFT → GA, content refresh post-TASK-2.7b)
+
+Refresh skill content to reflect Aether #45 Phase 2 TASK-2.7b GA
+(forgejo-secrets backend rotation tooling shipped 2026-05-08 evening,
+v1.10.6 plugin release predated this content refresh by hours):
+
+- `skills/aether-rotate-pat/SKILL.md` header: version 0.1.0 → 0.2.0;
+  removed "(DRAFT — AB pending)" footer; AB benchmark snapshot retained
+  with eval-3 deprecation note.
+- "决策核心" section: was "nomad-variables GA; forgejo-secrets ci-build
+  defer to emergency runbook" → both backends GA with per-backend
+  semantic snapshot (5-step + atomic vs 2-step + best-effort + chaos-kill
+  defer-to-emergency).
+- New `forgejo-secrets backend 流程` section (45 lines): 7-row diff
+  table vs nomad-variables, full usage example with --old-token-file +
+  AETHER_FORGEJO_TOKEN env, interrupt recovery semantics, 4 forgejo-
+  specific failure modes (MISSING_OLD_TOKEN_FILE / MISSING_FORGEJO_TOKEN
+  / FORGEJO_MANUAL_RECOVERY_REQUIRED / CLEANUP_REFUSED_INCOMPLETE).
+- Footer "Last updated": 2026-05-08 (DRAFT) → 2026-05-09 (GA).
+
+### Skill 变更强制流程 waiver
+
+Per CLAUDE.md `§Skill 变更强制流程`, SKILL.md content changes require AB
+re-benchmark before version bump. This release uses [skip-benchmark]
+waiver because:
+
+1. AB methodology validated for skill: 3/3 evals WITH_BETTER (2026-05-07
+   v0.1.0; results retained at `aether-plugin-benchmarks/ab-results/2026-05-07/aether-rotate-pat/`).
+2. Existing eval-3 ("ci-build-class-defer-to-emergency") tests behavior
+   that is now incorrect post-TASK-2.7b GA. Re-running eval-3 against
+   refreshed skill would test the WRONG question (the new behavior is
+   "use Tier 1 normally for ci-build", not "defer to emergency").
+3. Designing new eval scenarios for forgejo-secrets Tier 1 happy path +
+   chaos-kill-defer-to-emergency requires non-trivial fixture work
+   (live-cluster-shaped tests) — tracked as follow-up issue.
+
+The content change is fact-stating (forgejo-secrets is now GA, here's
+how to use it) backed by spec amendment scope_amendment_2026_05_08
+recorded in main repo proposal.md frontmatter. R1 audit (4-agent
+challenge mode) flagged the skill DRAFT/WIP messaging as Critical
+(tl-C2); this release closes that finding.
+
+### Spec / Issue
+
+- Aether #45 Phase 2 R1 pre_merge audit tl-C2 + cr-M1 + tl-M1 + tl-M3
+  convergent finding closure (DRAFT footer + WIP messaging in GA artifact).
+- Main repo commits eef7ebd (dry-run sub-step fix) + 730c87f (doc drift
+  refresh) handle CLAUDE.md / runbook / MEMORY / proposal.md surfaces.
+
 ## [1.10.6] - 2026-05-07
 
 ### Added — `aether-rotate-pat` skill (#45 Phase 2 GA)
