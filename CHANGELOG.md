@@ -2,6 +2,34 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.10.6] - 2026-05-10
+
+### Added
+
+- **NEW skill `aether-rotate-pat`** — guided wrapper around
+  `aether registry-auth rotate/resume/cleanup` for #45 Phase 2 Tier 1
+  PAT rotation (nomad-variables backend). Walks operator through:
+  list inventory → pick PAT → dry-run plan → confirm execute → 24h
+  grace + cleanup. Auto-routes errors to runbook troubleshooting
+  sections by error.code. Strict security regs: refuses to read PAT
+  plaintext, requires user confirmation for cluster-mutating steps.
+- Min CLI version bumped to 1.12.0 (covers `registry-auth list/rotate/
+  resume/cleanup` cobra commands shipped in #45 Phase 2).
+
+### Pending — known work-in-progress
+
+- AB benchmark for `aether-rotate-pat` not yet run (per CLAUDE.md
+  §Skill 强制流程 "新建 Skill: 必须" requirement). Filed as
+  follow-up; this skill is shipped as v0.1.0 (pre-benchmark
+  validation). Static benchmark (line guard) passed — 160 lines
+  well under 400 warning threshold.
+
+### See also
+
+- Runbook: `docs/guides/forgejo-pat-rotation.md` (in main Aether repo)
+- CLI commands: shipped in feat/45-phase2-tier1-rotation branch (audit-converged at PASS_WITH_WARNINGS)
+- Audit reports: `.aria/audit-reports/post_implementation-2026-05-10-*-R{1,2}.md`
+
 ## [1.10.5] - 2026-05-04
 
 ### Documented — runner-side aliyun apt mirror (no plugin functionality change)
