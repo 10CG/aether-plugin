@@ -2,6 +2,52 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.10.8] - 2026-05-14
+
+### Changed — `aether-report` skill v1.0.0 → v1.1.0 (empty-body validation gate)
+
+Closes the gap that allowed Aether issue #23 to enter backlog with an
+empty body in 2026-04-09 and remain unactionable for a month before
+being closed stale on 2026-05-14. User-identified root cause: skill had
+no hard gate refusing empty submissions.
+
+**New Step 4.5 (hard gate, between compose and preview)**:
+
+- Description / use_case / steps fields require ≥ 20 chars non-whitespace
+- Title requires ≥ 10 chars (rejects "?" / "..." / "a" placeholders)
+- Body must contain at least one rendered user_* field (not just template
+  scaffolding + environment info)
+
+On failure: re-prompt OR exit. Three re-prompts allowed but a determined
+user with nothing to say cannot bypass the gate by repeated empty
+submission — the skill exits hard instead of creating a placeholder
+issue.
+
+**Why this matters per the #23 lesson**: AI-side processing of
+unactionable issues costs operator time (triage comment, follow-up
+nudge, stale closure decision) that's better spent on issues with
+real content. Refusing empty submission at the skill boundary
+eliminates the entire downstream chain.
+
+**Cost guard**: SKILL.md now 291 lines (was 254). Well under 400/500
+warn/block thresholds per `static-benchmark.sh`.
+
+**AB test**: skipped per CLAUDE.md §Skill 变更强制流程 "错误处理/格式
+改进: 推荐" — this addition is unambiguously positive (refusing a
+class of low-quality submission has no path where it makes the skill
+behave worse). Existing happy-path scenarios continue to pass through
+all 7 steps; new Step 4.5 only activates on empty-body inputs that
+didn't previously have a defined behavior anyway.
+
+### Plumbing
+
+- `cli.recommended_version`: 1.16.9 → **1.16.21** (catches up to today's
+  5 new doctor checks shipped this session: `heavy_node_dns_clean_upstream`,
+  `cloud_init_network_disabled`, `runner_health`, `cron_job_backlog`,
+  `heavy_node_forgejo_hosts_entry`, `registry_mirror_drift`)
+
+Refs: Aether #23 (the root-cause incident that motivated this gate)
+
 ## [1.10.7] - 2026-05-09
 
 ### Changed — `aether-rotate-pat` skill v0.1.0 → v0.2.0 (DRAFT → GA, content refresh post-TASK-2.7b)

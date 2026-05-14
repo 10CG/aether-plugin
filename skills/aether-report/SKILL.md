@@ -19,7 +19,7 @@ dependencies:
 
 # Aether Issue 报告 (aether-report)
 
-**版本**: 1.0.0 | **优先级**: P1
+**版本**: 1.1.0 | **优先级**: P1
 
 帮助用户向 Aether 维护团队报告 Bug、提交功能建议或提问。自动收集环境信息并路由到正确的仓库。
 
@@ -120,6 +120,38 @@ HAS_CONFIG=$( [ -f ".aether/config.yaml" ] && echo "yes" || echo "no" )
 ---
 *由 aether-report 自动生成*
 ```
+
+### Step 4.5: 空 body 拦截（必须）
+
+**触发原因**: Aether issue #23 (2026-04-09 创建, 2026-05-14 因 body 空无法 triage 而关闭) 暴露的根因 — 早期第三方项目集成或自动化流程可能调用 issue submission 接口但未提供有意义内容。本步骤是硬拦截，防止此类 placeholder issue 进入 backlog。
+
+**检查项** — 提交前必须满足全部：
+
+1. **用户内容字段非空**:
+   - Bug Report: `description` + `steps` 至少一个 ≥ 20 字符（非空白）
+   - Feature Request: `description` + `use_case` 至少一个 ≥ 20 字符
+   - Question: `description` ≥ 20 字符
+2. **不是纯模板**: body 包含至少一处 `{user_*}` 渲染后的实际内容，不能全是模板骨架 + 环境信息
+3. **Title 非空且不只是问号/省略号**: title 不为空且至少 10 字符（"a" / "?" / "..." 这种拒绝）
+
+**拦截行为**:
+
+```
+⚠️ Issue 内容不足以让维护者 triage。
+
+具体缺失:
+  - [ ] description 字段为空（建议 ≥ 20 字符描述问题）
+  - [ ] steps 字段为空（建议给至少 1 个复现步骤）
+
+参考已 ship 的 doctor checks (heavy_node_dns_clean_upstream 等), 每个
+都有: 触发现象 → 诊断路径 → 修复方法 三层信息。请补充后再提交。
+
+[1] 重新填写  [2] 取消提交
+```
+
+用 AskUserQuestion 给用户选择。选 [1] 回 Step 3 重新收集；选 [2] 直接退出 skill。
+
+**绝不允许的回退路径**: 即使用户三次重填仍空，也不能强行提交 — 直接退出，提示用户"明确想清楚再来"。本 skill 不创建 placeholder issue 是 #23 教训的核心约束。
 
 ### Step 5: 隐私审查（必须）
 
@@ -249,6 +281,11 @@ Issue 内容已保存，请手动提交:
 
 ---
 
-**Skill 版本**: 1.0.0
-**最后更新**: 2026-03-31
+**Skill 版本**: 1.1.0
+**最后更新**: 2026-05-14
 **维护者**: 10CG Infrastructure Team
+
+## Changelog
+
+- **1.1.0** (2026-05-14): 加 Step 4.5 空-body 拦截（Aether #23 教训）
+- **1.0.0** (2026-03-31): 初版
