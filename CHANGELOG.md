@@ -2,6 +2,55 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.10.9] - 2026-05-22
+
+### Added — `aether-build-container` skill (Aether #27 walking skeleton)
+
+New owner-triggered build primitive that lets Aether build container images
+on the cluster (heavy nodes) and push to internal registry, eliminating
+Symptom B "用 Aether 做 build 无 entry point" identified in Aether #27.
+Zero Go code / zero CLI version bump on Aether side / Level 2 / pure
+skill delivery.
+
+**Capabilities**:
+- Owner-triggered Nomad batch dispatch via `aether dev run` (no automatic
+  CI gate, owner agency preserved)
+- 5-field output contract (`image_sha256` / `registry_url` /
+  `source_commit_sha` / `source_git_ref` / `build_node`) per Aria #111
+  authoritative input
+- 8 error codes (4 node-side exit 20-23 + 4 skill-side)
+- Multi-submodule meta-repo support via `git clone --recurse-submodules`
+  + tar working tree (covers Aether/Aria/nexus/silknode + standards-
+  shared submodule pattern; ~1/3 10CG projects)
+- §3a pre-flight registry-auth parity check across dynamic Nomad
+  /v1/nodes filter
+- DooD execution (docker:cli + host docker.sock + /root/.docker + shared
+  virtiofs build-ctx mounts)
+- 1800s alloc deadline + skill-lifecycle finally cleanup
+
+**Validation** (full audit trail in Aether #27):
+- post_spec audit converged PASS (3 rounds; R1 caught real D2×D5 critical)
+- post_implementation audit converged PASS (1 round, 0 C/M, 12 minor tracked)
+- pre_merge audit converged PASS + D4 amendment addendum
+- AB tests 3/3 WITH_BETTER decisive (1 standard + 1 negative + 1 edge)
+- e2e smoke 6/6 PASS — single-repo AND multi-submodule meta-repo fixtures
+- 7 runtime issues caught + fixed during smoke iteration
+
+**Files**:
+- `skills/aether-build-container/SKILL.md` (228 lines, under 400 warn
+  threshold per static-benchmark gate)
+- `skills/aether-build-container/references/job-template.hcl` (raw_exec
+  → docker DooD pivot after heavy_workload nodes proven to lack raw_exec)
+- `skills/aether-build-container/references/task-script.sh` (8 error
+  code exit mapping, `$NOMAD_ALLOC_ID` in every result.json)
+
+**Known iteration follow-ups** (non-blocking, tracked in audit reports):
+BUILD_ARGS escaping doc location, smoke sha-prefix assertion precision,
+5/8 error codes not deterministically triggered (only `source_not_found`),
+RW `/root/.docker` mount → "trusted Dockerfile only" boundary precision.
+
+Cross-ref: Aether #27 / Aria #111 / Aether #32 (Vault deferral preserved).
+
 ## [1.10.8] - 2026-05-14
 
 ### Changed — `aether-report` skill v1.0.0 → v1.1.0 (empty-body validation gate)
