@@ -2,6 +2,38 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.10.10] - 2026-05-23
+
+### Fixed — `aether-report` Forgejo labels payload note (Aether #138)
+
+`aether-report` SKILL.md §6 Forgejo submission template already omits the
+`labels` field, but lacked an explicit warning explaining *why*. Future
+agents/maintainers reading the GitHub branch (which uses `labels:[\"bug\"]`)
+were tempted to "fix" the Forgejo branch by adding labels — triggering
+HTTP 422 (`json: cannot unmarshal string into Go struct field
+CreateIssueOption.labels of type int64`) because Forgejo expects
+`[]int64` (label IDs) not `[]string`.
+
+Added a 1-paragraph note immediately after the Forgejo `forgejo POST`
+example documenting the API divergence and pointing to the
+`GET /repos/{owner}/{repo}/labels` workaround.
+
+**Companion fix (outside this submodule)**: The `forgejo` CLI wrapper
+at `~/.npm-global/bin/forgejo` previously used `curl -sf` which silently
+ate 4xx/5xx bodies, leaving callers with no diagnostic. The wrapper was
+hardened in this same effort (Aether main repo commit) to surface HTTP
+errors on stderr + exit 2 — meaning that if an agent ever does send a
+bad payload, the error will now be visible rather than silent
+`exit=22`.
+
+[skip-benchmark] — 豁免 1 (pure documentation warning, no decision tree
+change, no new trigger conditions, no behavior change to any
+existing path). Issue #138 explicitly identified the gap as
+documentation-only on the skill side.
+
+**Files**:
+- `skills/aether-report/SKILL.md` — +1 warning paragraph in §6
+
 ## [1.10.9] - 2026-05-22
 
 ### Added — `aether-build-container` skill (Aether #27 walking skeleton)

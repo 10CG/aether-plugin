@@ -199,6 +199,8 @@ forgejo POST /repos/10CG/Aether/issues -d "{
 }"
 ```
 
+> ⚠️ **不要给 Forgejo 加 `labels` 字段**。Forgejo API `CreateIssueOption.labels` 是 `[]int64`（label ID 数组），跟 GitHub 的 `[]string` 不同 — 直接传 `["bug"]` 会返 HTTP 422 `json: cannot unmarshal string into Go struct field CreateIssueOption.labels of type int64`。如确需 label，先 `GET /repos/{owner}/{repo}/labels` 拿 ID 数组再传整数；否则交给维护者人工 triage 加标签（issue #138）。
+
 **GitHub API 提交：**
 
 ```bash
