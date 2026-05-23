@@ -226,6 +226,67 @@ server {
 
 ---
 
+## In-cluster build-cache override (可选,大幅提速)
+
+Aether 集群跑了一个 build-cache LXC (CT 306, `192.168.69.206`)：
+
+- **Verdaccio :4873** — npm 包缓存(upstream `npmmirror` → `npmjs`)
+- **devpi :3141** — pip / uv 包缓存(upstream tsinghua tuna)
+
+模板默认走**公网镜像**(`npmmirror.com` / `mirrors.aliyun.com`),目的是
+保持 Dockerfile 在集群内外都可移植。**若构建发生在 Aether 集群内**
+(`/aether:dev` / Forgejo runner 上),把 `--build-arg` 指到内网 cache
+可省大量跨境流量,首次冷启动也快 3-5×:
+
+```bash
+# Node.js / Next.js — 覆盖 NPM_REGISTRY
+docker build \
+  --build-arg NPM_REGISTRY=http://192.168.69.206:4873/ \
+  -t my-app .
+
+# Python (pip) — 覆盖 PIP_INDEX_URL + PIP_TRUSTED_HOST
+docker build \
+  --build-arg PIP_INDEX_URL=http://192.168.69.206:3141/root/pypi/+simple/ \
+  --build-arg PIP_TRUSTED_HOST=192.168.69.206 \
+  -t my-app .
+
+# Python (uv) — 注意 UV_INDEX_URL,uv 不读 PIP_INDEX_URL
+docker build \
+  --build-arg UV_INDEX_URL=http://192.168.69.206:3141/root/pypi/+simple/ \
+  --build-arg UV_EXTRA_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple/ \
+  -t my-app .
+```
+
+为支持 pip/uv 覆盖,Python 模板需在头部声明 ARG 并在 RUN 中消费:
+
+```dockerfile
+ARG PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+ARG PIP_TRUSTED_HOST=mirrors.aliyun.com
+
+RUN pip config set global.index-url "$PIP_INDEX_URL" && \
+    pip config set global.trusted-host "$PIP_TRUSTED_HOST" && \
+    pip install --no-cache-dir -r requirements.txt
+```
+
+### Host-stage 自动注入(已生效)
+
+Forgejo runner 跨 3 heavy 节点已通过 `container.options --env` 全局注入
+这 5 个 env,所有 CI **host stage**(workflow 步骤直接跑 `npm ci` / `pip install`)
+自动走 build-cache,**无需 workflow 改动**。
+
+详见 `docs/guides/forgejo-runner-multi-node.md § 13` + 主仓 issue
+[#117](https://forgejo.10cg.pub/10CG/Aether/issues/117) §P3。
+
+### 安全注意
+
+- **不要 commit `.npmrc` / `pip.conf` 含 `192.168.69.206` 到公开 repo** —
+  内网 IP 泄露面。用 `--build-arg` 在 build 时覆盖,或 Dockerfile 默认值
+  保持公网镜像。
+- 健康检查: `aether doctor build_cache_health`(WARN 级,验证 `:4873`
+  + `:3141` reachable;cli v1.16.22+)。
+
+---
+
 ## Alpine vs Debian-slim 选择
 
 | 基础镜像 | 优点 | 注意事项 |

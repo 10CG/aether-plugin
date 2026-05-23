@@ -2,6 +2,41 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.10.11] - 2026-05-23
+
+### Added — `aether-init` build-cache override doc (#117 P0 doc follow-up)
+
+Added new §"In-cluster build-cache override (可选,大幅提速)" to
+`skills/aether-init/references/dockerfile-templates.md` explaining how to
+override the default public-mirror ARGs (`NPM_REGISTRY` /
+`PIP_INDEX_URL` / `UV_INDEX_URL`) to point at the in-cluster build-cache
+LXC (CT 306, 192.168.69.206) when builds happen inside the Aether cluster.
+
+The defaults stay on public mirrors (`npmmirror.com` / `mirrors.aliyun.com`)
+for portability — projects building outside the cluster keep working.
+Projects building inside the cluster can pass `--build-arg
+NPM_REGISTRY=http://192.168.69.206:4873/` (or pip/uv equivalents) for
+3-5× faster cold builds.
+
+Also documents:
+- Host-stage env injection is already global (P3 done; no workflow
+  change needed for `npm ci` / `pip install` steps)
+- Security boundary: don't commit `.npmrc`/`pip.conf` with internal IP
+  to public repos
+- Health check: points at `aether doctor build_cache_health` (CLI
+  v1.16.22+) for verifying LXC reachability
+
+Companion CLI feature: `aether doctor build_cache_health` (Aether main
+repo v1.16.22).
+
+[skip-benchmark] — 豁免 1 (additive documentation section, no decision
+tree change, no new trigger condition, no behavior change to any
+existing init flow).
+
+**Files**:
+- `skills/aether-init/references/dockerfile-templates.md` — +60 lines
+  new section before "Alpine vs Debian-slim 选择"
+
 ## [1.10.10] - 2026-05-23
 
 ### Fixed — `aether-report` Forgejo labels payload note (Aether #138)
