@@ -2,6 +2,21 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.10.13] - 2026-06-04
+
+### Changed — make NFS-virtiofs guide reachable for plugin-only users (#159)
+
+- `aether-init` reference `nomad-templates.md`: the host-volume guide link was a
+  relative path (`../../../../docs/guides/...`) that resolves only inside the main
+  Aether repo — unreachable for plugin-only users. Replaced with the full Forgejo
+  web URL and inlined a compact **node-class × storage capability** summary
+  (`heavy_workload` = docker + NFS-virtiofs; light = exec-only) so the essential
+  mapping no longer requires opening the main repo. Surfaced by #157 triage.
+- `cli.recommended_version` 1.16.33 → **1.16.34** (tracks the paired aether-cli
+  release that fixes the same guide path in `volume create --help`).
+- References-only change (no SKILL.md decision-tree/trigger edit) → SKILL AB-test
+  gate not triggered; fact-stating doc addition.
+
 ## [1.10.12] - 2026-06-04
 
 ### Changed — track current CLI + fix release tag URL (requirements.yaml)

@@ -139,7 +139,11 @@ job "__PROJECT_NAME__" {
 > **前置要求**: volume 必须在**所有** heavy 节点上都已注册 — 单节点注册
 > 会变成 blast-radius trap (任一节点宕机即服务不可用)。Aether 集群的
 > `/opt/aether-volumes/` 是 NFS-virtiofs 共享挂载，物理上已在所有 heavy 节点,
-> 只需 Nomad 注册全覆盖即可。详见 [`docs/guides/nfs-virtiofs-host-volumes.md`](../../../../docs/guides/nfs-virtiofs-host-volumes.md)。
+> 只需 Nomad 注册全覆盖即可。详见 [nfs-virtiofs-host-volumes.md](https://forgejo.10cg.pub/10CG/Aether/src/branch/master/docs/guides/nfs-virtiofs-host-volumes.md)。
+>
+> **node-class × 存储能力**: 有状态 Docker 服务用约束 `${node.class} = heavy_workload`
+> (heavy-1/2/3 — 唯一带 docker driver + NFS-virtiofs `/opt/aether-volumes/` 共享挂载);
+> light 节点仅 exec driver, 无法消费 docker host_volume。
 >
 > 注册命令 (**对每个 heavy 节点**都执行):
 > ```bash
