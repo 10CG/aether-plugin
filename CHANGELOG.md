@@ -2,6 +2,16 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.10.12] - 2026-06-04
+
+### Changed — track current CLI + fix release tag URL (requirements.yaml)
+
+- `cli.recommended_version` 1.16.21 → **1.16.33** (current aether-cli release,
+  #163 docker_prune systemd-timer detection fix).
+- Fixed `cli.tag_format` / `cli.version_url`: were `aether-cli/v{VERSION}`, but
+  main-repo release tags are actually `cli-v{VERSION}` (e.g. `cli-v1.16.33`) —
+  the install-by-version flow would 404. Now `cli-v{VERSION}`.
+
 ## [1.10.11] - 2026-05-23
 
 ### Added — `aether-init` build-cache override doc (#117 P0 doc follow-up)

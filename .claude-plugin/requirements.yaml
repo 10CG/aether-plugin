@@ -3,7 +3,7 @@
 
 cli:
   min_version: "1.0.0"
-  recommended_version: "1.16.21"
+  recommended_version: "1.16.33"
   # 安装位置 (与 config.yaml 同目录)
   install_dir: "~/.aether"
   install_path:
@@ -15,9 +15,9 @@ cli:
   # 获取最新版本
   latest_url: "https://forgejo.10cg.pub/api/v1/repos/10CG/Aether/releases/latest"
   # 获取指定版本 (替换 {VERSION})
-  version_url: "https://forgejo.10cg.pub/api/v1/repos/10CG/Aether/releases/tags/aether-cli/v{VERSION}"
-  # Tag 格式
-  tag_format: "aether-cli/v{VERSION}"
+  version_url: "https://forgejo.10cg.pub/api/v1/repos/10CG/Aether/releases/tags/cli-v{VERSION}"
+  # Tag 格式 (主仓库实际 tag 形如 cli-v1.16.33, 非 aether-cli/v...)
+  tag_format: "cli-v{VERSION}"
   # 二进制命名格式
   binary_format: "aether-{OS}-{ARCH}"  # Windows 添加 .exe
   # 源码仓库
