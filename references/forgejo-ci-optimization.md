@@ -39,7 +39,9 @@ If you are `/aether:ci`, use this guide to interpret failures and propose fixes.
 - CI push fails with `tls:`, `EIDLETIMEOUT`, `operation not supported`,
   or `invalid pkt-len` errors
 - Dockerfile uses `--mount=type=cache` (it will fail here)
-- Workflow uses `driver: docker-container` or `network=host` driver-opts
+- Workflow uses a bare `docker-container` builder (setup-buildx 默认, 未经
+  #151 provisioning)。注意: 经节点 `aether-build` builder 的 docker-container
+  是 2026-06-11 起的标准形态 (B1), 不是反模式
 - Deployment verification uses `sleep N` (will be replaced with polling)
 - pytest / npm ci takes > 3 minutes (parallelization opportunity)
 
@@ -178,6 +180,15 @@ Know these once, then every rule below makes sense:
 
 ### A1. `driver: docker-container` (default buildx driver)
 
+> **EVOLUTION (2026-06-11, Aether #151 ①+(i))**: docker-container driver 本身
+> 不再是反模式 — **节点 provision 的 `aether-build` builder**（docker-container
+> driver + 4 GiB memcg + `network=host` + buildkitd.toml CA pin，heavy-1/2/3
+> systemd 单元常驻）现在是**标准 build 路径**（新形态见 B1）。仍然坏的是
+> `setup-buildx-action` 默认 spawn 的**裸** docker-container builder（无 CA
+> provisioning），失败形态与下文完全一致。`driver: docker`（宿主 daemon）在
+> 未迁移 repo 上仍可运行（#151 §9.4 R4 迁移期），但其嵌套 build **内存无界**
+> （= #149 根因路径）— 动到该 repo workflow 时应顺手迁移。
+
 **Why it looks appealing**: Modern BuildKit features (registry cache,
 cache mounts, parallel stages, frontend syntax directives) all work best
 with `docker-container`.
@@ -195,23 +206,31 @@ isolated container that does NOT inherit the host daemon's
 `insecure-registries` configuration. It tries to verify the internal
 registry's self-signed cert, fails, and aborts the push.
 
-**Why `buildkitd-config-inline: insecure = true` does NOT fix it**:
-The `insecure = true` BuildKit config only affects the image pull/push
-content path, not the OAuth2 token exchange path. The `POST /v2/token`
-request ignores the per-registry insecure flag in current BuildKit
-versions (tested on BuildKit 0.13+).
+**Why `buildkitd-config-inline: insecure = true` does NOT fix it (refined
+2026-06-11, Aether #151 §9.1 S3 实证)**: TLS 链有**两段 client**。① blob/manifest
+传输在 buildkitd（builder 容器）内 — 其信任库没有内网 CA；② **oauth token fetch
+发生在 job 容器的 docker CLI**（client-side session auth），根本不经过 buildkitd。
+早先 "OAuth path ignores the insecure flag" 的观察正确，但归因错了：不是
+buildkitd 忽略 flag，而是该请求不在 buildkitd 里发生 — 所以任何 buildkitd 配置
+都修不了 ②。
 
-**Fix**: Use `driver: docker` explicitly. This delegates the build to
-the host Docker daemon, which honors `insecure-registries`.
+**Fix (standard since 2026-06-11)**: 用节点 provision 的 `aether-build` builder
+（B1 新形态）— ① 由 buildkitd.toml `ca=` pin 解决（provisioning 单元建档拷入），
+② 由 runner 给 job 容器注入的 CA bundle bind 解决（`container.options`
+`-v /etc/ssl/certs/ca-certificates.crt:...:ro`，heavy-1/2/3 已部署）。
+
+**Legacy fix（未迁移 repo 仍在用）**: `driver: docker` 显式声明，build 走宿主
+daemon 的 `insecure-registries` — 可用但嵌套 build 内存无界（#149 路径）。
 
 ```yaml
 - uses: docker/setup-buildx-action@v3
   with:
-    driver: docker    # MUST be explicit — not default
+    driver: docker    # legacy 形态 — 迁移期可用, 动到时改 B1 新形态
 ```
 
 **Case**: SilkNode run #1950, #1952, #1953 — all failed with this exact
-error before reverting to `driver: docker` in run #1954 (succeeded).
+error before reverting to `driver: docker` in run #1954 (succeeded; 当时
+provisioned builder 尚不存在, revert 是正确止血).
 
 ---
 
@@ -234,6 +253,10 @@ through the OAuth path and hits the TLS cert issue.
 **Fix**: Do not use registry cache in this environment. Rely on
 **host Docker layer cache** (which works because `driver: docker`)
 plus **good Dockerfile layering** (deps before source).
+
+> NOTE (2026-06-11): 根因同 A1 的 CA 链，#151 CA provisioning 后本路径**可能**
+> 已解锁 — 未验证，不要未经测试启用（B1 形态下 builder 自带持久 cache，需求
+> 也已减弱；解锁评估归 #151 Phase 2 后续）。
 
 ---
 
@@ -494,17 +517,29 @@ entirely.
 
 ## Best practices (USE these in Aether)
 
-### B1. Buildx setup (always explicit)
+### B1. Build via the provisioned `aether-build` builder (standard since 2026-06-11)
 
 ```yaml
-- name: Set up Docker Buildx
-  uses: docker/setup-buildx-action@v3
-  with:
-    driver: docker    # Delegates to host daemon with insecure-registries
+- name: Build and push (memory-limited builder)
+  run: |
+    docker buildx create --name aether-build --driver docker-container \
+      --driver-opt memory=4g --driver-opt memory-swap=4g --driver-opt network=host 2>/dev/null || true
+    docker buildx build --builder aether-build --push \
+      -t forgejo.10cg.pub/org/project:${{ github.sha }} \
+      -t forgejo.10cg.pub/org/project:latest \
+      .
 ```
 
-Never omit `driver:`. Never use `driver-opts: network=host`. Never use
-`buildkitd-config-inline`.
+要点（Aether #151 ①+(i)，§9.1 spike 实证）：
+- **不需要 `setup-buildx-action`**（runner job 镜像自带 buildx ≥0.34）— 少一个
+  gitea.com action 拉取 flake 面。
+- 节点 systemd 单元（`aether-buildx-builder.service`）常驻 provision 该 builder
+  （4 GiB memcg + CA pin + host net）；`create || true` 在 job 内只落 client
+  元数据并 **adopt 既有 builder**（cache 跨 job 共享）。
+- 冷建 fallback（provisioning 缺位）带限额但**无 CA config** — 内网 registry
+  操作显式失败，此时在节点跑 provisioning 单元，不要回退 legacy 形态。
+- Legacy 形态（`setup-buildx-action` + `driver: docker` + B3 分步）在未迁移
+  repo 上仍可运行（#151 §9.4 R4 迁移期）。
 
 ---
 
@@ -521,7 +556,7 @@ Cloudflare edge.
 
 ---
 
-### B3. Build + Push (split pattern)
+### B3. Build + Push (split pattern) — LEGACY (superseded by B1, 2026-06-11)
 
 ```yaml
 - name: Build Docker image
@@ -546,6 +581,10 @@ Cloudflare edge.
 single step ALSO works (the host daemon handles both). But the split
 form is proven stable across all four case-study projects. The couple
 seconds you save by merging isn't worth the risk.
+
+**Superseded (2026-06-11, #151)**: 迁移到 B1 新形态后，`buildx build --push`
+多 `-t` 单步直推取代本节（build 不再经 host daemon，memcg 受 `aether-build`
+builder 约束）。本节仅适用于尚未迁移的 legacy repo。
 
 ---
 
@@ -788,10 +827,11 @@ Match the error keyword to find the relevant section.
 
 | Error fragment | Cause | Fix section |
 |----------------|-------|------------|
-| `tls: failed to verify certificate` at push | `driver: docker-container` | [A1](#a1-driver-docker-container-default-buildx-driver) + [B1](#b1-buildx-setup-always-explicit) |
+| `tls: failed to verify certificate` at push | bare `docker-container` builder（未经 #151 provisioning）或 job 容器缺 CA bind | [A1](#a1-driver-docker-container-default-buildx-driver) + [B1](#b1-build-via-the-provisioned-aether-build-builder-standard-since-2026-06-11) |
 | `tls: failed to verify certificate` at cache import | `cache-from: type=registry` | [A2](#a2-cache-from--cache-to-typeregistry) |
-| `failed to fetch oauth token ... tls:` | `buildkitd-config-inline: insecure = true` doesn't work for OAuth | [A1](#a1-driver-docker-container-default-buildx-driver) |
+| `failed to fetch oauth token ... tls:` | token fetch 在 **job 容器 CLI 侧**（非 buildkitd）→ job 容器缺 CA bundle；任何 buildkitd 配置修不了 | [A1](#a1-driver-docker-container-default-buildx-driver) |
 | `x509: certificate signed by unknown authority` | Same as above | [A1](#a1-driver-docker-container-default-buildx-driver) |
+| `cannot allocate memory` / `ResourceExhausted` + 日志 `Killed`（exit 102） | `aether-build` builder 4 GiB memcg 命中（按设计 fail-fast；#149 防御生效） | 不是 bug — 查该 build 内存是否异常（参照 Aether `forgejo-runner-memory-limits.md` §7.6/§9.4 R1） |
 
 ### Build/network errors
 
@@ -831,8 +871,8 @@ Match the error keyword to find the relevant section.
 
 | ✅ DO | ❌ DON'T |
 |------|--------|
-| `driver: docker` explicit | `driver: docker-container`, `network=host`, `buildkitd-config-inline` |
-| Split `build (load:true)` + manual `docker push` | Use `cache-from/to: type=registry` |
+| `--builder aether-build` + `--push` 多 tag 单步（B1，2026-06-11 起标准；legacy `driver: docker` 迁移期可用） | bare `docker-container`（setup-buildx 默认，无 CA provisioning）、`buildkitd-config-inline` |
+| 节点跑 `aether-buildx-builder.sh` 修 provisioning 缺位 | 把迁移过的 repo "修"回 `driver: docker`（#163 式倒退） |
 | Polling verify loop (5s × 24) | `sleep N` for deployment wait |
 | `npm config set registry https://registry.npmmirror.com` | Direct `npm ci` against `registry.npmjs.org` in Alpine |
 | `pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/` | Direct `pip install` against `pypi.org` |

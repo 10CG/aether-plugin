@@ -35,12 +35,15 @@
 
 ## 关键设计决策（所有 Docker 模板统一遵循）
 
-1. **`driver: docker`** — Buildx 使用宿主 Docker daemon。必须显式声明，否则默认
-   `docker-container` driver 不继承 host 的 `insecure-registries` 配置，推送
-   内网 registry 时会 TLS 证书失败。
-2. **Build + Push 分步** — 先 `push: false, load: true` 构建到本地，再手动
-   `docker tag` + `docker push`。这样所有 push 都经过 host daemon，利用其
-   `insecure-registries` 配置。
+1. **经节点常驻限额 builder 构建（`aether-build`）** — 2026-06-11 起（Aether #151
+   ①+(i)）heavy-1/2/3 由 systemd 单元常驻 docker-container builder：**4 GiB
+   memcg**（嵌套 build 防 #149 级 retry-storm 拖垮宿主）+ host 网 + CA pin。
+   workflow 用 `create || true` adopt 它。**不再使用 `setup-buildx-action` +
+   `driver: docker`**（旧形态内存无界 = #149 根因路径；未迁移 repo 的处置见
+   `forgejo-ci-optimization.md §A1`）。
+2. **`--push` 单步直推（多 tag 一次 build）** — TLS 两段已解决：buildkitd 侧走
+   builder CA pin；job 容器侧 token fetch 走 runner 注入的 CA bundle bind
+   （2026-06-11 三节点）。不再依赖 `insecure-registries`，不再分步 tag/push。
 3. **DNS fix** — 向 `/etc/hosts` 注入 registry 内网 IP，绕过 Cloudflare/公网。
 4. **Polling verify** — 替代 `sleep N`，最多 2 分钟每 5 秒轮询，running 即退出。
 5. **不使用** `cache-from/to: type=registry` 和 `--mount=type=cache` —
@@ -90,12 +93,6 @@ jobs:
       - name: Fix registry DNS
         run: echo "__REGISTRY_IP__ __REGISTRY__" | sudo tee -a /etc/hosts
 
-      # driver: docker 必须显式声明 — 见顶部"关键设计决策"
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver: docker
-
       - name: Login to Registry
         uses: docker/login-action@v3
         with:
@@ -103,24 +100,19 @@ jobs:
           username: ${{ secrets.FORGEJO_USER }}
           password: ${{ secrets.FORGEJO_TOKEN }}
 
-      # 构建 — 注意 push: false，推送在下一步用 docker CLI 完成
-      # (利用 host daemon 的 insecure-registries 配置)
-      - name: Build Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: false
-          load: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-
-      - name: Tag and push images
+      # 经节点常驻限额 builder 构建并直推 — 见顶部"关键设计决策" 1/2 (#151)
+      # create || true: adopt 节点 provision 的 builder; provisioning 缺位时
+      # 冷建带限额但无 CA, 内网 registry 操作会显式失败 (节点跑 provisioning 单元修)
+      - name: Build and push (memory-limited builder)
         run: |
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev-${SHORT_SHA}
-          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev-${SHORT_SHA}
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          docker buildx create --name aether-build --driver docker-container \
+            --driver-opt memory=4g --driver-opt memory-swap=4g --driver-opt network=host 2>/dev/null || true
+          docker buildx build --builder aether-build --push \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev-${SHORT_SHA} \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+            .
 
       - name: Install Nomad CLI
         run: |

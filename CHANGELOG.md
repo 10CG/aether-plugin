@@ -2,6 +2,31 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.10.14] - 2026-06-11
+
+### Changed — build 路径迁移到节点常驻限额 builder (Aether #151 ①+(i))
+
+- `aether-init` reference `workflow-templates.md`：dev workflow 的
+  `setup-buildx-action(driver: docker)` + `build-push-action(push:false,load:true)`
+  + 手动 tag/push 三步，改为单步 `docker buildx build --builder aether-build
+  --push` 多 tag 直推。builder 由 heavy 节点 systemd 单元常驻 provision
+  （docker-container driver + **4 GiB memcg**（防 #149 retry-storm 拖垮宿主）
+  + `network=host` + buildkitd.toml CA pin）；workflow 内 `create || true`
+  adopt。顶部"关键设计决策" 1/2 同步重写。
+- `references/forgejo-ci-optimization.md`（L2 权威 guide）联动演进：
+  - §A1 加 EVOLUTION 注记（docker-container driver 经 provisioning 后是标准，
+    裸 setup-buildx 形态仍坏）+ **根因订正**：oauth token fetch 发生在 job 容器
+    CLI 侧而非 buildkitd（这就是 buildkitd-config-inline 永远修不了它的原因；
+    #151 §9.1 S3 spike 实证），由 runner 注入 job 容器的 CA bundle bind 解决。
+  - §B1 重写为 aether-build 新标准形态（不再需要 setup-buildx-action）；
+    §B3 标 LEGACY；决策树/触发清单/Dos-Don'ts 同步，新增 memcg 命中签名行
+    （exit 102 / `cannot allocate memory` = 防御生效非 bug）+ "勿把迁移 repo
+    修回 driver: docker" 防 #163 式倒退。
+  - §A2 加注：registry cache 随 CA 链可能解锁，未验证勿启用。
+- 无 SKILL.md 改动（决策树/触发条件不变）→ 免 AB 测试（同 v1.10.12 先例）。
+  守门层: refs 总词数 5272 (net -1 vs v1.10.13 的 5273；>5000 cost-guard
+  BLOCKED 为既有状态，follow-up 瘦身 issue 另行跟踪)。
+
 ## [1.10.13] - 2026-06-04
 
 ### Changed — make NFS-virtiofs guide reachable for plugin-only users (#159)
