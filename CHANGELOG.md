@@ -2,6 +2,20 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.10.15] - 2026-06-13
+
+### Changed — `cli.recommended_version` → 1.16.36 + hooks.json 版本对齐
+
+- `requirements.yaml`: `cli.recommended_version` 1.16.34 → **1.16.36**，追上当前
+  aether-cli release（`cli-v1.16.36` — doctor `build_oom_events` /
+  `buildx_builder_provisioned` probe sentinel 硬化，Aether #151 / #170 follow-up）。
+- `hooks.json`: 版本 **1.10.13 → 1.10.15** — 修正 v1.10.14 发版时遗漏的版本漂移
+  （该文件未随其余 6 文件 bump）。
+- 7 文件版本统一 1.10.14 → **1.10.15**（VERSION / plugin.json / marketplace.json /
+  hooks.json / requirements.yaml / README.md / CHANGELOG.md）。
+
+纯 metadata 发布，无 SKILL.md 改动 → 免 AB 测试。
+
 ## [1.10.14] - 2026-06-11
 
 ### Changed — build 路径迁移到节点常驻限额 builder (Aether #151 ①+(i))
