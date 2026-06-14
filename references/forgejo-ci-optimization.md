@@ -174,6 +174,30 @@ Know these once, then every rule below makes sense:
    (aliyun won on TCP connect + TTFB + throughput; tuna/ustc/tencent all
    hit 5.3s SYN-retry from these networks). See B11 for usage notes.
 
+8. **All cross-border egress from heavy runners funnels through a single
+   transparent-proxy gateway at `192.168.69.212`.** This is the mechanism
+   behind fact #3. On heavy-1/2/3, external hosts (`pypi.org`,
+   `registry-1.docker.io`, `cdn.npmmirror.com`, `pypi.tuna.tsinghua.edu.cn`)
+   resolve to **fake-IP `198.18.0.x`** (RFC2544 TEST-NET range — the
+   signature of a TUN/transparent proxy), and `ip route get 198.18.0.7`
+   shows `via 192.168.69.212`. The dev workstation does **not** use this
+   path — which is exactly why a host is reachable (HTTP 200, ~1-2s) from a
+   laptop but intermittently times out from a runner.
+   **Diagnostic property**: small requests (a `curl -I` HEAD, a manifest
+   fetch) almost always pass; **sustained transfers** (`npm ci` /
+   `uv sync` / `pip install` pulling tens of MB, docker layer pulls)
+   intermittently hit idle-timeout / TLS-handshake-timeout at the proxy
+   under load or upstream flap. So a one-shot probe "looks fine" while CI
+   keeps failing — never conclude "egress is healthy" from a single HEAD.
+   **Internal mirrors bypass the proxy entirely**: verdaccio
+   (`192.168.69.206:4873`, npm) and devpi (`192.168.69.206:3141`, pip) are
+   on the internal subnet and are always reachable. The whole point of the
+   mirror rules below is to keep the CI hot path **off** the 212 proxy.
+   The proxy gateway's own stability is operator/infra-owned (`.212` is not
+   in the documented infra trio `.70/.71/.72`); CI's job is to not depend on
+   it. (Empirical: Aether #172/#173, 2026-06-14 — live-probed across all 3
+   heavy nodes.)
+
 ---
 
 ## Anti-patterns (do NOT use these in Aether)
@@ -383,10 +407,20 @@ not `node:22-alpine` (tag coverage is incomplete, no automatic sync).
 Upgrading Node version silently breaks.
 
 **Fix**: Use Docker Hub directly (`FROM node:22-alpine`). Aether
-runners have stable access to Docker Hub in practice (relay workflow
-has always pulled from Docker Hub successfully). Alternatively, use
+runners have *usually* stable access to Docker Hub. Alternatively, use
 the aliyun Docker mirror `registry.cn-hangzhou.aliyuncs.com` which
 has broader tag coverage.
+
+> **ERRATUM (2026-06-14, Aether #172)**: "stable access to Docker Hub" is
+> only *mostly* true — `registry-1.docker.io` egress also rides the
+> `192.168.69.212` proxy (Environment fact #8) and **can intermittently
+> TLS-handshake-timeout under load**. SilkNode run 8155 failed at
+> `Head "https://registry-1.docker.io/v2/docker/dockerfile/manifests/1":
+> net/http: TLS handshake timeout` — buildkit pulling the **Docker Hub
+> dockerfile frontend** because the Dockerfile started with
+> `# syntax=docker/dockerfile:1`. For the base-image pull, aliyun mirror is
+> the robust choice; for the frontend pull, see A11 + B12 (drop the
+> `# syntax` directive or mirror the frontend internally).
 
 ---
 
@@ -512,6 +546,56 @@ language runtimes via `FROM node:22-alpine AS frontend-builder`.
 (apt + npm ci + vite build). Moving into a `console-builder` Dockerfile
 stage let layer cache absorb most of it and eliminated the apt install
 entirely.
+
+---
+
+### A11. Any external (cross-border) fetch in the CI hot path
+
+> **NEW (2026-06-14, Aether #172/#173)**. Generalizes A5/A6: the failure
+> isn't about *which* external host — it's about touching the
+> `192.168.69.212` proxy egress at all (Environment fact #8).
+
+**Pattern**: A workflow or Dockerfile reaches a cross-border host on the
+CI hot path — even one that "works from my laptop" and even a CN mirror.
+All of these ride the `192.168.69.212` proxy and fail **intermittently**:
+
+- `PRISMA_ENGINES_MIRROR=registry.npmmirror.com` → `@prisma/engines`
+  postinstall pulls from `cdn.npmmirror.com:443` (external CDN, **not** the
+  internal verdaccio that `NPM_CONFIG_REGISTRY` points at).
+- `# syntax=docker/dockerfile:1` → buildkit pulls the dockerfile frontend
+  from `docker.io/docker/dockerfile:1` (A6 erratum).
+- `uv sync` / `pip install` falling back to `pypi.org` or
+  `pypi.tuna.tsinghua.edu.cn` because the internal **devpi cache is missing
+  a package** (e.g. `uv`, `fsspec`).
+
+**What fails** (all the same root cause, different symptom strings):
+```
+npm error code EIDLETIMEOUT — Idle timeout reached for host `cdn.npmmirror.com:443`
+TLS handshake timeout — Head "https://registry-1.docker.io/v2/docker/dockerfile/manifests/1"
+error: Request failed after 3 retries — Failed to fetch: https://pypi.org/simple/fsspec/
+  Caused by: peer closed connection without sending TLS close_notify
+ReadTimeoutError: HTTPSConnectionPool(host='pypi.tuna.tsinghua.edu.cn', port=443): Read timed out
+```
+
+**Why it's deceptive**: from a laptop (or a one-shot `curl -I` on the
+runner host) every one of these hosts returns 200 in ~1-2s. The failure
+only appears under a **sustained** transfer through the proxy. "It works
+when I test it" is not evidence the CI path is healthy (Environment fact
+#8, diagnostic property).
+
+**Compounding failure — no step timeout**: when the proxy stalls a
+transfer, an install/build step with no `timeout-minutes` does not fail
+fast — it sits in `running` while `npm ci` burns ~30 min/host idle-timeout
+×3 retries. SilkNode run 8078 reached **193 minutes** before overall
+failure, holding a runner the entire time. The hang *looks* like a
+deadlocked runner; it's actually egress idle-timeout with no kill switch.
+
+**Fix**: Keep the CI hot path **off** the proxy — internal-mirror every
+dependency and add per-step `timeout-minutes` (see B12). Two live cases:
+- #173 (nexus, uv/pip): devpi cache must carry the hot-path packages so
+  `uv sync` never falls back cross-border.
+- #172 (SilkNode, npm/docker): mirror Prisma engines internally and drop /
+  internally-mirror the Docker Hub dockerfile frontend.
 
 ---
 
@@ -766,6 +850,45 @@ See Environment fact #7 for the runner-side mechanism.
 
 ---
 
+### B12. Internal-mirror the whole hot path + `timeout-minutes` fast-fail
+
+The counterpart to A11. Two independent habits; do both.
+
+**(a) Route every CI dependency through an internal mirror** (bypasses the
+`192.168.69.212` proxy — Environment fact #8). The internal mirrors are
+already provisioned and healthy:
+
+| Ecosystem | Internal mirror | Common leak to plug |
+|-----------|-----------------|---------------------|
+| npm | verdaccio `192.168.69.206:4873` (`NPM_CONFIG_REGISTRY`) | `PRISMA_ENGINES_MIRROR` → external CDN; point it at an internal binary mirror or drop it |
+| pip / uv | devpi `192.168.69.206:3141` | devpi **missing a package** → silent cross-border fallback; pre-populate hot-path packages (`uv`, `fsspec`, …) |
+| docker base image | aliyun `registry.cn-hangzhou.aliyuncs.com` (A6) | — |
+| docker frontend | — | `# syntax=docker/dockerfile:1` pulls Docker Hub; drop the directive (buildkit's built-in frontend needs no pull) or mirror it internally |
+
+Setting `NPM_CONFIG_REGISTRY` / `pip index-url` to an internal mirror is
+necessary but **not sufficient** — audit for *secondary* fetches
+(postinstall scripts, build-time downloads, syntax frontends) that escape
+the configured registry. A11's three cases were all secondary fetches.
+
+**(b) Put `timeout-minutes` on every install/build step** so a stalled
+egress fails in minutes, not hours (A11 compounding failure):
+
+```yaml
+- name: Install Python dependencies
+  timeout-minutes: 10        # fail fast instead of 193-minute idle hang
+  run: uv sync --frozen
+- name: Build and push
+  timeout-minutes: 15
+  run: docker buildx build --builder aether-build --push ...
+```
+
+Fast-fail is strictly better than a silent hang: it frees the runner and
+surfaces the real error immediately instead of after 3× idle-timeout
+retries. Pair with the Dockerfile-level retry loops (B5/B6) — `timeout-minutes`
+is the outer backstop, the retry loop is the inner recovery.
+
+---
+
 ## Case studies (measured impact)
 
 All four projects use Forgejo Actions → Docker → Nomad on the Aether
@@ -845,6 +968,19 @@ Match the error keyword to find the relevant section.
 | `failed to create hash for /app/node_modules` | Cache mount + overlay fs | [A3](#a3-run---mounttypecachetarget) |
 | `pip timeout` / `Connection timed out` for pypi | Alpine → pypi.org network | [B6](#b6-pip-mirror--retry-in-dockerfile) |
 
+### Cross-border egress / proxy-gateway errors
+
+> All of these are one root cause: a CI hot-path fetch riding the
+> `192.168.69.212` proxy (Environment fact #8). Fix = internal-mirror it.
+
+| Error fragment | Cause | Fix section |
+|----------------|-------|------------|
+| `EIDLETIMEOUT` for `cdn.npmmirror.com` (not npmjs) | Prisma engines / postinstall pulling external CDN via proxy 212 | [A11](#a11-any-external-cross-border-fetch-in-the-ci-hot-path) + [B12](#b12-internal-mirror-the-whole-hot-path--timeout-minutes-fast-fail) |
+| `TLS handshake timeout` to `registry-1.docker.io` | Docker Hub dockerfile frontend (`# syntax=...`) via proxy 212 | [A11](#a11-any-external-cross-border-fetch-in-the-ci-hot-path) + [B12](#b12-internal-mirror-the-whole-hot-path--timeout-minutes-fast-fail) |
+| `peer closed connection without sending TLS close_notify` (pypi) | uv/pip cross-border fallback (devpi cache miss) via proxy 212 | [A11](#a11-any-external-cross-border-fetch-in-the-ci-hot-path) + [B12](#b12-internal-mirror-the-whole-hot-path--timeout-minutes-fast-fail) |
+| `Read timed out` for `pypi.tuna.tsinghua.edu.cn` | Same (tuna also rides proxy 212) | [A11](#a11-any-external-cross-border-fetch-in-the-ci-hot-path) + [B12](#b12-internal-mirror-the-whole-hot-path--timeout-minutes-fast-fail) |
+| Host is HTTP 200 from laptop but times out in CI | Runner egress ≠ laptop egress (proxy 212) | Environment fact #8 — do not conclude "egress healthy" from one probe |
+
 ### Workflow / runner errors
 
 | Error fragment | Cause | Fix section |
@@ -853,6 +989,8 @@ Match the error keyword to find the relevant section.
 | `Post Run actions/setup-node@v4` taking 4+ minutes | Same | [A4](#a4-cache-npm-in-actionssetup-node) |
 | `invalid pkt-len found` | Transient runner action git-clone glitch | Retry (not a code issue) |
 | `some refs were not updated` on `data.forgejo.org` | Non-fatal, always present | Ignore |
+| Run stuck `running` 30-190 min, no step progress, no kill | Egress idle-timeout via proxy 212 + missing step `timeout-minutes` (looks like a hung runner, isn't) | [A11](#a11-any-external-cross-border-fetch-in-the-ci-hot-path) + [B12](#b12-internal-mirror-the-whole-hot-path--timeout-minutes-fast-fail) |
+| `cancel`/`rerun` API → `rc=22` (can't kill a stuck run) | Forgejo Actions API gap (related upstream gap: Aether #8) | Cut the root cause (B12 `timeout-minutes`) so runs don't need manual kill |
 
 ### Performance / scaling
 
@@ -883,6 +1021,9 @@ Match the error keyword to find the relevant section.
 | `FROM node:22-alpine` (Docker Hub) | `docker.1ms.run/library/node:22-alpine` |
 | Fast-path check before expensive side-tasks | Unconditional clone + npm ci + test for "maybe publish" |
 | PR-only quality gates when Docker also builds | Duplicating `npm run build` on host and in Docker |
+| Internal-mirror every hot-path fetch (verdaccio/devpi @ `.206`); audit secondary fetches (Prisma engines, `# syntax` frontend) | CI hot-path fetch to any cross-border host (rides proxy `192.168.69.212`, intermittent timeout) |
+| `timeout-minutes` on every install/build step (fast-fail) | No step timeout (egress stall drags a run to 30-190 min) |
+| Conclude egress health from a sustained transfer | Conclude "egress healthy" from one `curl -I` HEAD (Env fact #8) |
 
 ---
 
@@ -909,5 +1050,6 @@ Match the error keyword to find the relevant section.
 
 | Version | Date | Change |
 |---------|------|--------|
+| 1.2.0 | 2026-06-14 | Added Environment fact #8 (transparent-proxy egress gateway `192.168.69.212` / fake-IP `198.18.0.x`; small-probe-passes / sustained-transfer-fails diagnostic) + A11 (any cross-border fetch in the CI hot path) + B12 (internal-mirror everything + `timeout-minutes` fast-fail) + Troubleshooting § Cross-border egress / proxy-gateway errors + A6 erratum (Docker Hub also rides the proxy). From live-probed triage of Aether #172 (SilkNode) / #173 (nexus). |
 | 1.1.0 | 2026-04-10 | Added § CI Monitoring Policy — the push → CI → deploy-watch → report chain. Codified as the single most important operational rule for Aether projects. |
 | 1.0.0 | 2026-04-10 | Initial version — extracted from 4-project optimization effort (SilkNode, Nexus, Kairos, Kino). All patterns verified with measured data. |

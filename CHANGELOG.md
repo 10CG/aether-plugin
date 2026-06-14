@@ -2,6 +2,20 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.10.16] - 2026-06-14
+
+### Added — `forgejo-ci-optimization.md` 跨境 egress / 代理网关防御 (guide 1.2.0)
+
+来自 Aether #172 (SilkNode) / #173 (nexus) 的 live-probed triage —— 把「runner 跨境拉包间歇失败」固化进 L2 权威 guide：
+
+- **Environment fact #8**: heavy runner 所有外网 egress 经透明代理网关 `192.168.69.212`（外网 host 解析为 fake-IP `198.18.0.x`，`ip route get` → `via 192.168.69.212`）。核心诊断属性：**小 probe 必过 / sustained transfer 间歇失败** —— 单次 `curl -I` 不能判 egress 健康。内网镜像（verdaccio/devpi @ `.206`）不经代理。
+- **A11**（新反模式）: CI 热路径任何跨境 fetch（Prisma engines 外网 CDN / `# syntax=docker/dockerfile:1` 拉 Docker Hub frontend / devpi cache miss 回退 pypi）都经代理 → 间歇 timeout；含「无 step timeout → 193min 静默卡死」复合故障。
+- **B12**（新最佳实践）: 内网镜像化整条热路径（含 secondary fetch 审计）+ 每个 install/build step 加 `timeout-minutes` fast-fail。
+- **Troubleshooting §**「Cross-border egress / proxy-gateway errors」+ Workflow/runner 表补「卡 30-190min」「cancel rc=22」行。
+- **A6 erratum**: 「Docker Hub access 稳定」修正 —— `registry-1.docker.io` 也经代理，可间歇 TLS-handshake-timeout（SilkNode run 8155 实证）。
+
+纯 reference 文档增补（**无 SKILL.md 改动 → 免 AB 测试**）；反应式 hardening，非 OpenSpec change。`cli.recommended_version` 不变（CLI 未改，仍 1.16.36）。
+
 ## [1.10.15] - 2026-06-13
 
 ### Changed — `cli.recommended_version` → 1.16.36 + hooks.json 版本对齐
