@@ -2,6 +2,15 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.10.17] - 2026-06-29
+
+### Changed — `cli.recommended_version` 追平 1.16.36 → 1.16.40
+
+`requirements.yaml` 的 `cli.recommended_version` 自 1.10.16 起停在 `1.16.36`，而 CLI 已发布到 `1.16.40`（本轮随 Aether `volumes_hcl_drift` doctor check 一并发版）。用户安装时依此字段确认推荐 CLI 版本，落后会让用户停留在旧 CLI。本次追平到 `1.16.40`。
+
+- 纯 metadata 指针更新，**无 SKILL.md 改动 → 免 AB 测试**。
+- 对应 CLI 变更见主仓 `aether-cli/CHANGELOG.md` `[1.16.40]`（新增 `volumes_hcl_drift` check）。
+
 ## [1.10.16] - 2026-06-14
 
 ### Added — `forgejo-ci-optimization.md` 跨境 egress / 代理网关防御 (guide 1.2.0)
