@@ -2,6 +2,15 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.10.18] - 2026-06-30
+
+### Changed — `cli.recommended_version` 1.16.40 → 1.16.41
+
+CLI 发布 `1.16.41`（新增 `aether volume recapture-sot` — volumes.hcl SoT auto re-capture，#184 C2）。`requirements.yaml` 追平推荐版本，让用户安装时拿到含新命令的 CLI。
+
+- 纯 metadata 指针更新，**无 SKILL.md 改动 → 免 AB 测试**。
+- 对应 CLI 变更见主仓 `aether-cli/CHANGELOG.md` `[1.16.41]`。
+
 ## [1.10.17] - 2026-06-29
 
 ### Changed — `cli.recommended_version` 追平 1.16.36 → 1.16.40
