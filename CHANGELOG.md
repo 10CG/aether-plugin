@@ -2,6 +2,15 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.10.19] - 2026-07-01
+
+### Changed — `cli.recommended_version` 1.16.41 → 1.16.42
+
+CLI 发布 `1.16.42`（`pat_inventory_drift` + PAT inventory schema 加 `var_key` 支持 — 消除 silknode 双-cred / aria-build 自定义 key 两个良性 drift 误报）。`requirements.yaml` 追平推荐版本。
+
+- 纯 metadata 指针更新，**无 SKILL.md 改动 → 免 AB 测试**。
+- 对应 CLI 变更见主仓 `aether-cli/CHANGELOG.md` `[1.16.42]`。
+
 ## [1.10.18] - 2026-06-30
 
 ### Changed — `cli.recommended_version` 1.16.40 → 1.16.41
