@@ -2,6 +2,19 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.10.21] - 2026-07-02
+
+### Added — 新 skill `aether-forgejo-creds`（Forgejo 凭据决策/诊断/轮换指南）
+
+根治 H1（#189）暴露的凭据"乱"：新 skill 指导 AI/operator 在 Aether 环境下正确用 Forgejo token——
+
+- **决策**：人机两账号模型（simonfish 人 / 10cg-ci-bot 机）+ "我做 X 用哪个 token" 矩阵
+- **诊断**：CF Access vs forgejo PAT 两平面 + 误导性 `Only signed in user` 403（302/403-json/200 口诀）
+- **轮换**：revoke 前枚举全部 store（Nomad var + Actions secret repo/org + host docker config + shell env）
+- **红线**：不跨账号一 token N 用、机器 token 不进人 shell、凭据卫生（sha256 指纹不打印值）
+
+投产验证（CLAUDE.md 强制流程）：static-benchmark 175 行 [OK]；**AB 测试 3/3 场景 with-skill 胜**（agent team workflow：author + with/without + blind grader + skill-reviewer）；review verdict ship-with-fixes（4 项 fixes 已应用）。深度指向 `docs/guides/forgejo-token-map.md` + `.aether/pat-inventory.yaml`。
+
 ## [1.10.20] - 2026-07-02
 
 ### Changed — `cli.recommended_version` 1.16.42 → 1.16.43
