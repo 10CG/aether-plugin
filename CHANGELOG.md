@@ -2,6 +2,15 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.10.20] - 2026-07-02
+
+### Changed — `cli.recommended_version` 1.16.42 → 1.16.43
+
+CLI 发布 `1.16.43`（#189 P3: PAT inventory schema 加 `org_level` flag + `host-docker-config` consumer type；新 doctor check `forgejo_actions_secret_drift` 对账 org Actions secret 补 H1 审计盲区）。`requirements.yaml` 追平推荐版本。
+
+- 纯 metadata 指针更新，**无 SKILL.md 改动 → 免 AB 测试**。
+- 对应 CLI 变更见主仓 `aether-cli/CHANGELOG.md` `[1.16.43]`。
+
 ## [1.10.19] - 2026-07-01
 
 ### Changed — `cli.recommended_version` 1.16.41 → 1.16.42
