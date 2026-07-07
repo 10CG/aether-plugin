@@ -109,6 +109,25 @@ job "build-container-__JOB_ID__" {
         SRC_SHA         = "__SRC_SHA__"
       }
 
+      # Push auth (#225): inject the write:package token (T4) from THIS run's own
+      # Nomad var. The skill writes nomad/jobs/build-container-<id> with
+      # FORGEJO_BOT_USER/FORGEJO_BOT_PAT just before dispatch and deletes it after
+      # the build terminates (SKILL.md Step 5/8). Default workload-identity ACL
+      # lets a job read variables under nomad/jobs/<its-own-id>; rendered to
+      # secrets/ (tmpfs) as env so the token is never in the job spec plaintext.
+      # task-script.sh logs in with it to a THROWAWAY docker config for push —
+      # the mounted host /root/.docker is T2 (read:package), pull-only.
+      template {
+        data        = <<EOH
+{{- with nomadVar "nomad/jobs/build-container-__JOB_ID__" -}}
+FORGEJO_BOT_USER={{ .FORGEJO_BOT_USER }}
+FORGEJO_BOT_PAT={{ .FORGEJO_BOT_PAT }}
+{{- end -}}
+EOH
+        destination = "secrets/push.env"
+        env         = true
+      }
+
       config {
         image = "docker:cli"
 
@@ -124,12 +143,12 @@ job "build-container-__JOB_ID__" {
 
         # DooD mounts:
         #   docker.sock → container's docker CLI talks to host daemon
-        #   /root/.docker → container's docker CLI reads host registry
-        #     credentials. Without this mount the daemon would receive
-        #     push requests (via socket) with no auth header, since
-        #     `docker push` reads auth from CLIENT-side config not from
-        #     daemon — classic DooD gotcha. Read-only to make tampering
-        #     by the build process harder.
+        #   /root/.docker → host registry credentials for base-image PULL during
+        #     build (T2 = 10cg-ci-bot read:package). #225: PUSH no longer uses
+        #     this — it holds only read:package and 401s on 10cg/* push. The
+        #     script logs in with T4 (write:package) to a throwaway config and
+        #     pushes with `docker --config <throwaway>`; the host config stays
+        #     read-only pull auth (never written by push).
         #   shared volume → container can read ctx + script and write
         #     result.json; host daemon ALSO sees these paths (virtiofs) so
         #     docker build's context resolution works.

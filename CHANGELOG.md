@@ -2,6 +2,17 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.10.22] - 2026-07-07
+
+### Fixed — `aether-build-container`: push 用 write token (T4) 修 #225
+
+skill build 成功后 push 稳定 401 —— DooD 挂宿主 `/root/.docker` = T2 (`10cg-ci-bot` `read:package`)，对 `10cg/*` push 缺 `write:package`。修复（读写分离 T2 pull / T4 push）：
+- **task-script.sh**：push 用 T4 (`write:package`) 登录 **throwaway** docker config 再 push，宿主只读 config 全程不被写。
+- **job-template.hcl**：`template{}` 从【本次运行自己的】Nomad var 注入 T4 → `secrets/push.env` env（token 不进 job spec 明文）。
+- **SKILL.md**：dispatch 前 (Step 5b-bis) 写 T4 到 `nomad/jobs/build-container-<id>`（秘钥经 600 文件不上 argv），Step 8 finally `nomad var purge`；push 鉴权段重写 + 错误码新增 `push_auth_failed` (exit 24)。
+
+真机 e2e 验证：build+push 到 `10cg/cesura-backend` → `status=ok`。Closes #225。
+
 ## [1.10.21] - 2026-07-02
 
 ### Added — 新 skill `aether-forgejo-creds`（Forgejo 凭据决策/诊断/轮换指南）

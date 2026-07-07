@@ -15,8 +15,9 @@
 # Outputs:
 #   $RESULT_PATH (JSON) — success: 5+ field contract per Aria #111;
 #                         failure: status=error + error_code + alloc_id
-#   exit code  — 0 success, 20-23 = source_not_found / dockerfile_invalid /
-#                build_failed / push_failed (mapped to result.json error_code)
+#   exit code  — 0 success, 20-24 = source_not_found / dockerfile_invalid /
+#                build_failed / push_failed / push_auth_failed
+#                (mapped to result.json error_code)
 #
 # Design notes (proposal §3 + Risk Highlights):
 #   - prune runs AFTER result.json write in a backgrounded subshell so a
@@ -101,7 +102,23 @@ if ! docker build \
   emit_error "build_failed" "docker build failed (see nomad alloc logs ${ALLOC_ID})" 22
 fi
 
-if ! docker push "${REGISTRY}:${TAG}" ; then
+# Push auth (#225): the mounted host /root/.docker holds T2 (10cg-ci-bot,
+# read:package) which CANNOT push — every push to 10cg/* 401s. Log in with the
+# write:package token (T4, injected as FORGEJO_BOT_USER/FORGEJO_BOT_PAT via this
+# run's own Nomad var → secrets/push.env) to a THROWAWAY docker config dir, so we
+# never write to or pollute the read-only host config. The build above still uses
+# the host config for base-image PULL (read is enough). See docs/guides/forgejo-token-map.md.
+PUSH_CFG="$(mktemp -d)"
+trap 'rm -rf "$WORK_DIR" "$PUSH_CFG"' EXIT
+if [ -z "${FORGEJO_BOT_PAT:-}" ] || [ -z "${FORGEJO_BOT_USER:-}" ]; then
+  emit_error "push_auth_failed" "write token (FORGEJO_BOT_PAT/FORGEJO_BOT_USER) not injected — check this run's Nomad var nomad/jobs/build-container-${JOB_ID} (#225)" 24
+fi
+REG_HOST="${REGISTRY%%/*}"   # forgejo.10cg.pub  (strip the /10cg/<name> path)
+if ! printf '%s' "$FORGEJO_BOT_PAT" | docker --config "$PUSH_CFG" login "$REG_HOST" -u "$FORGEJO_BOT_USER" --password-stdin >/dev/null 2>&1 ; then
+  emit_error "push_auth_failed" "docker login to ${REG_HOST} with the write:package token (T4) failed" 24
+fi
+
+if ! docker --config "$PUSH_CFG" push "${REGISTRY}:${TAG}" ; then
   emit_error "push_failed" "docker push to ${REGISTRY}:${TAG} failed (see nomad alloc logs ${ALLOC_ID})" 23
 fi
 

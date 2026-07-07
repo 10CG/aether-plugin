@@ -71,14 +71,15 @@ message: "<诊断信息>"
 alloc_id: "<nomad alloc id, 若 dispatch 已发生>"
 ```
 
-## 错误码 (8 枚举)
+## 错误码 (9 枚举)
 
 | 来源 | 码 | 触发 |
 |------|----|------|
 | 节点 | `source_not_found` (exit 20) | 共享卷上 ctx tarball 缺失 / tar 解包失败 |
 | 节点 | `dockerfile_invalid` (exit 21) | 解包后 dockerfile_path 不存在 |
 | 节点 | `build_failed` (exit 22) | `docker build` 非零 / inspect 拿不到 digest |
-| 节点 | `push_failed` (exit 23) | `docker push` 失败 (含 registry auth 陈旧 token) |
+| 节点 | `push_failed` (exit 23) | `docker push` 失败 (T4 已注入仍失败: 网络 / registry / tag 冲突) |
+| 节点 | `push_auth_failed` (exit 24) | write token (T4) 未注入或 `docker login` 失败 (#225) |
 | skill | `scp_failed` | 本地打包 / scp 到共享卷失败 |
 | skill | `dispatch_failed` | pre-flight registry-auth parity 失败 / `aether dev run` 拒绝 |
 | skill | `alloc_timeout` | 1800s deadline 内 alloc 未到终态 |
@@ -196,13 +197,32 @@ sed -e "s|__JOB_ID__|${JOB_ID}|g" \
     -e "s|__SRC_SHA__|${SRC_SHA}|g" \
     "$HCL_TPL" > "$RENDERED"
 
-# 5c. dispatch (确保 NOMAD_ADDR 在 env 中, aether dev run 默认 fallback 127.0.0.1:4646)
 export NOMAD_ADDR="${NOMAD_ADDR:-http://192.168.69.70:4646}"
+
+# 5b-bis (#225) — 写本次运行的 push 凭据 var。宿主 /root/.docker 是 T2 (read:package)
+# push 必 401;job-template 的 template{} 从【本 job 自己的】var 注入 write token (T4)
+# 成 secrets/push.env,task-script 用它 throwaway-config push。job 默认 workload-identity
+# 只能读 nomad/jobs/<自己id>,故写这个路径。秘钥不上 argv:600 JSON → Nomad API PUT → shred。
+python3 - "$JOB_ID" <<'PY'
+import subprocess, json, os, sys
+jid = sys.argv[1]
+t = json.loads(subprocess.check_output(['nomad','var','get','-out=json','nomad/jobs/aria-build']))['Items']
+body = json.dumps({"Path": f"nomad/jobs/build-container-{jid}",
+                   "Items": {"FORGEJO_BOT_USER": t["FORGEJO_BOT_USER"], "FORGEJO_BOT_PAT": t["FORGEJO_BOT_PAT"]}})
+p = f"/tmp/pv-{jid}.json"
+fd = os.open(p, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600); os.write(fd, body.encode()); os.close(fd)
+PY
+curl -s -X PUT --data-binary @"/tmp/pv-${JOB_ID}.json" \
+     "${NOMAD_ADDR}/v1/var/nomad/jobs/build-container-${JOB_ID}" >/dev/null \
+  || { emit_error "dispatch_failed" "写 push 凭据 var 失败 (#225)" ; return 1; }
+shred -u "/tmp/pv-${JOB_ID}.json" 2>/dev/null || rm -f "/tmp/pv-${JOB_ID}.json"
+
+# 5c. dispatch (确保 NOMAD_ADDR 在 env 中, aether dev run 默认 fallback 127.0.0.1:4646)
 aether dev run "$RENDERED" --name "build-container-${JOB_ID}" --yes --json \
   || { emit_error "dispatch_failed" "aether dev run rejected HCL or Nomad unreachable" ; return 1; }
 ```
 
-清理时 Step 8 加: `ssh "root@${STAGE_NODE}" "rm -f ${SCRIPT_REMOTE}"`
+清理时 Step 8 加: `ssh "root@${STAGE_NODE}" "rm -f ${SCRIPT_REMOTE}"` + purge push 凭据 var
 
 ### Step 6 — 轮询 alloc 收敛 (deadline 1800s, 复用 qa-M1 模式)
 
@@ -237,13 +257,21 @@ echo "$RESULT_JSON" | python3 -c "import json,sys,yaml;print(yaml.safe_dump(json
 ```bash
 ssh "root@${STAGE_NODE}" "rm -f /opt/aether-volumes/_build-ctx/${JOB_ID}.tgz /opt/aether-volumes/_build-ctx/${JOB_ID}.result.json /opt/aether-volumes/_build-ctx/${JOB_ID}.sh" 2>/dev/null || true
 rm -f "$CTX_LOCAL" "$RENDERED" 2>/dev/null || true
+# #225: purge 本次运行的 push 凭据 var (write token 不留残)
+nomad var purge "nomad/jobs/build-container-${JOB_ID}" 2>/dev/null || true
 ```
 
 清理归 **skill 生命周期所有权**, 不依赖节点 trap。节点 trap 只清自己解出来的 WORK_DIR `/opt/aether-volumes/_build-ctx/work-<id>/`(DooD 后从原 `/tmp/b-<id>` 迁到共享卷, 因 host daemon 必须见同 inode 才能解析 build context;tgz/result.json/sh 由 skill finally 清)。临时 job 可能死, 共享卷清理不能托付它。
 
 ## 关键设计说明
 
-**push 鉴权 (诚实)**: build job **不注入凭据**。`docker push` 复用宿主 docker daemon 既有 `~/.docker/config.json` + insecure-registries (Forgejo runner 8 个月已建立)。这是 **#32 Vault 对本 skeleton 非阻塞的肯定性理由**: skill scope 内零 secret 注入。代价: 见 Step 3 pre-flight 的保护边界局限 + push_failed 优雅降级路径。
+**push 鉴权 (#225 修订)**: build 用宿主 `/root/.docker` (T2 = 10cg-ci-bot `read:package`) 拉基础镜像 (读够)。但 **push 需 `write:package`** — 宿主 T2 没有 → 对 `10cg/*` 稳定 401 (这正是 #225)。故 push 单独注入 T4 (`write:package` token, 权威存 `nomad/jobs/aria-build` 的 `FORGEJO_BOT_PAT`, 见 `docs/guides/forgejo-token-map.md`):
+- skill dispatch 前 (Step 5b-bis) 把 T4 写进【本次运行自己的】var `nomad/jobs/build-container-<id>` (默认 workload-identity 只能读自己这个路径; 秘钥经 600 文件 → API PUT, 不上 argv);
+- `job-template.hcl` 的 `template{}` 从该 var 渲染成 `secrets/push.env` (tmpfs) 注入 env — **token 不进 job spec 明文**;
+- `task-script.sh` 用它 `docker --config <throwaway> login` 再 `push` — **宿主只读 config 全程不被写/污染**;
+- Step 8 finally `nomad var purge` 删掉该 var (write token 不留残)。
+
+读写分离 (T2 pull / T4 push) 是 token-map 红线, 不把 write token 常驻宿主 config。
 
 **scp 目标节点任意性**: `/opt/aether-volumes` 是 NFS 经 virtiofs 重新挂载到 3 台 heavy, **同一 inode 空间** (CLAUDE.md #56)。scp 到哪台都行, Nomad 把 build 放到哪台, 那台都能读到 — **scp 目标与 build 落点解耦**。
 
