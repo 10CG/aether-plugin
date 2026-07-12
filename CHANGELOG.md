@@ -2,6 +2,16 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.10.23] - 2026-07-12
+
+### Changed — `forgejo-ci-optimization.md` § Troubleshooting: memcg OOM entry 细化 (#235)
+
+- `cannot allocate memory` / `ResourceExhausted` entry 现区分 **runaway**（#149 防御）
+  vs **合法增长顶破**（本地 build 干净 + 无并发 = 代码量涨到把类型检查内存推临界,
+  非 bug, SilkNode 首例）; 加 `npm error signal SIGKILL` 签名 + swap 头寸处置 +
+  "改 workflow --driver-opt 不生效"坑（builder 节点级 provision, `|| true` 只 adopt）。
+- 配套 Aether 侧: aether-build builder memcg 4 GiB RSS + 2 GiB swap 头寸 (§7.6 #235 amendment)。
+
 ## [1.10.22] - 2026-07-07
 
 ### Fixed — `aether-build-container`: push 用 write token (T4) 修 #225

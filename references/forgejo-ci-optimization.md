@@ -954,7 +954,7 @@ Match the error keyword to find the relevant section.
 | `tls: failed to verify certificate` at cache import | `cache-from: type=registry` | [A2](#a2-cache-from--cache-to-typeregistry) |
 | `failed to fetch oauth token ... tls:` | token fetch 在 **job 容器 CLI 侧**（非 buildkitd）→ job 容器缺 CA bundle；任何 buildkitd 配置修不了 | [A1](#a1-driver-docker-container-default-buildx-driver) |
 | `x509: certificate signed by unknown authority` | Same as above | [A1](#a1-driver-docker-container-default-buildx-driver) |
-| `cannot allocate memory` / `ResourceExhausted` + 日志 `Killed`（exit 102） | `aether-build` builder 4 GiB memcg 命中（按设计 fail-fast；#149 防御生效） | 不是 bug — 查该 build 内存是否异常（参照 Aether `forgejo-runner-memory-limits.md` §7.6/§9.4 R1） |
+| `cannot allocate memory` / `ResourceExhausted` + 日志 `Killed`（exit 102；Node 项目常伴 `npm error signal SIGKILL`） | `aether-build` builder memcg 命中（4 GiB RSS + 2 GiB swap 头寸, #235）。**两种**：①**runaway**（内存无界增长）= #149 防御生效；②**合法增长顶破**（同 commit **本地 build 干净** + **无并发** = 非代码问题, 是代码量涨到把类型检查内存推到临界, #235 SilkNode 首例） | 先分辨①②：本地 build 干净 + 无并发 → ②，非 bug。**处置**: dispatch 重跑（2 GiB swap 头寸下边缘尖峰多半能溢 swap 成功）；仍复发 = 提配额（`aether-buildx-builder.sh` `WANT_SWAP` 或根治提节点 RAM，见 `forgejo-runner-memory-limits.md` §7.6 #235 amendment）。**注意坑**: memcg 由节点级 builder provision, 改 workflow 里 `--driver-opt memory=` 数字**不生效**（`buildx create ... \|\| true` 只 adopt） |
 
 ### Build/network errors
 
