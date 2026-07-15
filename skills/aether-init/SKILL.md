@@ -120,6 +120,55 @@ fi
 此步骤确保所有 Aether 项目（无论新旧）都具备 CI Monitoring Policy。
 See `references/file-generation.md` § Step 1.1c for implementation details.
 
+### Step 1.1d: 已有项目的集成规范 Policy 回填检查 (C1, Aether #245)
+
+与 Step 1.1c **并行独立**的第二次检查（两套 marker 互不影响判定，检测顺序不重要）。
+无论 Step 1.1 是否检测到"已有完整部署配置"，只要目标项目存在 CLAUDE.md（或即将由
+本 skill 创建 CLAUDE.md），都要跑一遍集成规范 policy 的四分支判定 —— 这正是**老项目
+回填 (C1)** 的入口：已接入 Aether 但从未拿到过这段 policy 的项目（如 #241 触发源
+TurfSync），只需重跑 `/aether:init`，无需其它操作。
+
+**四分支检测（精确锚定 marker，不与旧 `aether-ci-policy` 混淆）**:
+```bash
+TEMPLATE_DATE=$(grep -m1 -oE '<!-- aether:integration-policy [0-9]{4}-[0-9]{2}-[0-9]{2} start -->' \
+  "${CLAUDE_PLUGIN_ROOT}/skills/aether-init/references/integration-policy-rules.md" \
+  | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}')
+
+if [ ! -f CLAUDE.md ]; then
+  : # 分支 1a — 交给 Step 2.2c（或本步骤直接创建，取决于是否会走 Phase 2）
+elif ! grep -qE '^<!-- aether:integration-policy [0-9]{4}-[0-9]{2}-[0-9]{2} start -->$' CLAUDE.md; then
+  : # 分支 1b — AskUserQuestion 是否 append（consent gate，见下）
+else
+  EXISTING_DATE=$(grep -oE '<!-- aether:integration-policy [0-9]{4}-[0-9]{2}-[0-9]{2} start -->' CLAUDE.md \
+    | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}')
+  if [[ "$EXISTING_DATE" < "$TEMPLATE_DATE" ]]; then
+    : # 分支 2 — 陈旧，AskUserQuestion 是否原地更新
+  else
+    : # 分支 3 — 当前版本，skip（幂等：重跑不产生重复段）
+  fi
+fi
+```
+
+**完整决策树 + 每个分支的 consent gate 细节（`cp .bak` / diff 回显 / 降级追加）**:
+见 [file-generation.md § CLAUDE.md 集成规范 Policy 注入](references/file-generation.md#claudemd-集成规范-policy-注入-成对栅栏日期戳-marker-aether-245-c1)。
+
+**关键约束（不可省略）**:
+- **绝不静默覆盖用户内容**：分支 1b 与分支 2 都必须先 `cp CLAUDE.md CLAUDE.md.bak`，
+  写入后 `diff -u` 回显给用户核对，且写入前必须 `AskUserQuestion` 得到用户同意；
+  用户拒绝时不写。分支 1a（无 CLAUDE.md）没有覆盖风险，可直接创建，无需询问。
+- **注入失败必须降级，不得半写坏文件**：若 marker 定位出现歧义（如文件里有 2 组
+  start marker 但只有 1 组 end marker），不做 in-place 替换，改为"追加 + 告警"，
+  原文件内容不可被截断/删除。
+- **不 retrofit 旧 `<!-- aether-ci-policy -->` marker**：本步骤只识别/写入
+  `aether:integration-policy` 这一种 marker；旧 marker（若存在）保持原样，不做任何
+  格式升级或迁移。
+- **幂等**：对同一项目重复执行本步骤，若已是当前版本（分支 3）应产生零写操作；这是
+  C1 回填"可安全重跑"的核心保证，供后续对 TurfSync 等外部消费方项目回填时依赖。
+
+此步骤与 Step 1.1c 均在 Phase 1 完成，不受 Step 1.1 是否判定"跳过 Phase 2 文件生成"
+影响 —— 即便项目已有完整部署配置（因而跳过 Dockerfile/HCL/Workflow 生成），集成规范
+policy 的回填检查仍要执行。
+
 ### Step 1.2: 决策逻辑
 
 | 分析项 | 决策 |
@@ -159,7 +208,7 @@ See `references/file-generation.md` § Step 1.1c for implementation details.
 project/
 ├── Dockerfile
 ├── .dockerignore
-├── CLAUDE.md              ← 注入部署监控规则
+├── CLAUDE.md              ← 注入部署监控规则 + 集群集成规范 Policy (C1)
 ├── .forgejo/
 │   └── workflows/
 │       └── deploy.yaml
@@ -205,6 +254,30 @@ JOB_NAME=$(grep -m1 -E '^job ' deploy/nomad-dev.hcl | sed -E 's/job +"([^"]+)".*
 marker `<!-- aether-ci-policy -->`，内容与 SilkNode CLAUDE.md lines 152-184 在应用 AC1a 的
 4 项已知转换后逐字一致）
 
+### Step 2.2c: 注入集群集成规范 Policy 到 CLAUDE.md (成对栅栏日期戳 marker, Aether #245 C1)
+
+与 Step 2.2b **独立**的第二段注入（顺序不重要，两套 marker 互不依赖）。检查项目
+CLAUDE.md（此时若 Step 2.2b 刚创建/追加过，读的是它产出后的版本）：
+
+- **新项目（Step 2.2b 刚创建了 CLAUDE.md）**: 直接在同一份新建的 CLAUDE.md 里追加
+  集成规范 policy 段（等价 Step 1.1d 分支 1a 的"无覆盖风险直接写入"，无需再次询问）。
+- **已有 CLAUDE.md 的项目**: 复用 Step 1.1d 已经跑过的四分支判定结果——若 Step 1.1
+  判定"已有完整部署配置"从而跳过了本 Phase 2，集成规范 policy 的回填已经在 Step 1.1d
+  完成，本步骤为 no-op。
+
+**内容来源**: [`integration-policy-rules.md`](references/integration-policy-rules.md)
+（首行为成对栅栏日期戳 marker `<!-- aether:integration-policy YYYY-MM-DD start -->`，
+末行为 `<!-- aether:integration-policy end -->`）。
+
+**完整四分支逻辑（1a 创建 / 1b consent-gate append / 2 原地更新 / 3 skip）+ 强制失败
+降级路径 + fixture 清单**: 见
+[file-generation.md § CLAUDE.md 集成规范 Policy 注入](references/file-generation.md#claudemd-集成规范-policy-注入-成对栅栏日期戳-marker-aether-245-c1)。
+
+**不与 Step 2.2b 合并的原因**: 两段 policy 内容、marker 格式、治理门（CI-policy 走
+豁免 1/2；integration-policy 走独立行为 spot-check，不套豁免 2）均独立演进，合并会
+让"只更新其中一段"的场景（如 C1 老项目回填只需要 integration-policy，不需要重新
+触碰 CI-policy）无法干净表达。
+
 ### Step 2.3: 验证
 
 ```bash
@@ -227,6 +300,8 @@ nomad job validate deploy/nomad-dev.hcl
 | Dockerfile 模板 | [dockerfile-templates.md](references/dockerfile-templates.md) |
 | Nomad 模板 | [nomad-templates.md](references/nomad-templates.md) |
 | Workflow 模板 | [workflow-templates.md](references/workflow-templates.md) |
+| 集群集成规范 Policy 内容 (C1, Aether #245) | [integration-policy-rules.md](references/integration-policy-rules.md) |
+| 集成规范 Policy 注入决策树 + fixture | [file-generation.md § CLAUDE.md 集成规范 Policy 注入](references/file-generation.md#claudemd-集成规范-policy-注入-成对栅栏日期戳-marker-aether-245-c1) |
 | **CI 优化 + 故障诊断 (跨 skill 权威参考)** | `${CLAUDE_PLUGIN_ROOT}/references/forgejo-ci-optimization.md` |
 
 > 模板背后的设计决策（为什么用 `driver: docker`、为什么要轮询 verify、
