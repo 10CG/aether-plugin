@@ -150,8 +150,14 @@ fi
 
 HTML marker `<!-- aether-ci-policy -->` **MUST NOT** be stripped by future markdown
 processing tools. If a markdown linter (prettier, markdownlint, remark) is added to CI
-in the future, configure it to preserve HTML comments. The drift check function in
-`static-benchmark.sh` (`check_template_drift`) relies on this marker being the first line.
+in the future, configure it to preserve HTML comments.
+
+**[订正 2026-07-15, 见 Aether [#245](https://forgejo.10cg.pub/10CG/Aether/issues/245)]** 本节此前声称 "The drift check function in
+`static-benchmark.sh` (`check_template_drift`) relies on this marker being the first
+line" —— 该函数从未实现: `static-benchmark.sh` 实测唯一函数是 `check_cost`
+（112 行）。**待办**: 目前没有任何自动化守护强制这条约定，marker 保持首行纯靠人工
+约定 + code review 兜底。若未来要补机械检测，必须先证明脚本真的被某 CI job 调用、
+且能在刻意破坏 marker 顺序时报错，不能重演本次"写了没接线"的失效模式。
 
 ### Monorepo 暂不支持
 

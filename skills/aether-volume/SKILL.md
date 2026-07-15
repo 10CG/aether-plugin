@@ -11,12 +11,13 @@ allowed-tools: Bash, AskUserQuestion
 dependencies:
   cli:
     required: true
-    min_version: "0.7.0"
+    min_version: "1.15.0"
 ---
 
 # Aether Volume 管理 (aether-volume)
 
-> **版本**: 1.3.0 | **优先级**: P1
+> **版本**: 1.4.0 | **优先级**: P1
+> **集成规范**: "该注册几个节点 / 有数据的卷怎么处理" 这类规范性问题，先查 `aether-conventions` skill（Volume 域速记 + 铁律）
 
 ## 前置检查
 
@@ -56,10 +57,29 @@ aether volume create --node <node> --project <project> --volumes <list>
 **常用参数**:
 - `--dry-run`: 预览操作
 - `--ssh-key`: SSH 私钥路径
+- `--register-only`: 跳过 mkdir/chmod，只注册 `host_volume` 配置 + 重启 Nomad（**卷已有数据时必须用这个**——补注册到其他节点若仍走完整 mkdir+chmod，`chmod -R` 会重写已有文件权限，可能破坏 postgres pgdata（要求 700）等权限敏感数据）
+
+> ⚠️ **生产 / 有状态服务铁律**: `host_volume` 必须覆盖**每一个** heavy 节点，只注册单节点 =
+> blast-radius trap —— 该服务被 pin 死在一个节点，节点故障或 alloc 被重调度到其他 heavy 节点
+> 即找不到数据（`/opt/aether-volumes` 是 NFS-virtiofs 共享存储，数据物理上都在，只是 Nomad
+> 没在其他节点上声明 `host_volume` 而已）。诊断: `aether doctor host_volume_parity`。
 
 ```bash
-# 示例
+# 无状态 / 一次性测试: 单节点即可
 aether volume create --node heavy-1 --project my-api --volumes data,logs
+
+# 生产 / 有状态服务: 新建卷时对每个 heavy 节点重复注册
+# (节点清单以实际集群为准: aether status 或 curl $NOMAD_ADDR/v1/nodes 核对,
+#  不要硬编码假设节点数——集群会扩容)
+aether volume create --node heavy-1 --project my-api --volumes data,logs
+aether volume create --node heavy-2 --project my-api --volumes data,logs
+aether volume create --node heavy-3 --project my-api --volumes data,logs
+aether volume create --node heavy-4 --project my-api --volumes data,logs
+aether volume create --node heavy-5 --project my-api --volumes data,logs
+
+# 补注册到其他节点，但该卷已有数据 (例如把历史单节点卷补齐为全 heavy 注册):
+# 用 --register-only 跳过 mkdir/chmod，只注册配置，不碰已有文件权限
+aether volume create --node heavy-2 --project my-api --volumes data --register-only
 ```
 
 ### 列出 Volume
@@ -229,6 +249,6 @@ Host heavy-* light-*
 
 ---
 
-**Skill 版本**: 1.1.0
-**最后更新**: 2026-03-12
+**Skill 版本**: 1.4.0
+**最后更新**: 2026-07-15
 **维护者**: 10CG Infrastructure Team

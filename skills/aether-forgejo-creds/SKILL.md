@@ -34,6 +34,10 @@ allowed-tools: Bash, Read, AskUserQuestion
 > 不确定就读 `docs/guides/forgejo-token-map.md` (权威人读版) 或
 > `.aether/pat-inventory.yaml` (机读 SoT)。**不要凭记忆编造 token/账号**。
 
+> ⚠️ **范围边界**: 本 skill **仅**覆盖 Forgejo / git / registry 凭据 (T1–T7，见 §3)。应用 /
+> 数据库 secret (连接串密码等) **不在本 skill 范围** —— 走 Nomad Variables +
+> `template{env=true}` 注入模式，不硬编码进 HCL，详见 `aether-conventions` skill。
+
 ---
 
 ## 1. 两账号模型 (who)
