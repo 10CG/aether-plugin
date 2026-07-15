@@ -462,15 +462,15 @@ config {
 > **关于此 template 的特殊性**: 该示例仅使用 `nomadVar` (Nomad Variables), 不涉及 `service "..."`
 > 服务查询指令, 因此**不需要** `{{ if gt (len $svc) 0 }}` 服务守卫 — nomadVar 读取不存在的 path
 > 时 `with` 块整体跳过, 语义已是安全的。`wait` + `change_mode = "noop"` 两件套在此仍然必要:
-> Nomad Variables 变更 (凭据轮换) 不应自动重启 (见运维手册 [nomad-variables-docker-auth.md](../../../../docs/guides/nomad-variables-docker-auth.md) §轮换流程)。
+> Nomad Variables 变更 (凭据轮换) 不应自动重启 (见运维手册 [nomad-variables-docker-auth.md](https://forgejo.10cg.pub/10CG/Aether/src/branch/master/docs/guides/nomad-variables-docker-auth.md) §轮换流程，maintainer-only / 需主仓 + CF Access 权限 / 请勿 fetch)。
 
-**验证**: `aether doctor hardcoded_docker_auth` 应返回 0 findings。详见 `docs/guides/nomad-variables-docker-auth.md`。
+**验证**: `aether doctor hardcoded_docker_auth` 应返回 0 findings。详见 [nomad-variables-docker-auth.md](https://forgejo.10cg.pub/10CG/Aether/src/branch/master/docs/guides/nomad-variables-docker-auth.md) (maintainer-only / 需主仓 + CF Access 权限 / 请勿 fetch)。
 
 ## Consul Template 渲染抖动缓解
 
 必选 env 经 `{{ range service "X" }}` 注入时, 上游短暂 0 实例会让整行消失 → 应用重启循环 (触发: SilkNode#207)。**三件套**: `wait { min="10s" max="30s" }` + `change_mode="noop"` + `{{ if gt (len $svc) 0 }}` 守卫, 仅保护运行中进程, 冷启动失败仍是应用责任。
 
-完整语义、边界、迁移步骤、HCL 示例: [docs/guides/consul-template-render-flap-mitigation.md](../../../../docs/guides/consul-template-render-flap-mitigation.md) (canonical)。检测: `aether doctor template_bare_range --json`。
+完整语义、边界、迁移步骤、HCL 示例: [consul-template-render-flap-mitigation.md](https://forgejo.10cg.pub/10CG/Aether/src/branch/master/docs/guides/consul-template-render-flap-mitigation.md) (canonical, maintainer-only / 需主仓 + CF Access 权限 / 请勿 fetch)。检测: `aether doctor template_bare_range --json`。
 
 ---
 
