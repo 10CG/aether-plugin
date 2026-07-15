@@ -2,6 +2,22 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [Unreleased] — #245 aether-conventions 集群集成规范 hub (Phase B)
+
+> 版本 bump 待 Phase C/D (TASK-014); 本段记录 Phase B 已实施内容 + 门径证据。
+
+### Added — `aether-conventions` L2 skill (强制 AB PASS)
+- 四域 investigation-first hub (DNS case-A-first / 凭据窄委托 forgejo-creds + 应用DB-secret in-scope / volume / stateful) + references 蒸馏 + L3 集成规范 policy 段 (`aether-init` 幂等注入)。
+- **门径证据**: static-benchmark 156 行 [OK]; **强制 AB 测试 PASS** (with 4/4 胜, 规范遵循率 1/4→4/4, blind grader; 见 `aether-plugin-benchmarks/ab-results/2026-07-15/aether-conventions.md`); 自包含隔离 / L3 静默对抗 / 触发精度门均 PASS。
+
+### Fixed — `aether-volume`: 单节点示例违反 #56 全heavy铁律 (#245 TASK-004)
+- 创建示例 `--node heavy-1` 单节点(与 #56 blast-radius trap 反模式冲突)→ 语境化为"无状态/测试专用" + 加"生产/有状态必须全 heavy 注册"铁律 + `--register-only`(已有数据)+ host_volume_parity 诊断 + aether-conventions 互链。
+- `min_version 0.7.0 → 1.15.0`(新示例用 `--register-only`, 需 CLI 1.15.0+)。
+- **门径证据**: static-benchmark 254 行 [OK]。**AB 状态(诚实标注)**: 本变更是纠正违反既有 #56 铁律的**错误示例**(skill 对 stateful 卷的推荐一直应是全 heavy, 非新增决策分支), 归 correctness fix; 是否需为 aether-volume 单独跑 AB / 套 `[skip-benchmark]` 豁免, 由 owner 在 TASK-014 发布前判定 —— 本 Phase B 未替 owner 预设。
+
+### Fixed — `check_template_drift` 虚假既成事实声称订正 (#245 TASK-006)
+- 见下方 [1.x] 段的 inline 订正: `file-generation.md` + 本 CHANGELOG 双处订正该函数"文档声称却代码不存在"。
+
 ## [1.10.23] - 2026-07-12
 
 ### Changed — `forgejo-ci-optimization.md` § Troubleshooting: memcg OOM entry 细化 (#235)
