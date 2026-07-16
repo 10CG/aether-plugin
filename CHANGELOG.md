@@ -2,9 +2,9 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
-## [Unreleased] — #245 aether-conventions 集群集成规范 hub (Phase B)
+## [1.11.0] - 2026-07-16 — #245 aether-conventions 集群集成规范 hub
 
-> 版本 bump 待 Phase C/D (TASK-014); 本段记录 Phase B 已实施内容 + 门径证据。
+> 新增 L2 skill = MINOR bump。Phase B 全部实施 + 五强制门 PASS + 发布前 discriminating 重测。requirements cli.recommended_version → 1.16.61(配套 CLI doctor check)。
 
 ### Added — `aether-conventions` L2 skill (强制 AB PASS)
 - 四域 investigation-first hub (DNS case-A-first / 凭据窄委托 forgejo-creds + 应用DB-secret in-scope / volume / stateful) + references 蒸馏 + L3 集成规范 policy 段 (`aether-init` 幂等注入)。
