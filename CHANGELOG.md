@@ -17,6 +17,16 @@ All notable changes to aether-plugin will be documented in this file.
 
 ### Fixed — `check_template_drift` 虚假既成事实声称订正 (#245 TASK-006)
 - 见下方 [1.x] 段的 inline 订正: `file-generation.md` + 本 CHANGELOG 双处订正该函数"文档声称却代码不存在"。
+## [1.10.24] - 2026-07-14
+
+### Changed — 版本一致性收尾 (无 skill 内容变更, 纯 metadata)
+
+- `requirements.yaml` cli.recommended_version `1.16.43` → `1.16.60`（跨会话遗留漂移,
+  期间 CLI 实际发了 16 个 patch: doctor 系列检查 / self-update 二进制化 / volume --name /
+  node_docker_auth_parity 等）。
+- `hooks.json` version `1.10.16` → `1.10.24`: 该文件自 1.10.17 起连续 7 个版本被 bump
+  流程遗漏, 本次对齐并入 7 文件一致性检查范围。
+- 不涉及任何 SKILL.md 内容变更, 无需 AB 测试。
 
 ## [1.10.23] - 2026-07-12
 
