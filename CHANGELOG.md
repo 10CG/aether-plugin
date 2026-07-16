@@ -13,7 +13,7 @@ All notable changes to aether-plugin will be documented in this file.
 ### Fixed — `aether-volume`: 单节点示例违反 #56 全heavy铁律 (#245 TASK-004)
 - 创建示例 `--node heavy-1` 单节点(与 #56 blast-radius trap 反模式冲突)→ 语境化为"无状态/测试专用" + 加"生产/有状态必须全 heavy 注册"铁律 + `--register-only`(已有数据)+ host_volume_parity 诊断 + aether-conventions 互链。
 - `min_version 0.7.0 → 1.15.0`(新示例用 `--register-only`, 需 CLI 1.15.0+)。
-- **门径证据**: static-benchmark 254 行 [OK]。**AB 状态(诚实标注)**: 本变更是纠正违反既有 #56 铁律的**错误示例**(skill 对 stateful 卷的推荐一直应是全 heavy, 非新增决策分支), 归 correctness fix; 是否需为 aether-volume 单独跑 AB / 套 `[skip-benchmark]` 豁免, 由 owner 在 TASK-014 发布前判定 —— 本 Phase B 未替 owner 预设。
+- **门径证据**: static-benchmark 254 行 [OK]。**AB 定案(2026-07-16 双臂重测)**: 新旧 skill 内容双臂 AB delta≈0(新 4/4 全heavy / 旧 4/4 全heavy, stateful 框定天花板) → 内容改动**不 regress**, `[skip-benchmark]` **豁免成立**(纠正 #56-违规错误示例的 correctness fix, 非改推荐路径)。fix 仍 warranted(旧单节点示例在非-stateful 框定下可能误导)。证据 `aether-plugin-benchmarks/ab-results/2026-07-15/aether-conventions.md` discriminating 段, run `wf_e6d9ffd4-937`。
 
 ### Fixed — `check_template_drift` 虚假既成事实声称订正 (#245 TASK-006)
 - 见下方 [1.x] 段的 inline 订正: `file-generation.md` + 本 CHANGELOG 双处订正该函数"文档声称却代码不存在"。
