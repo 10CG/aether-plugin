@@ -323,7 +323,7 @@ C1 老项目回填的核心要求是**可重跑**：同一项目对同一版本�
 
 四分支 + 三类边界/复合场景的完整样例落盘于
 [`fixtures/integration-policy/`](fixtures/integration-policy/README.md)，供本流程自检，
-也是 `aether doctor claude_md_integration_policy_present`（TASK-009, Aether #245 C2）
+也是 `aether doctor --check claude_md_integration_policy_present`（TASK-009, Aether #245 C2）
 Go 测试的**权威 fixture 输入**（而非该 check 自行手造复刻同一 marker 契约 ——
 detailed-tasks.yaml TASK-005/TASK-009 post_planning R2 Critical 修正 "C1↔C2 契约往返验证"）：
 

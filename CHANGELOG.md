@@ -2,6 +2,80 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.12.0] - 2026-08-09 — #275 凭据双 skill 九笔文档债清理 + AB 基线刷新
+
+> 两个 P1 凭据 skill 内容变更 = MINOR bump。**强制 AB 门 PASS: WITH 7/7 WITH_BETTER**
+> (rotate-pat 4/4, forgejo-creds 3/3 首基线), WITHOUT 臂 3 处 critical FAIL。
+> requirements `cli.recommended_version` 1.16.61 → **1.16.75** (落后 13 个 release 已追平)。
+
+### Fixed — `aether-rotate-pat` (债 1/2/3/6/9)
+
+- **`aether doctor <check>` 旧语法** → `aether doctor --check <name>`。`doctor` 是 `Args: cobra.NoArgs`,
+  位置参数形态**从未存在过** (非"CLI 改接口致文档滞后"); 实测 `unknown command`。全 plugin **14 处**全修
+  (#275 表格仅列 6 处;另 8 处在 `aether-init/references` ×5 / `aether-volume` ×1 / fixtures README ×2,
+  按豁免 1 边界情形处理并经 owner 逐条确认)。skill 内保留一处**反例文本**说明该形态跑不通。
+- **新增「Tier 1 准入边界」章节** —— cli-v1.16.74/75 引入的三个准入拒绝码
+  (`VAR_KEY_UNSUPPORTED` / `ORG_LEVEL_UNSUPPORTED` / `NO_ROTATABLE_CONSUMERS`) 各自的触发条件 +
+  手工路径 + runbook Mode 6/7 锚点;并区分 `NO_ROTATABLE_CONSUMERS` (声明了却是空的) 与
+  Mode 4 `BOOTSTRAP_NO_AUTOROTATE` (根本没有 consumers 块)。
+- **`--dry-run` 与 `--confirm` 共用准入点** (#281/#287 落地后实测: 两条 entry 的 dry-run 直接吐对应错误码)。
+  **注意方向**: #275 triage (2026-08-06) 建议补的「dry-run 通过不代表 confirm 会通过」警告在 PR #285/#288
+  合入后已**反向失效**, 本次按实测写成"两路判定一致", 并把旧假绿降级为 **cli < 1.16.74 的历史警告**。
+- **`--from-file` 强制** —— 手工路径一律 `--from-file`, 绝不把 token 值写成命令行参数 (argv 进 shell
+  history / `ps aux` / AI transcript, 与 stdout 是否遮蔽无关, #282)。另加"工具拒绝执行时不要顺手
+  stamp `last_rotated`"告诫。
+- **[AB 揪出] bootstrap scope 更正**: forgejo-secrets backend 的 `AETHER_FORGEJO_TOKEN` 需
+  **`write:repository`** (打 `/repos/<o>/<r>/actions/secrets`), 原文误写 `write:user` (那是
+  nomad-variables 侧打 `/users/<n>/tokens` 需要的)。照原文 mint 的 bootstrap PAT 会 scope 不足必败。
+  权威: `docs/guides/forgejo-pat-rotation.md §Pre-requisites` access matrix。
+- **[AB 揪出] resume 退出码更正**: `FORGEJO_MANUAL_RECOVERY_REQUIRED` 时 **exit 1** 而非原文的 exit 4;
+  `registryAuthResumeErr` 两个分支均 `os.Exit(1)`, 全仓无 `os.Exit(4)`。判别应看 JSON envelope 的 `error.code`。
+
+### Fixed — `aether-forgejo-creds` (债 1/5/7/8)
+
+- **[#291 物种第三个传播点] username/401 断言收窄** (§1 账号规则 · §2 401-vs-403 速判 · §5 红线 5 共三处)。
+  Forgejo 容器 registry 的 `/v2/token` **只校验 PAT、完全忽略 basic-auth username** (2026-07-02 /
+  07-12 / 08-08 三次独立实测)。401 一律**先查 token 死活**;username 仍应保持正确, 但理由是**日志可读 +
+  记录准确 + 非 registry 消费方行为未验证**, 不是"否则会 401"。含边界声明与 #291 消歧锚点。
+- **[AB 揪出] T3↔T4 解耦事实更正**: 原文称 org `FORGEJO_TOKEN` (T3) 与 aria-build `FORGEJO_BOT_PAT` (T4)
+  复用同一物理 token、轮换 T3 会连带断 aria-build ——**2026-07-02 已解耦**, T4 用专用 `write:package` token。
+  同时保留"blast-radius 仍须逐条枚举"的告诫 (解耦只解了这一条已知耦合)。
+- **[AB 揪出] T1 scope 更正 (2 处)**: simonfish dev-shell token **2026-07-02 起已有 `read:package`**
+  (只读), 原文两处仍写"无 package → doctor 查 registry 会 401", 会让操作者无谓绕道内网或临时借用 T2 值。
+  仍无 `write:package` 的部分保持不变。
+- §4 手工轮换路径补上错误码锚点 (拿到码即知走哪条手工路径) + `--from-file` 安全形态 (#282)。
+
+### Added — AB eval 套件 (suite v1.1.0 → v1.2.0)
+
+- `aether-rotate-pat` 升 0.2.0: **retire eval-3** (ci-build defer-to-emergency —— 2026-05-09
+  forgejo-secrets GA 后其期望答案已错, 保留在册以便回溯基线);**新增 eval-4** (forgejo-secrets Tier 1
+  happy path) 与 **eval-5** (准入拒绝三码 + 两个危险提议: 改 inventory 绕过守卫 / 提前 stamp `last_rotated`)。
+- **新建 `aether-forgejo-creds` 首个套件** (3 例): 401 username 陷阱 / 该用哪个 token / revoke 前枚举全部 store。
+- **门径证据**: static-benchmark rotate-pat 297 行 [OK] · forgejo-creds 205 行 [OK] (均 <400)。
+  **AB PASS 7/7 WITH_BETTER**, 结果与协议记录见 `aether-plugin-benchmarks/ab-results/2026-08-09/summary.yaml`。
+
+### Changed
+
+- `requirements.yaml`: `cli.recommended_version` **1.16.61 → 1.16.75**;新增 `1.12.x` 兼容矩阵条目
+  (说明三个准入码需 cli >= 1.16.74/1.16.75, 但 `cli_min` 不上抬 —— skill 内已标注版本边界)。
+
+### 方法论记录 (AB 协议缺陷与修正)
+
+首轮 AB 判 **FAIL (WITH 3/7)** 并已归档于 `ab-results/2026-08-09-run1-protocol-defect/`, **不作发版依据**。
+两处缺陷 + 一处 rubric 污染, 均已修正后重跑:
+
+1. **盲评脚本非幂等** —— 每次运行重刷全部映射表, 致 rotate-pat 四例的原始 A/B 归属在评分后被覆盖;
+   编排层因此曾报出两条错误结论, 事后用各臂独有的内容判别串 (每例 2-5 个交叉验证) 重建才发现。
+   脚本已改为幂等 (重新盲化须显式 `--force` 且不得在 grader 运行期间执行)。
+2. **without 臂未被禁止读仓库源码** —— 实测变成"skill 摘要 vs 深挖源码"(单臂曾耗 193k tokens /
+   39 次工具调用)。修正后 without 臂平均 20 次 → 9 次调用、124k → 76k tokens, 回到真正的无引导基线;
+   grader rubric 同时加"不得因引用仓库特有标识而加分/因缺失而扣分", 防偏置转移到评分侧。
+3. **rubric 含陈旧断言** —— creds eval-3 照 skill 现有文本写 rubric, 把已过时的 T3↔T4 耦合写成了
+   GROUND TRUTH。**用被测对象当判据来源, 会把被测对象的错误固化成判据。** 已改写为"必须逐条核实当前
+   实际消费者"。同物种也修了 eval-4 rubric 里的 `exit 4` / `write:user` 两条。
+
+首轮虽作废但**是五处 skill 事实错误里四处的发现来源**, 故保留归档。
+
 ## [1.11.0] - 2026-07-16 — #245 aether-conventions 集群集成规范 hub
 
 > 新增 L2 skill = MINOR bump。Phase B 全部实施 + 五强制门 PASS + 发布前 discriminating 重测。requirements cli.recommended_version → 1.16.61(配套 CLI doctor check)。

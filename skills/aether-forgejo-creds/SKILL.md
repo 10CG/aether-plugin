@@ -18,8 +18,10 @@ allowed-tools: Bash, Read, AskUserQuestion
 
 # Aether Forgejo 凭据指南 (aether-forgejo-creds)
 
-> **版本**: 0.1.0 | **优先级**: P1 | **事故根因**: H1 (#189, 2026-07-01 一 token N 用级联)
+> **版本**: 0.2.0 | **优先级**: P1 | **事故根因**: H1 (#189, 2026-07-01 一 token N 用级联)
 > **机读 SoT**: `.aether/pat-inventory.yaml` · **人读权威**: `docs/guides/forgejo-token-map.md`
+> **AB Benchmark**: **3/3 evals WITH_BETTER (2026-08-09, suite v1.2.0, Aether #275, 首个基线)**
+> —— WITHOUT 臂在 eval-3 critical FAIL (把 org 级 entry 押在 Tier 1 上, 第一步即撞 `ORG_LEVEL_UNSUPPORTED`)。
 
 ## 核心原则 (先记这三条)
 
@@ -52,9 +54,22 @@ allowed-tools: Bash, Read, AskUserQuestion
 > 专用永久 bot 令牌 (如 `ci-runner-image-mirror`，见 §3 T5) 另计。
 
 **账号规则 (永远)**:
-- `docker login` / basic-auth: **username 必须匹配 token 归属账号**。10cg-ci-bot 的 token
-  → `-u 10cg-ci-bot`。账号切换必须**同步原子改 user + token** (H1 + heavy-node 两次踩坑)。
+- `docker login` / basic-auth: username **应当**匹配 token 归属账号 (`10cg-ci-bot` 的
+  token → `-u 10cg-ci-bot`)。理由是**日志可读 + 记录准确**，**不是**"否则会 401" —— 见下方实测。
 - `curl -H "Authorization: token …"` (拉 package / API): **只看 token 不看 user**。
+
+> ☠️ **registry 401 不要查 username**。Forgejo 容器 registry 的 `/v2/token` 端点**只校验
+> PAT，完全忽略 basic-auth username** —— 错误账号名、甚至不存在的账号名，配有效 token
+> 都能签出 token 并 push (2026-07-02 / 07-12 / 08-08 **三次独立实测**)。故:
+> - `401` → **先查 token 死活** (已 revoke / 过期)；查 username 是已知的时间黑洞
+> - `403` on push → 查 **scope** (例如 `read:package` 的 token 去 push)
+>
+> **边界**: 上述实测只覆盖 **registry 路径** (`/v2/token` + blob upload)。若某消费方拿
+> `$FORGEJO_USER` 拼 URL 或调**非 registry** 的 Forgejo API，行为未验证 —— 这才是仍要保持
+> username 正确的理由。
+>
+> ⚠️ 「username 不匹配会致 401」这条断言**已被实测杀死两次又复活两次** (跟踪
+> [#291](https://forgejo.10cg.pub/10CG/Aether/issues/291))；仓内别处若仍有旧表述，**以本条为准**。
 
 ---
 
@@ -87,7 +102,9 @@ allowed-tools: Bash, Read, AskUserQuestion
 
 ### 401 vs 403 速判
 
-- `401 unauthorized` on `docker login`/push/pull → token 值错 / 账号-username 不匹配 / scope 不含 package。查 §3 是否用错 token。
+- `401 unauthorized` on `docker login`/push/pull → **token 死了或值错** (已 revoke / 过期 /
+  抄错)。**不是 username 问题** —— registry 忽略 username，见 §1 实测。查 §3 是否用错 token。
+- `403` on push/pull → **scope 不足** (例如 `read:package` 的 token 去 push)。
 - `403 Only signed in user` → §2 上表，刷 PAT。
 
 ---
@@ -107,16 +124,16 @@ allowed-tools: Bash, Read, AskUserQuestion
 | act_runner 拉 runner-images | **T2** | heavy `/root/.docker/config.json` (`docker login -u 10cg-ci-bot`) |
 | aria-build push aria-runner 镜像 | **T4** | Nomad var `FORGEJO_BOT_PAT` (`nomad/jobs/aria-build`) |
 | todo-web CI push package | **T6** (repo 级 override，不继承 org T3) | todo-web repo 级 Actions secret |
-| 手动 `aether doctor` 查 registry (需 read:package) | ⚠️ T1 **无 package** → 会 401 | 走内网，或临时用 T2 值，或给 simonfish 加 read:package |
+| 手动 `aether doctor` 查 registry (需 read:package) | **T1 可用** —— 2026-07-02 起已加 `read:package` (只读) | shell 里的 `$FORGEJO_TOKEN` 直接用；**仍无 `write:package`**，push 场景要换 T2/T3 |
 
 ### Token 清单速览 (账号 · scope · store)
 
 | # | 用途 | 账号 | scope | store |
 |---|------|------|-------|-------|
-| T1 | 人的 dev-shell | simonfish | issue+repo+read:user (**无 package**) | `~/.forgejo_env` (600), `.bashrc`+`.profile` source |
+| T1 | 人的 dev-shell | simonfish | read:user+write:issue+write:repository+**`read:package`** (2026-07-02 加, 只读; **绝无 write:package**) | `~/.forgejo_env` (600), `.bashrc`+`.profile` source |
 | T2 | runtime registry pull | 10cg-ci-bot | `read:package` | 18 Nomad var `docker_auth_password` + 3 heavy `/root/.docker/config.json` |
 | T3 | org CI 全用途 | 10cg-ci-bot | issue+repo+package+read:user | org `10CG` Actions secret `FORGEJO_TOKEN` (+`FORGEJO_USER`) |
-| T4 | aria-build DooD push | 10cg-ci-bot | `write:package` | Nomad var `FORGEJO_BOT_PAT` (aria-build, 自定义 key)。⚠ 现**复用 T3 同一物理 token** (待 mint 专用) → **轮换 T3 会连带断 aria-build** |
+| T4 | aria-build DooD push | 10cg-ci-bot | `write:package` | Nomad var `FORGEJO_BOT_PAT` (aria-build, **自定义 key** → Tier 1 拒绝, `VAR_KEY_UNSUPPORTED`)。✅ **已解耦 (2026-07-02)**: 专用 token，不再共用 org T3 |
 | T5 | runner-image mirror push | `ci-runner-image-mirror` (专用永久 bot) | `write:package` (**永不过期**) | heavy-1 `/opt/forgejo-runner/.docker-mirror/config.json` |
 | T6 | todo-web CI | todo-web own | `write:package` | todo-web **repo 级** Actions secret (override org T3) |
 | T7 | rotation bootstrap | ops | `write:user` | 不部署 (引导凭据) |
@@ -134,19 +151,27 @@ allowed-tools: Bash, Read, AskUserQuestion
 - [ ] **① Nomad Variables**: `docker_auth_password` + 自定义 key (`FORGEJO_BOT_PAT` 等)
   → `aether registry-auth list`
 - [ ] **② Forgejo Actions secrets**: **repo 级 AND org 级** 都查
-  → `aether doctor forgejo_actions_secret_drift` (cli-v1.16.43+)
+  → `aether doctor --check forgejo_actions_secret_drift` (cli-v1.16.43+)
 - [ ] **③ host docker configs**: heavy `/root/.docker/config.json` (runner-pull) +
   `/opt/forgejo-runner/.docker-mirror` (mirror push)
   → 远端 `python3 base64 decode + sha256` 指纹，**不打印 token**
 - [ ] **④ shell env**: `~/.forgejo_env` (simonfish 单一来源，login+interactive 都 source 它)
 
-> ⚠ **T3 (org FORGEJO_TOKEN) 轮换的 blast-radius 目前包含 aria-build (T4)** —— 二者复用同一
-> 物理 token；换 T3 时必须同步更新 aria-build 的 `FORGEJO_BOT_PAT` (或先 mint 专用解耦)。
+> ✅ **T3 (org FORGEJO_TOKEN) 与 aria-build (T4) 已于 2026-07-02 解耦** —— T4 改用专用
+> `write:package` token，轮换 org token **不再**连带断 aria-build。(此前"二者复用同一物理
+> token"的记载已过时；权威以 `.aether/pat-inventory.yaml` T4 entry 为准。)
+>
+> 但 **blast-radius 仍要逐条枚举**：解耦只解了这一条已知耦合，不等于 T3 没有别的消费方。
 
 工具:
-- **Tier 1 自动轮换**: `aether registry-auth rotate` (nomad-variables + forgejo-secrets repo 级；`docker_auth_password` 单 key) —— 详见 `aether-rotate-pat` skill
-- **手动**: 账号切换 / 自定义 var key / org 级 secret / host docker config / 永久 bot → 手动 (token-map §2 定位 store + `docs/guides/forgejo-pat-rotation.md` / `forgejo-pat-emergency-rotation.md`)
-- **审计**: `aether doctor pat_age` (到期) + `pat_inventory_drift` (Nomad var 漂移) + `forgejo_actions_secret_drift` (org Actions secret 漂移)
+- **Tier 1 自动轮换**: `aether registry-auth rotate` (nomad-variables + forgejo-secrets **repo 级**；`docker_auth_password` 单 key) —— 详见 `aether-rotate-pat` skill
+- **手动**: 账号切换 / 自定义 var key (`VAR_KEY_UNSUPPORTED`) / **org 级** secret
+  (`ORG_LEVEL_UNSUPPORTED`) / host docker config / 永久 bot → 手动 (token-map §2 定位 store +
+  `docs/guides/forgejo-pat-rotation.md` **Mode 6/7** / `forgejo-pat-emergency-rotation.md`)
+  - cli-v1.16.74+ 在 `--dry-run` 阶段就以这两个码拒绝，**拿到码即知走哪条手工路径**
+  - 手工写值一律 `aether env set --job <job> <KEY> --from-file <file>`，**绝不**把 token
+    放进命令行参数 (argv 进 shell history / `ps aux` / AI transcript，#282)
+- **审计**: `aether doctor --check pat_age` (到期) + `--check pat_inventory_drift` (Nomad var 漂移) + `--check forgejo_actions_secret_drift` (org Actions secret 漂移)
 
 > scope 决定消费面: 换的 token scope 不足 (例如 issue-only 却给需要 package 的消费方) 会留隐性断裂。
 > 换前核对该 store 消费方需要的最小 scope。
@@ -165,7 +190,8 @@ allowed-tools: Bash, Read, AskUserQuestion
 2. 机器 token 绝不进人的 shell，人的 token 绝不进 CI/job/host (反之亦然)。
 3. revoke 前枚举**全部** store (§4)。
 4. 新 token / 新 store 必须登记进 `.aether/pat-inventory.yaml` —— `forgejo_actions_secret_drift` 会揪未登记的 org secret。
-5. 账号切换必须**同步原子**改 user + token (docker login username 必须匹配 token 归属账号)。
+5. 账号切换时 user + token **同步改** —— 保持记录一致、日志可读。**注意**: 理由不是
+   "不同步会 401" (registry 忽略 username, 见 §1 实测)，而是非 registry 消费方的行为未验证。
 
 ---
 
@@ -173,7 +199,7 @@ allowed-tools: Bash, Read, AskUserQuestion
 
 - **权威人读版**: `docs/guides/forgejo-token-map.md` (完整 token 清单 + 决策矩阵 + 待办红线)
 - **机读 SoT**: `.aether/pat-inventory.yaml` (登记全部 token/store，drift check 依据)
-- **审计**: `aether doctor forgejo_actions_secret_drift` / `pat_age` / `pat_inventory_drift`
+- **审计**: `aether doctor --check forgejo_actions_secret_drift` / `--check pat_age` / `--check pat_inventory_drift`
 - **轮换执行**: `aether-rotate-pat` skill · `docs/guides/forgejo-pat-rotation.md` · `forgejo-pat-emergency-rotation.md`
 - **事故全账**: [#189](https://forgejo.10cg.pub/10CG/Aether/issues/189) (H1 一 token N 用级联)
 - **Nomad docker auth**: `docs/guides/nomad-variables-docker-auth.md`

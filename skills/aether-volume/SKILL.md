@@ -62,7 +62,7 @@ aether volume create --node <node> --project <project> --volumes <list>
 > ⚠️ **生产 / 有状态服务铁律**: `host_volume` 必须覆盖**每一个** heavy 节点，只注册单节点 =
 > blast-radius trap —— 该服务被 pin 死在一个节点，节点故障或 alloc 被重调度到其他 heavy 节点
 > 即找不到数据（`/opt/aether-volumes` 是 NFS-virtiofs 共享存储，数据物理上都在，只是 Nomad
-> 没在其他节点上声明 `host_volume` 而已）。诊断: `aether doctor host_volume_parity`。
+> 没在其他节点上声明 `host_volume` 而已）。诊断: `aether doctor --check host_volume_parity`。
 
 ```bash
 # 无状态 / 一次性测试: 单节点即可

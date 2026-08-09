@@ -282,7 +282,7 @@ Forgejo runner 跨 3 heavy 节点已通过 `container.options --env` 全局注�
 - **不要 commit `.npmrc` / `pip.conf` 含 `192.168.69.206` 到公开 repo** —
   内网 IP 泄露面。用 `--build-arg` 在 build 时覆盖,或 Dockerfile 默认值
   保持公网镜像。
-- 健康检查: `aether doctor build_cache_health`(WARN 级,验证 `:4873`
+- 健康检查: `aether doctor --check build_cache_health`(WARN 级,验证 `:4873`
   + `:3141` reachable;cli v1.16.22+)。
 
 ---

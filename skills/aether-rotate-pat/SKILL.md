@@ -21,14 +21,15 @@ dependencies:
 
 # Aether Forgejo PAT 凭换 (aether-rotate-pat)
 
-> **版本**: 0.2.0 (GA) | **Spec**: #45 Phase 2 | **优先级**: P1
-> **AB Benchmark**: 3/3 evals WITH_BETTER (2026-05-07; eval-3 deprecated 2026-05-09 per TASK-2.7b GA — re-AB tracked as follow-up)
+> **版本**: 0.3.0 (GA) | **Spec**: #45 Phase 2 | **优先级**: P1
+> **AB Benchmark**: **4/4 evals WITH_BETTER (2026-08-09, suite v1.2.0, Aether #275)** —— WITHOUT 臂在
+> eval-4/eval-5 critical FAIL。前基线 3/3 (2026-05-07);已 retire 的 eval-3 由 eval-4 取代。
 
 ## 快速决策
 
 ```
 PAT 即将过期或已过期?
-  ├─ 14d/30d alert (aether doctor pat_age) → 走本 Skill 标准 Tier 1 流程
+  ├─ 14d/30d alert (aether doctor --check pat_age) → 走本 Skill 标准 Tier 1 流程
   ├─ 7d critical alert / Tier 1 broken → 走 emergency runbook (web UI)
   └─ 例行预防性轮换 → 走本 Skill
 ```
@@ -50,9 +51,41 @@ aether status
 
 # 3. 当前 PAT 状态
 aether registry-auth list
-aether doctor pat_age          # alert tier
-aether doctor pat_inventory_drift   # drift detection
+aether doctor --check pat_age               # alert tier
+aether doctor --check pat_inventory_drift   # drift detection
 ```
+
+> `doctor` 只接受 `--check <name>`，**不接位置参数** (`Args: cobra.NoArgs`)。写成
+> `aether doctor pat_age` 会得 `unknown command` —— 该形态从未存在过 (Aether #275)。
+
+---
+
+## Tier 1 准入边界 (动手前先确认 entry 能自动轮换)
+
+不是每个 inventory entry 都能走 Tier 1。**`--dry-run` 与 `--confirm` 共用同一准入点**
+(cli-v1.16.74 起, #281/#287)，因此 dry-run 拒绝 = confirm 必然也拒绝，dry-run 通过 =
+准入已过。三种拒绝各有确定的手工路径：
+
+| 错误码 | 触发条件 | 手工路径 |
+|--------|---------|----------|
+| `VAR_KEY_UNSUPPORTED` | consumer 用自定义 var key (非 `docker_auth_password`)，如 aria-build 的 `FORGEJO_BOT_PAT` | `aether env set --job <job> <KEY> --from-file <file>` → 手工更新 inventory `last_rotated` |
+| `ORG_LEVEL_UNSUPPORTED` | entry 是 **org 级** Actions secret (Tier 1 只做 repo 级) | Forgejo org Settings → Actions → Secrets 手工换 → 手工写 `last_rotated`。见 runbook **Mode 6** |
+| `NO_ROTATABLE_CONSUMERS` | entry **有** `consumers` 块但 `paths` / `repos` 为空 → 轮换会"成功"却零次 API 调用 | 修 `.aether/pat-inventory.yaml` 的 `consumers.paths` / `consumers.repos`。见 runbook **Mode 7** |
+
+> 与 **Mode 4 `BOOTSTRAP_NO_AUTOROTATE` 不同**: 那是 entry **根本没有** `consumers` 块
+> (ops-rotation class 引导凭据，本就不该自动轮换)；上表第三行是**声明了却是空的**，属
+> inventory 写错，要修数据而非换路径。
+
+**`--from-file` 不是可选项**: 手工路径一律用 `--from-file`。**绝不**把 token 值写成命令行
+参数 —— argv 会进 shell history、`ps aux`、以及 AI 会话 transcript，与 stdout 是否遮蔽
+**无关** (#282)。
+
+> ⚠️ **`last_rotated` 只在真的换过之后才写**。工具拒绝执行时不要顺手 stamp ——
+> 那会把一个未轮换的凭据伪装成已轮换，比不轮换更危险。
+
+> ⚠️ **cli < 1.16.74 存在假绿**: 旧版 `--dry-run` 不校验 var_key，对上表第一种 entry 会
+> 打印完整绿色 5-step plan 并 exit 0，直到 `--confirm` 才报晦涩的
+> `missing docker_auth_password key`。撞到这个组合先 `aether version`。
 
 ---
 
@@ -81,6 +114,8 @@ aether registry-auth rotate --pat-id <id> --dry-run
 - `Consumer count` = inventory 中的 paths 数量
 - 每个 path 都是预期 job 名
 - 没有未声明的 consumer (drift 应先解决)
+- 若报 `VAR_KEY_UNSUPPORTED` / `ORG_LEVEL_UNSUPPORTED` / `NO_ROTATABLE_CONSUMERS`
+  → 该 entry **不走 Tier 1**，转上节手工路径 (confirm 也会同样拒绝，别再试)
 
 ### Step 3: 执行 rotation (`--confirm`)
 
@@ -176,14 +211,19 @@ ci-build class PAT (例如 `forgejo-actions-ci-2026-Q2`) 走单 slot 2-step 流�
 | Atomic rollback | 完整 | **best-effort in-process** |
 | OldToken 来源 | cluster 自动读 | **必须 `--old-token-file`** (Forgejo Actions 写-only API) |
 | Chaos-kill resume | 支持 | **拒绝** → emergency runbook |
-| Bootstrap 凭据 | `cluster.NomadToken` | **`AETHER_FORGEJO_TOKEN` env** (write:user) |
+| Bootstrap 凭据 | `cluster.NomadToken` | **`AETHER_FORGEJO_TOKEN` env** (**`write:repository`**) |
+
+> ⚠️ **两个 backend 的 bootstrap scope 不同**: `nomad-variables` 走 `/users/<n>/tokens`
+> 需 **`write:user`**；`forgejo-secrets` 走 `/repos/<o>/<r>/actions/secrets` 需
+> **`write:repository`**。实战推荐 bootstrap PAT **两个都勾**，一次创建覆盖两个 backend。
+> 权威 access matrix 见 runbook §Pre-requisites。
 
 ### 用法
 
 ```bash
 # ENV (按需)
 export AETHER_FORGEJO_ADDR="http://192.168.69.200:3000"   # 默认值
-export AETHER_FORGEJO_TOKEN="<bootstrap PAT, write:user>"  # 必需
+export AETHER_FORGEJO_TOKEN="<bootstrap PAT, write:repository>"  # 必需 (勿用 write:user-only)
 
 chmod 600 /tmp/new.pat /tmp/old.pat   # 注意: 必须双 token 文件
 
@@ -208,7 +248,7 @@ rm /tmp/new.pat /tmp/old.pat
 
 ```bash
 aether registry-auth resume --pat-id <id> --new-token-file /tmp/new.pat --old-token-file /tmp/old.pat
-# → exit 4 + FORGEJO_MANUAL_RECOVERY_REQUIRED
+# → exit 1, error.code = FORGEJO_MANUAL_RECOVERY_REQUIRED
 ```
 
 forgejo backend 设计上拒绝 auto-resume (单 slot 无 _OLD 备份, OldToken 不持久化, 无 fingerprint guard). 必须走 emergency runbook 手动逐 repo 确认 secret 状态后修复. 详见 [docs/guides/forgejo-pat-emergency-rotation.md](https://forgejo.10cg.pub/10CG/Aether/src/branch/master/docs/guides/forgejo-pat-emergency-rotation.md)。
@@ -226,11 +266,11 @@ forgejo backend 设计上拒绝 auto-resume (单 slot 无 _OLD 备份, OldToken 
 
 ```
 □ aether registry-auth list                    — 确认 inventory + drift
-□ aether doctor pat_age                        — 确认 alert tier
+□ aether doctor --check pat_age                — 确认 alert tier
 □ Forgejo web UI 生成新 PAT (匹配 scope)
 □ chmod 600 /tmp/new.pat
 □ aether registry-auth rotate --pat-id <id> --dry-run
-□ 核对 plan
+□ 核对 plan (若报准入拒绝三码之一 → 转手工路径, 不要 --confirm)
 □ aether registry-auth rotate --pat-id <id> --new-token-file /tmp/new.pat --confirm
 □ aether status <jobname>                      — 验证 alloc running
 □ docker pull 抽样验证                         — 验证新 PAT 可用
@@ -253,4 +293,5 @@ forgejo backend 设计上拒绝 auto-resume (单 slot 无 _OLD 备份, OldToken 
 
 ---
 
-**Last updated**: 2026-05-09 (GA — both backends shipped; forgejo-secrets eval re-AB tracked as follow-up)
+**Last updated**: 2026-08-09 (Aether #275 — doctor `--check` 形态修正 · 新增 Tier 1 准入边界三码 ·
+bootstrap scope 更正为 `write:repository` · resume 退出码更正为 1 · AB 基线刷新 4/4)

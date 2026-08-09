@@ -3,7 +3,7 @@
 
 cli:
   min_version: "1.0.0"
-  recommended_version: "1.16.61"
+  recommended_version: "1.16.75"
   # 安装位置 (与 config.yaml 同目录)
   install_dir: "~/.aether"
   install_path:
@@ -77,6 +77,16 @@ compatibility:
     cli_min: "1.0.0"
     cli_recommended: "1.13.2"
     notes: "doctor heuristic refinements (Aether #47); migrate-script timestamp tightening (#48); host_volume_parity / docker_disk_pressure / docker_root_on_nfs driver-filter (Aether #67)"
+
+  - plugin_version: "1.12.x"
+    cli_min: "1.0.0"
+    cli_recommended: "1.16.75"
+    notes: >-
+      Aether #275: aether-rotate-pat 新增 Tier 1 准入边界三码
+      (VAR_KEY_UNSUPPORTED / ORG_LEVEL_UNSUPPORTED / NO_ROTATABLE_CONSUMERS)。
+      这三码需 cli >= 1.16.74 (#281) / 1.16.75 (#287) 才会由 --dry-run 与 --confirm
+      共用准入点一致给出;更早版本的 dry-run 对自定义 var_key entry 会打印假绿 5-step plan。
+      skill 内已就此标注版本边界, 故 cli_min 保持 1.0.0 不上抬。
 
 # 依赖 CLI 的 Skills
 dependent_skills:

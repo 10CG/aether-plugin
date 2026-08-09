@@ -1,7 +1,7 @@
 # integration-policy marker 注入 fixture 集 (Aether #245 TASK-005)
 
 > **权威来源声明**: 本目录是 C1 (`aether-init` 成对栅栏日期戳 marker 注入/回填, TASK-005)
-> 产出的**权威 fixture 输入**，供 C2 (`aether doctor claude_md_integration_policy_present`,
+> 产出的**权威 fixture 输入**，供 C2 (`aether doctor --check claude_md_integration_policy_present`,
 > TASK-009) 的 Go 测试**直接消费**——TASK-009 不得脱离本目录自行手造复刻同一 marker
 > 契约（openspec/245-aether-conventions/detailed-tasks.yaml TASK-005/TASK-009
 > post_planning R2 Critical 修正: C1↔C2 契约往返验证）。
@@ -13,7 +13,7 @@
 
 ## 场景清单
 
-| 文件 | 对应分支 | `aether-init` 行为 | 预期 `aether doctor claude_md_integration_policy_present` 结果 |
+| 文件 | 对应分支 | `aether-init` 行为 | 预期 `aether doctor --check claude_md_integration_policy_present` 结果 |
 |------|---------|---------------------|------------------------------------------------------------|
 | `01a-create-new.after.md` | 1a：无 CLAUDE.md | 直接创建（无覆盖风险，无需确认） | PASS |
 | `01b-append-existing.before.md` → `01b-append-existing.after.md` | 1b：有 CLAUDE.md 但无 marker | `AskUserQuestion` 确认 → `cp .bak` → diff 回显 → 用户同意后 EOF append | PASS |
