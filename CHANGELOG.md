@@ -2,6 +2,49 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.12.1] - 2026-08-23 — #326 `aether-rotate-pat` 追平 cli-v1.17.0 + Step 4 假绿验证修复
+
+> Skill 内容变更 = **强制 AB 门**。PASS: **WITH 4/4 WITH_BETTER** (rubric 4.7/4.7/4.75/4.7 vs 3.9/4.1/4.45/4.4),
+> 两臂 Part 1 全部达标无 critical FAIL。结果与协议缺陷记录: `ab-results/2026-08-23/summary.yaml`。
+> requirements `cli.recommended_version` 1.16.75 → **1.17.0**。
+
+### Fixed — `aether-rotate-pat` (#326 票面两条)
+
+- **`pat_age` 告警档标签追平 #302 (PR #324)**: 快速决策树的 `14d/30d alert` / `7d critical alert`
+  换成 `WARN cadence_33pct / cadence_10pct` 与 `FAIL critical`,并补一段说明档位自 cli-v1.17.0 起
+  **按 class cadence 相对** (ci-build 30d / runtime 90d / ops·ops-rotation 180d),`days_to_due` 在
+  `(cadence/10, cadence/3]` → `cadence_33pct`,`[1, cadence/10]` → `cadence_10pct`,`≤ 0` → `critical`
+  (绝对边界);`rotation_policy: non_expiring` 零 finding。明示旧 `"14d"`/`"7d"` 标签仍在用的是
+  `cf_token_age`,别混。
+- **准入错误码三码表 → 8 码表**: 补 `BACKEND_NOT_ROTATABLE` · `UNKNOWN_BACKEND` ·
+  `FORGEJO_SECRET_NAME_INVALID` · `FORGEJO_ORG_REQUIRED` · `PREFLIGHT_FAILED` (后者 #312 新增,
+  **仅 `--dry-run`**,nomad-variables 逐 path 预检 Nomad 不可达即拒,离线 dry-run 不再可能),
+  各带触发条件 + 手工路径 + runbook Mode 映射;补判定顺序 (backend → var_key → 可轮换性 → forgejo 字段)
+  与「`BACKEND_MISMATCH` 只在 resume 出现,正常 CLI 路径到不了」。
+- **dry-run `verify_class` 说明** (#312): plan entry 的 `job_not_found` / `batch_parent` / `dead`
+  三类只列 3 步 (跳 RESTART/VERIFY) + 信封 `verify_skipped_count` 是预期而非缺陷,处置看 runbook Mode 8。
+
+### Fixed — `aether-rotate-pat` Step 4 验证是假绿 (AB 盲评抓到,票面之外)
+
+- 原 Step 4 让操作员用 `ssh heavy-N 'docker pull ...'` 验证轮换生效。该命令走**节点上那份 docker
+  登录配置**,与本次轮换的 job 级 registry 口令 var 是**两套独立凭据**;#234 prong b 之后节点那份
+  已不是任何 Nomad job 的可用性依赖,因此它**无论轮换成没成都会绿**。
+- 改为真正消费新 token 的阳性对照: 内网 `/v2/<org>/<image>/tags/list` 探针,token 走 `curl -K`
+  配置文件不进 argv (#282);并标注 Tier 1 的 `VERIFY_OK` 只轮询 alloc `running` 从不回读 token (#301),
+  以及「靠 alloc 重启触发重拉」同样不可靠 (镜像本地已存在时 docker driver 可能根本不发 pull)。
+- 实机佐证: 内网 `/v2` 无凭据 401 (探针形态有效),外网 `forgejo.10cg.pub` 前有 CF Access 得 302
+  (判不了凭据,故指定内网端点)。
+
+### Changed — AB 方法学: 首次去标识化盲评
+
+- 阶段一盲评发现**盲评在文档内容层面本就不盲**: with 臂报告开头自报「依据 Skill aether-rotate-pat
+  v0.3.1 执行」、正文引用「SKILL.md 第 N 行」,without 臂文末自报「AB 基线组」。随机化 A/B 映射和
+  换 staging 目录都拦不住 —— 泄漏在被测文档自身 (两名 grader 各自主动申报)。
+- 阶段二加 scrub (剥离自述条件行 + 中性化 skill 名/版本) + 盲评副本 staged 到仓库外 +
+  显式禁止 grader 检索 benchmarks 全树,复查零残留后重评,**最终采信阶段二**。
+- **对基线的影响**: 2026-08-09 的 4/4 由同一 harness 产出,很可能同样不盲,与本轮不完全可比。
+- 建议把 scrub 收编进 `scripts/ab-blind.sh` 并加零残留自检 (另立票)。
+
 ## [1.12.0] - 2026-08-09 — #275 凭据双 skill 九笔文档债清理 + AB 基线刷新
 
 > 两个 P1 凭据 skill 内容变更 = MINOR bump。**强制 AB 门 PASS: WITH 7/7 WITH_BETTER**

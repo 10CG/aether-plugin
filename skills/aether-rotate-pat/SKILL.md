@@ -21,7 +21,7 @@ dependencies:
 
 # Aether Forgejo PAT 凭换 (aether-rotate-pat)
 
-> **版本**: 0.3.0 (GA) | **Spec**: #45 Phase 2 | **优先级**: P1
+> **版本**: 0.3.1 (GA) | **Spec**: #45 Phase 2 | **优先级**: P1
 > **AB Benchmark**: **4/4 evals WITH_BETTER (2026-08-09, suite v1.2.0, Aether #275)** —— WITHOUT 臂在
 > eval-4/eval-5 critical FAIL。前基线 3/3 (2026-05-07);已 retire 的 eval-3 由 eval-4 取代。
 
@@ -29,10 +29,17 @@ dependencies:
 
 ```
 PAT 即将过期或已过期?
-  ├─ 14d/30d alert (aether doctor --check pat_age) → 走本 Skill 标准 Tier 1 流程
-  ├─ 7d critical alert / Tier 1 broken → 走 emergency runbook (web UI)
+  ├─ WARN cadence_33pct / cadence_10pct (aether doctor --check pat_age) → 走本 Skill 标准 Tier 1 流程
+  ├─ FAIL critical (已逾期) / Tier 1 broken → 走 emergency runbook (web UI)
   └─ 例行预防性轮换 → 走本 Skill
 ```
+
+> `pat_age` 告警档自 cli-v1.17.0 (#302) 起**按 class cadence 相对**, 不再是绝对 14d/30d/7d:
+> `days_to_due` 在 (cadence/10, cadence/3] → WARN `cadence_33pct`; [1, cadence/10] → WARN
+> `cadence_10pct`; ≤ 0 → FAIL `critical` (绝对边界)。cadence: ci-build 30d / runtime 90d /
+> ops·ops-rotation 180d。`rotation_policy: non_expiring` 的 entry 零 finding (`days_to_due: null`
+> = 未知, 不是逾期)。旧标签 `"14d"`/`"7d"` 不再出现在 doctor 输出 — 仍沿用的是 `cf_token_age`,
+> 别混。
 
 **决策核心**: 双 backend 全部 GA (2026-05-08 nomad-variables + 2026-05-09 forgejo-secrets).
 - `nomad-variables` (runtime class) — 5-step + atomic rollback + 24h grace, chaos-kill 可 resume
@@ -64,13 +71,23 @@ aether doctor --check pat_inventory_drift   # drift detection
 
 不是每个 inventory entry 都能走 Tier 1。**`--dry-run` 与 `--confirm` 共用同一准入点**
 (cli-v1.16.74 起, #281/#287)，因此 dry-run 拒绝 = confirm 必然也拒绝，dry-run 通过 =
-准入已过。三种拒绝各有确定的手工路径：
+准入已过。准入拒绝共 **8 种**错误码 (cli-v1.17.0)，各有确定的手工路径：
 
 | 错误码 | 触发条件 | 手工路径 |
 |--------|---------|----------|
 | `VAR_KEY_UNSUPPORTED` | consumer 用自定义 var key (非 `docker_auth_password`)，如 aria-build 的 `FORGEJO_BOT_PAT` | `aether env set --job <job> <KEY> --from-file <file>` → 手工更新 inventory `last_rotated` |
 | `ORG_LEVEL_UNSUPPORTED` | entry 是 **org 级** Actions secret (Tier 1 只做 repo 级) | Forgejo org Settings → Actions → Secrets 手工换 → 手工写 `last_rotated`。见 runbook **Mode 6** |
 | `NO_ROTATABLE_CONSUMERS` | entry **有** `consumers` 块但 `paths` / `repos` 为空 → 轮换会"成功"却零次 API 调用 | 修 `.aether/pat-inventory.yaml` 的 `consumers.paths` / `consumers.repos`。见 runbook **Mode 7** |
+| `BACKEND_NOT_ROTATABLE` | `consumers.type: host-docker-config` — 凭据住在节点 `/root/.docker/config.json`，不归 Tier 1 | 在报错列出的 host 上 `docker login`（`--password-stdin`）→ 手工写 `last_rotated`。见 runbook **Mode 8** |
+| `UNKNOWN_BACKEND` | `consumers.type` 不是 `nomad-variables` / `forgejo-secrets` / `host-docker-config` 之一 (typo) | 修 `.aether/pat-inventory.yaml`。见 runbook **Mode 8** |
+| `FORGEJO_SECRET_NAME_INVALID` | forgejo-secrets entry 的 `consumers.secret_name` 缺失或不匹配 `^[A-Z][A-Z0-9_]*$` | 修 entry 字段后重跑。见 runbook **Mode 9** |
+| `FORGEJO_ORG_REQUIRED` | forgejo-secrets entry 缺 `consumers.org` (否则会打到 `/repos//<repo>/...`) | 补 `consumers.org` 后重跑。见 runbook **Mode 9** |
+| `PREFLIGHT_FAILED` | **仅 `--dry-run`** (nomad-variables, cli-v1.17.0 #312)：dry-run 现在逐 path 对 Nomad 预检父 job，Nomad 不可达 → 拒绝打印无法验证的绿 plan | 修 `NOMAD_ADDR` / `cluster.nomad_addr` 可达性 (`aether doctor`) 后重跑；**离线 dry-run 不再可能** |
+
+> 判定顺序固定: backend 归属 (Mode 8 两码) → var_key → 可轮换性 (Mode 6/7) → forgejo 字段 (Mode 9)。
+> org 级 entry 同时字段畸形时只会看到 `ORG_LEVEL_UNSUPPORTED` —— 终局判定优先，先修字段再跑只是撞第二堵墙。
+> 另有 `BACKEND_MISMATCH` 只在 `resume` 出现 (journal 的 backend 与 entry `consumers.type` 不符)，
+> 正常 CLI 路径到不了，见到即 journal 被手改过。
 
 > 与 **Mode 4 `BOOTSTRAP_NO_AUTOROTATE` 不同**: 那是 entry **根本没有** `consumers` 块
 > (ops-rotation class 引导凭据，本就不该自动轮换)；上表第三行是**声明了却是空的**，属
@@ -114,8 +131,11 @@ aether registry-auth rotate --pat-id <id> --dry-run
 - `Consumer count` = inventory 中的 paths 数量
 - 每个 path 都是预期 job 名
 - 没有未声明的 consumer (drift 应先解决)
-- 若报 `VAR_KEY_UNSUPPORTED` / `ORG_LEVEL_UNSUPPORTED` / `NO_ROTATABLE_CONSUMERS`
-  → 该 entry **不走 Tier 1**，转上节手工路径 (confirm 也会同样拒绝，别再试)
+- 若报上节 8 码之一 → 该 entry **不走 Tier 1** (或环境没就绪)，转上节手工路径
+  (confirm 也会同样拒绝，别再试)
+- cli-v1.17.0 起 plan entry 带 `verify_class`：`job_not_found` / `batch_parent` / `dead` 类 path
+  只列 3 步 (跳 RESTART/VERIFY)，信封有 `verify_skipped_count` — 这是预期，不是缺陷；
+  skip 清单的处置看 runbook **Mode 8 四分类表**
 
 ### Step 3: 执行 rotation (`--confirm`)
 
@@ -133,9 +153,30 @@ aether registry-auth rotate --pat-id <id> \
 ### Step 4: 验证轮换生效
 
 ```bash
-aether status <jobname>      # alloc 状态
-ssh heavy-1 'docker pull forgejo.10cg.pub/<org>/<image>:latest'
+aether status <jobname>      # alloc 状态 — 必要但**不充分**
 ```
+
+> ⚠️ Tier 1 的 `VERIFY_OK` 只轮询 alloc 是否 `running`，**从不回读 token** (#301)。
+> alloc 绿 = 调度成功，不等于新凭据可用。必须另外做一次真正消费新 token 的探测。
+
+**阳性对照 (真的用新 token 打 registry)** — 内网端点，token 走配置文件不进 argv (#282):
+
+```bash
+umask 077
+printf 'user = "%s:%s"\n' "<registry-user>" "$(cat /tmp/new.pat)" > /tmp/curlrc.$$
+curl -sS -K /tmp/curlrc.$$ -o /dev/null -w '%{http_code}\n' \
+  "http://192.168.69.200:3000/v2/<org>/<image>/tags/list"   # 期望 200
+rm -f /tmp/curlrc.$$
+```
+
+200 = 新 token 真能读 registry；401 = 值没写对或 scope 不足。
+(外网 `forgejo.10cg.pub` 前有 CF Access，裸 curl 得 302 而非 401，判不了凭据。)
+
+> ❌ **不要用 `ssh heavy-N 'docker pull ...'` 当验证** —— 它走节点
+> `/root/.docker/config.json`，与本次轮换的 job 级 `docker_auth_password` 是
+> **两套独立凭据**；#234 prong b 之后节点那份已不是任何 Nomad job 的可用性依赖，
+> 所以它无论轮换成没成都会绿 (典型假绿)。同理，靠 alloc 重启触发重拉也不可靠：
+> 镜像本地已存在时 docker driver 可能根本不发 pull，auth 一次都没行使。
 
 ### Step 5: 24 小时 grace + cleanup
 
@@ -270,10 +311,10 @@ forgejo backend 设计上拒绝 auto-resume (单 slot 无 _OLD 备份, OldToken 
 □ Forgejo web UI 生成新 PAT (匹配 scope)
 □ chmod 600 /tmp/new.pat
 □ aether registry-auth rotate --pat-id <id> --dry-run
-□ 核对 plan (若报准入拒绝三码之一 → 转手工路径, 不要 --confirm)
+□ 核对 plan (若报准入拒绝 8 码之一 → 转手工路径, 不要 --confirm)
 □ aether registry-auth rotate --pat-id <id> --new-token-file /tmp/new.pat --confirm
 □ aether status <jobname>                      — 验证 alloc running
-□ docker pull 抽样验证                         — 验证新 PAT 可用
+□ registry /v2 tags 探针 (新 token, -K 配置文件)  — 期望 200; **不要**用 ssh docker pull (另一套凭据, 恒绿)
 □ pat-inventory.yaml last_rotated 更新 + git commit
 □ 等 24 小时
 □ aether registry-auth cleanup --pat-id <id>
@@ -293,5 +334,10 @@ forgejo backend 设计上拒绝 auto-resume (单 slot 无 _OLD 备份, OldToken 
 
 ---
 
-**Last updated**: 2026-08-09 (Aether #275 — doctor `--check` 形态修正 · 新增 Tier 1 准入边界三码 ·
+**Last updated**: 2026-08-23 (Aether #326 — pat_age 告警档追平 #302 cadence 相对标签 · 准入错误码
+三码表扩为 8 码表 (+BACKEND_NOT_ROTATABLE/UNKNOWN_BACKEND/FORGEJO_SECRET_NAME_INVALID/
+FORGEJO_ORG_REQUIRED/PREFLIGHT_FAILED) · dry-run verify_class 说明 ·
+Step 4 验证改为真消费新 token 的 registry 探针 — 原 `ssh heavy-N docker pull` 验的是节点
+`/root/.docker/config.json` 另一套凭据, #234 prong b 后恒绿 = 假绿, 本轮 AB 盲评抓到)
+2026-08-09 (Aether #275 — doctor `--check` 形态修正 · 新增 Tier 1 准入边界三码 ·
 bootstrap scope 更正为 `write:repository` · resume 退出码更正为 1 · AB 基线刷新 4/4)
