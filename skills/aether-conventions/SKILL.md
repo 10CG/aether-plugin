@@ -1,18 +1,20 @@
 ---
 name: aether-conventions
 description: |
-  Aether 集成规范速查 —— 四域 investigation-first hub。消费方项目里临时手写 dev env /
-  测试配置 / 连接串时的规范速查点 (#185→#186→#241 同根因三次复发的知识层加固)。
+  Aether 集群集成规范速查 —— 四域 investigation-first hub。消费方项目在 **Aether 集群**上
+  手写 dev env / 测试配置 / 连接串时的规范速查点 (#185→#186→#241 同根因三次复发的知识层加固)。
 
-  回答: "内网服务连接该用 consul 名还是 IP"、"数据库怎么连"、"DATABASE_URL 怎么写"、
-  "REDIS_URL 怎么写"、"连接串该用 IP 还是 consul"、"连 postgres/redis/内网服务的地址"、
-  "host volume 该注册几个节点/规范"、"stateful 服务模板规范"、"有状态服务该怎么配"、
-  "DB 密码该存哪"、"应用 secret 该存哪"、"连接串密码能不能硬编码进 HCL"。
+  **适用前提: 问题落在 Aether 集群 / Nomad / Consul / 内网 192.168.69.x 语境内。** 回答:
+  "集群内服务连接该用 consul 名还是 IP"、"集群里的 postgres / redis / 内网服务怎么连"、
+  "集群内服务的 DATABASE_URL / REDIS_URL 该怎么写"、"连集群里的库该用 IP 还是 consul 名"、
+  "host volume 该注册几个节点 / volume 规范"、"Nomad 上 stateful 服务该怎么配 / 有状态服务
+  模板规范"、"集群里应用的 DB 密码 / 连接串密码该存哪"、"应用 secret 该存哪"、
+  "连接串密码能不能硬编码进 HCL"。
 
-  使用场景: "Aether 集成规范速查"、"consul 名还是 IP"、"内网服务怎么连"、"数据库怎么连"、
-  "DATABASE_URL 怎么写"、"REDIS_URL 怎么写"、"连接串用 IP 还是 consul"、"连 postgres/redis
-  地址"、"host volume 该注册几个节点"、"volume 规范"、"stateful 服务模板规范"、"有状态服务
-  该怎么配"、"DB 密码该存哪"、"应用 secret 该存哪"、"连接串密码能不能硬编码进 HCL"
+  **不适用 (缺少集群语境就让位, 不要触发本 skill)**: 与 Aether 集群无关的通用数据库 /
+  连接串问题 —— 本地或第三方托管 DB 的驱动与客户端用法、连接参数排错、SQL 调优、ORM 配置。
+  这类问句里出现 "数据库怎么连" / "连接串" / "DATABASE_URL" 等字样**不构成触发条件**:
+  本 skill 的触发靠的是集群语境, 不是这些裸词。
 disable-model-invocation: false
 user-invocable: true
 allowed-tools: Bash, Read, AskUserQuestion, Skill
@@ -20,7 +22,7 @@ allowed-tools: Bash, Read, AskUserQuestion, Skill
 
 # Aether 集成规范速查 (aether-conventions)
 
-> **版本**: 0.1.0 | **优先级**: P2 | **事故根因**: #185→#186→#241 同根因三次复发 (消费方钉 IP)
+> **版本**: 0.1.1 | **优先级**: P2 | **事故根因**: #185→#186→#241 同根因三次复发 (消费方钉 IP)
 > **形态**: investigation-first 四域路由 hub —— 先判落在哪域，再进对应段落。
 > **宣称边界**: 本 skill 是降低复发概率的**知识层加固**，不是机械闭环；repo 外手写文件
 > (如 `~/.turfsync/devdb.env`) 的拦截是 L4 hook 领域，本 skill 不覆盖 (#246 跟踪)。

@@ -2,6 +2,78 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.12.2] - 2026-08-26 — #338 `aether-rotate-pat` 追平 cli-v1.18.0 + #335 `aether-conventions` 触发边界
+
+> Skill 内容变更 = **强制 AB 门**。PASS: **WITH 4/4 WITH_BETTER**
+> (rubric with 4.5/4.8/4.5/4.0 vs without 3.5/4.5/4.2/3.5)。
+> **但这是第二轮**: 首轮 3/4，eval-4 判 WITHOUT_BETTER，门禁暴露 forgejo-secrets 段三条缺口，
+> 按源码补齐后重跑 eval-4 的 with 臂才达标。全过程与首轮证据保留在
+> `ab-results/2026-08-26/summary.yaml`（含 4 条完整性注记）。
+> requirements `cli.recommended_version` 1.17.0 → **1.18.0**。
+
+### Fixed — `aether-rotate-pat` (#338 票面三项 + 门禁挖出的四处)
+
+- **准入错误码 8 码表 → 9 码表**: 新增 `DECLARED_VAR_KEY_ABSENT` (cli-v1.18.0 / #334)。
+  **触发条件按源码写，与票面描述不同**: 票面写「entry 声明了 `var_key: K`」，实测 entry
+  **完全不声明 `var_key` 也会触发** —— 有效键回落成默认 `docker_auth_password`，默认槽位同样
+  被逐 path 预检。手工路径按 `path_exists` 分两支（`no Variable at this path` 要建或删该 path；
+  `Variable exists but holds no such key` 要拆 entry 写显式 `var_key`）。
+- **`PREFLIGHT_FAILED` 作用域更正**: 原文「**仅 `--dry-run`**」被 1.18.0 证伪。四入口实测:
+  `rotate --dry-run` / `rotate --confirm` / `resume` 三者**都返回** `PREFLIGHT_FAILED`。
+  两支 `suggested_action` 已分流（config 字段**类型**错 vs 探针不可达）——把人指错一支会让他去
+  排查一个完全正常的集群。另注明纯 YAML 语法错**构造上到不了**这个分支（viper 吞掉无法
+  tokenize 的文件回退默认值）。
+- **明示 `cleanup` 刻意不跑集群预检**: 票面称「rotate / resume / cleanup 三入口一致硬拒」，
+  与源码不符。同一夹具下三入口返回 `PREFLIGHT_FAILED` 而 `cleanup` 走到 `CLEANUP_FAILED`
+  （同夹具构成阳性对照）。源码有 `Do not "fix" this for symmetry` 注释：给 cleanup 加同样守卫，
+  会让「轮换成功后才改台账」的 entry 再也 cleanup 不了，于是 `*_OLD` 里的旧 token 永远留在集群上。
+- **新增 Mode 6 `RESUME_PRE_STATE_LOST`**: 票面未列的第 10 个操作员可见码（1.18.0 新增）。
+  断在 `DELETE` 与 `PUT_NEW` 之间时，该 path 轮换前的兄弟键哪里都不存在（`*_OLD` 要到
+  `PUT_OLD` 才写）。**重跑 resume 无用**，须手工重建 Variable。止血哨兵非根治，根治跟踪 #339。
+- **`registry-auth list` 的 Consumers 列对 host-docker-config 恒显示 0** (#340)，核对须走 `--json`。
+  **并给这条加了边界** —— 同一命令对 forgejo-secrets 行**会真的实查 Forgejo**（设了
+  `AETHER_FORGEJO_TOKEN` 即逐 repo 查，未设才回落 `deferred` 占位），别推广成「`list` 不可信」。
+- **`secret_name` 是 entry 级、全部 repo 共用**: 一个 entry 装不下「不同 repo 用不同 secret 名」。
+- **`rolled_back` ≠ 已验证恢复**: `rollbackForgejoSecrets` 的两个调用错误被 `_ =` 直接丢弃，
+  既不中断也不上报；该状态只说明回滚流程跑完了，须自己逐 repo 核 secret 的 `created_at`。
+- **更正两处 skill 自身的错误陈述**（均由本轮门禁在两臂输出里逮到）:
+  - 「残留 journal 是下一次轮换起不来的原因」—— 错。`RotateNomadVariables` 是 `NewJournal` 后
+    直接 `WriteAtomic`，无存在性检查，旧 journal 被直接覆盖；被挡住的只有 `cleanup`。
+    该句系从 CLI 源码注释转述，**源码注释本身措辞就松**。
+  - 「假 stamp `last_rotated`」的受骗方写松了。`pat_age` **不读**该字段（只看 `rotation_due` /
+    `issued_at`），假 stamp 不会让告警闭嘴。全 CLI 唯一的机器读者是
+    `doctor --check forgejo_actions_secret_drift`，且它**只读 `org_level: true` 的 entry**
+    的 `last_rotated`；对 repo 级 / nomad-variables entry 假 stamp 它根本读不到。
+
+### Changed — `aether-conventions` (#335，触发边界收窄)
+
+- `description` 的触发词由**无条件裸词**改为**集群语境限定**，并新增显式「不适用」边界
+  （与 Aether 集群无关的通用 DB / 连接串问题：本地或第三方托管 DB 的驱动与客户端用法、
+  连接参数排错、SQL 调优、ORM 配置）。按类别写，**未照抄 #245 TASK-016 负例 prompt 里的库名**
+  —— 该 spec 的 constraints 明确禁止往测试措辞过拟合。
+- **本项的验收门在发版之后**: 触发精度只能用 model-invocation 实测，而子 agent 加载的是**已安装的
+  plugin cache** 而非工作区，必须先发版 + marketplace 更新到 1.12.2 才能复测。
+  按 #335 协议跑 N5 ×5（要求让位 ≥4/5）+ 5 条正例 ×5 回归（要求触发命中率仍 ≥80%）。
+  **在复测通过前，#335 保持 open，#245 不归档** —— 本条目不构成「已修复」的声明。
+
+### 记录在案（不含糊过去）
+
+- **AB 测的不是最终发版文本**: SKILL.md 在臂跑完后又改了 4 处。其中 2 处是**更正既有陈述**
+  （对 eval-1/2/5 而言测的是修改前文本），3 处是为修 eval-4 首轮落败而补（eval-4 v2 测的就是这版），
+  最后 1 处在 v2 之后（fact-stating 更正，不引入新决策分支，未再重测）。
+  判据与逐条归属见 `ab-results/2026-08-26/summary.yaml` 的 `integrity_notes.I2`。
+- **eval-4 首次盲评破盲**: grader 一次以仓根为 root 的 grep 返回了 benchmarks 目录下的路径，
+  仅凭路径名即暴露归属（没打开任何文件）。该评分不采信并归档；以更严指令重评，结论与首评一致，
+  故首轮判定不是破盲造成的。grader 指令已补两条防线。
+- **AB 环境的 CLI 是 1.17.0**（仓内源码与已发版 tag 均为 1.18.0）。这对 with 臂是**逆风**：
+  它得在尚未升级的环境里主张 1.18.0 行为。全部 9 臂环境一致，未中途升级。
+- **`ab-blind.sh` (#332) 首次当门禁生产实跑**: 自检 10/10、变异 4/4、真实数据阳性对照
+  （原样静默 / 注入 2 行 → 3 条 RESIDUE + exit 1）、语义自指宽口径扫描 0 命中。
+  **#332 的实机验收由本轮完成。**
+- **守门层行数警告**: `aether-rotate-pat` SKILL.md 343 → 413 行，超过 400 警戒（未达 500 阻断）。
+  增量全部是门禁驱动的更正与补齐；不为躲警告压缩已核实内容。建议后续把两个 backend 的深水区
+  拆进 `references/`（该 skill 目前 refs 为 0）。
+
 ## [1.12.1] - 2026-08-23 — #326 `aether-rotate-pat` 追平 cli-v1.17.0 + Step 4 假绿验证修复
 
 > Skill 内容变更 = **强制 AB 门**。PASS: **WITH 4/4 WITH_BETTER** (rubric 4.7/4.7/4.75/4.7 vs 3.9/4.1/4.45/4.4),

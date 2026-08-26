@@ -21,7 +21,7 @@ dependencies:
 
 # Aether Forgejo PAT 凭换 (aether-rotate-pat)
 
-> **版本**: 0.3.1 (GA) | **Spec**: #45 Phase 2 | **优先级**: P1
+> **版本**: 0.3.2 (GA) | **Spec**: #45 Phase 2 | **优先级**: P1
 > **AB Benchmark**: **4/4 evals WITH_BETTER (2026-08-09, suite v1.2.0, Aether #275)** —— WITHOUT 臂在
 > eval-4/eval-5 critical FAIL。前基线 3/3 (2026-05-07);已 retire 的 eval-3 由 eval-4 取代。
 
@@ -65,13 +65,32 @@ aether doctor --check pat_inventory_drift   # drift detection
 > `doctor` 只接受 `--check <name>`，**不接位置参数** (`Args: cobra.NoArgs`)。写成
 > `aether doctor pat_age` 会得 `unknown command` —— 该形态从未存在过 (Aether #275)。
 
+> ⚠️ **`registry-auth list` 的 Consumers 列对 `host-docker-config` backend 恒显示 0**
+> (cli-v1.18.0 实测: `heavy-runner-pull-docker-config` 真值 **5 台 host**，表格印 `0`)。
+> 而这个 store 恰恰是台账漏登记过两次的那个 (heavy-4 / heavy-5)。核对它**必须走 JSON**，
+> 别拿会返回假零的那一列去核防漏清单 ([#340](https://forgejo.10cg.pub/10CG/Aether/issues/340)):
+>
+> ```bash
+> aether registry-auth list --json \
+>   | jq '.data.pats[] | select(.id=="heavy-runner-pull-docker-config") | .consumers.hosts | length'
+> ```
+>
+> **边界: 只有这一列这一个 backend 是假的**，别推广成「`list` 不可信」。同一条命令对
+> **forgejo-secrets 行会真的去查 Forgejo**（`registry_auth_list.go` #122 finding 2）:
+> 设了 `AETHER_FORGEJO_TOKEN` 就逐 repo 实查, 给出 `ok` / `drifted` / `unreachable`;
+> **没设**该 env 才回落成 `deferred` 占位。所以看到 `deferred` 的正确反应是**先 export
+> bootstrap PAT 再跑一次**, 而不是转去手工翻 `.forgejo/workflows`。
+
 ---
 
 ## Tier 1 准入边界 (动手前先确认 entry 能自动轮换)
 
-不是每个 inventory entry 都能走 Tier 1。**`--dry-run` 与 `--confirm` 共用同一准入点**
-(cli-v1.16.74 起, #281/#287)，因此 dry-run 拒绝 = confirm 必然也拒绝，dry-run 通过 =
-准入已过。准入拒绝共 **8 种**错误码 (cli-v1.17.0)，各有确定的手工路径：
+不是每个 inventory entry 都能走 Tier 1。**`--dry-run` / `--confirm` / `resume` 共用同一准入点**
+(cli-v1.16.74 起 #281/#287 覆盖前两者，cli-v1.18.0 起 #334 把 `resume` 也接上)，因此 dry-run
+拒绝 = confirm 必然也拒绝，不必再试。准入拒绝共 **9 种**错误码 (cli-v1.18.0)，各有确定的手工路径：
+
+> 反过来**不成立**: 最后一道是**问集群**的，集群状态会变 —— dry-run 通过只说明*当时*准入已过，
+> 不是一张长期通行证。中间被人改了 Variable 键名，`--confirm` 照样会在同一道墙上被拒。
 
 | 错误码 | 触发条件 | 手工路径 |
 |--------|---------|----------|
@@ -82,12 +101,28 @@ aether doctor --check pat_inventory_drift   # drift detection
 | `UNKNOWN_BACKEND` | `consumers.type` 不是 `nomad-variables` / `forgejo-secrets` / `host-docker-config` 之一 (typo) | 修 `.aether/pat-inventory.yaml`。见 runbook **Mode 8** |
 | `FORGEJO_SECRET_NAME_INVALID` | forgejo-secrets entry 的 `consumers.secret_name` 缺失或不匹配 `^[A-Z][A-Z0-9_]*$` | 修 entry 字段后重跑。见 runbook **Mode 9** |
 | `FORGEJO_ORG_REQUIRED` | forgejo-secrets entry 缺 `consumers.org` (否则会打到 `/repos//<repo>/...`) | 补 `consumers.org` 后重跑。见 runbook **Mode 9** |
-| `PREFLIGHT_FAILED` | **仅 `--dry-run`** (nomad-variables, cli-v1.17.0 #312)：dry-run 现在逐 path 对 Nomad 预检父 job，Nomad 不可达 → 拒绝打印无法验证的绿 plan | 修 `NOMAD_ADDR` / `cluster.nomad_addr` 可达性 (`aether doctor`) 后重跑；**离线 dry-run 不再可能** |
+| `PREFLIGHT_FAILED` | 集群预检**跑不起来**（不是跑出了坏结果）。cli-v1.18.0 起 `--dry-run` / `--confirm` / `resume` **三者都可能返回** —— 预检已从 dry-run 专属移到共用准入点；覆盖两个探针：#312 逐 path 父 job 分类（仅 dry-run）与 #334 declared var_key 检查（rotate + resume） | **先读报错分两支**：说 config 解不开 → 本地 `.aether/config.yaml` / `~/.aether/config.yaml` 某字段**类型**不对（标量放在该放块的位置、列表放在该放字符串的位置），**别去查集群**；说探针打不通 → 修 `NOMAD_ADDR` / `cluster.nomad_addr` 可达性（`aether doctor`）。两支都零集群写入 |
+| `DECLARED_VAR_KEY_ABSENT` | nomad-variables entry 的某条 declared path 上**没有该 entry 的有效 var key**（`consumers.var_key` 未声明时 = 默认 `docker_auth_password`）。**不声明 `var_key` 也会触发** —— 默认槽位同样被逐 path 预检。一次列出**全部**缺键 path（非 fail-fast），exit 1，零集群写入 | 看报错里每条 path 的括号分两支：`no Variable at this path` = 该 path 上根本没有 Variable（先建，或它已不是 consumer 就从 entry 里删掉）；`Variable exists but holds no such key` = 键名不同（把该 path 拆成自己的 entry 并写显式 `var_key`，之后它会以 `VAR_KEY_UNSUPPORTED` 被拒 → 走 Mode 8 手工换）。**改台账，不是加 flag**。交叉核对 `aether doctor --check pat_inventory_drift --json`（`kind=declared_var_key_absent`） |
 
-> 判定顺序固定: backend 归属 (Mode 8 两码) → var_key → 可轮换性 (Mode 6/7) → forgejo 字段 (Mode 9)。
+> 判定顺序固定: backend 归属 (Mode 8 两码) → var_key → 可轮换性 (Mode 6/7) → forgejo 字段 (Mode 9)
+> → **集群预检** (`PREFLIGHT_FAILED` / `DECLARED_VAR_KEY_ABSENT`, cli-v1.18.0)。前四道只读台账文件，
+> 最后一道才问集群。因此**声明了自定义 `var_key` 的 entry 永远先撞 `VAR_KEY_UNSUPPORTED`**，
+> 经 CLI 看不到 `DECLARED_VAR_KEY_ABSENT` —— 后者只在有效键 = `docker_auth_password` 时可见。
 > org 级 entry 同时字段畸形时只会看到 `ORG_LEVEL_UNSUPPORTED` —— 终局判定优先，先修字段再跑只是撞第二堵墙。
 > 另有 `BACKEND_MISMATCH` 只在 `resume` 出现 (journal 的 backend 与 entry `consumers.type` 不符)，
 > 正常 CLI 路径到不了，见到即 journal 被手改过。
+
+> ⚠️ **`cleanup` 不跑这两道集群预检**（它只查 backend 归属），是**刻意设计不是遗漏**: cleanup 依
+> journal 的 `CompletedConsumers` 推导 `*_OLD` path，不读 `paths` / `var_key`。给它加同样的守卫，
+> 会让「轮换成功之后才改了台账」的 entry 再也 cleanup 不了 —— 于是 `*_OLD` 里那份**旧 token 永远留在
+> 集群上**，而按期清掉旧凭据正是 24h grace + cleanup 存在的理由。所以「rotate 被硬拒」不蕴含
+> 「cleanup 也被硬拒」，别据此推断上一次轮换的收尾也卡住了。
+
+> 顺带纠一个常见误解：**残留 journal 不会挡住下一次 `rotate`** —— `RotateNomadVariables` 是
+> `NewJournal` 后直接 `WriteAtomic`，无存在性检查，旧 journal 被直接覆盖。它挡住的只有 `cleanup`
+> (`CLEANUP_REFUSED_INCOMPLETE`)。所以删 journal **不是重跑 rotate 的前置条件**; 真正的代价在别处 ——
+> 覆盖会**冲掉上一次中断的现场记录**。这正是下面 Mode 5 / Mode 6 让你「先删 journal 再重跑」的理由:
+> 那是要你**先取证再显式清场**，而不是靠一次盲目重跑把证据顺手抹掉。
 
 > 与 **Mode 4 `BOOTSTRAP_NO_AUTOROTATE` 不同**: 那是 entry **根本没有** `consumers` 块
 > (ops-rotation class 引导凭据，本就不该自动轮换)；上表第三行是**声明了却是空的**，属
@@ -99,10 +134,20 @@ aether doctor --check pat_inventory_drift   # drift detection
 
 > ⚠️ **`last_rotated` 只在真的换过之后才写**。工具拒绝执行时不要顺手 stamp ——
 > 那会把一个未轮换的凭据伪装成已轮换，比不轮换更危险。
+>
+> **但别搞反是谁被骗**: `pat_age` **不读** `last_rotated` (它只看 `rotation_due` / `issued_at`)，
+> 假 stamp **不会**让告警闭嘴，逾期照报。绝大多数 entry 上，`last_rotated` **没有任何机器读者** ——
+> 被骗的纯粹是**读台账的人和审计**。
+>
+> 唯一的例外要精确记: `doctor --check forgejo_actions_secret_drift` 只读 **`org_level: true` 的
+> forgejo-secrets entry** 的 `last_rotated`（源码里只有 `OrgLevel` 分支往锚点表里写值），拿它判
+> 各 repo 的 secret 是否陈旧 (#299)。所以**只有对 org 级 entry 假 stamp**才会让它把新鲜 repo
+> secret 打成 STALE；对 repo 级或 nomad-variables entry 假 stamp，该检查根本读不到。
+> (自带台账条目的 repo 级覆盖另有 `declaredRepoOverride` 豁免，不会被报 shadowing。)
 
-> ⚠️ **cli < 1.16.74 存在假绿**: 旧版 `--dry-run` 不校验 var_key，对上表第一种 entry 会
-> 打印完整绿色 5-step plan 并 exit 0，直到 `--confirm` 才报晦涩的
-> `missing docker_auth_password key`。撞到这个组合先 `aether version`。
+> ⚠️ **cli < 1.16.74 存在假绿**: 旧版 `--dry-run` 不校验 var_key，对上表第一种 entry 会打印
+> 完整绿色 5-step plan 并 exit 0，直到 `--confirm` 才报晦涩的 `missing docker_auth_password key`。
+> 撞到这个组合先 `aether version`。
 
 ---
 
@@ -131,7 +176,7 @@ aether registry-auth rotate --pat-id <id> --dry-run
 - `Consumer count` = inventory 中的 paths 数量
 - 每个 path 都是预期 job 名
 - 没有未声明的 consumer (drift 应先解决)
-- 若报上节 8 码之一 → 该 entry **不走 Tier 1** (或环境没就绪)，转上节手工路径
+- 若报上节 9 码之一 → 该 entry **不走 Tier 1** (或环境/台账没就绪)，转上节手工路径
   (confirm 也会同样拒绝，别再试)
 - cli-v1.17.0 起 plan entry 带 `verify_class`：`job_not_found` / `batch_parent` / `dead` 类 path
   只列 3 步 (跳 RESTART/VERIFY)，信封有 `verify_skipped_count` — 这是预期，不是缺陷；
@@ -237,6 +282,20 @@ revoke 旧 token. 详见 emergency runbook.
 **修复**: 读 journal `errors[]` 字段定位根因 → 修复 (重启 Nomad / 扩
 token scope / 排空节点) → 删 journal → 重新 rotate.
 
+### Mode 6: `RESUME_PRE_STATE_LOST` (cli-v1.18.0 新增)
+
+**根因**: journal 记的是该 consumer 的 Variable 已 `DELETE`，但那条 path 上**现在没有任何
+Variable** —— 轮换恰好断在 `DELETE` 与 `PUT_NEW` 之间。该 path 轮换前的其余键
+(`docker_auth_user` 以及这条 path 原本携带的任何兄弟键) 此刻**哪里都不存在**:
+`*_OLD` sibling 要到 `PUT_OLD` (5 步里的第 3 步, 在 `PUT_NEW` 之后) 才写，中断点还没走到那里。
+
+**修复**: **不要再跑 resume** —— 它会到达同一状态，唯一能做的就是把只含一个键的 Variable
+写回去，那正是这道哨兵拦下来的事。手工用 `aether env set --job <job> ... --from-file <file>`
+按该 path 应有的键集重建 Variable → 删 journal → 从干净状态重跑 rotate。
+
+> 这是**止血哨兵，不是修好了**: 该窗口目前只能响亮地停下，不能恢复。根治 (journal 持久化
+> pre-state 键集) 跟踪 [#339](https://forgejo.10cg.pub/10CG/Aether/issues/339)。
+
 ---
 
 ## forgejo-secrets backend 流程 (TASK-2.7b GA, 2026-05-09)
@@ -268,15 +327,11 @@ export AETHER_FORGEJO_TOKEN="<bootstrap PAT, write:repository>"  # 必需 (勿�
 
 chmod 600 /tmp/new.pat /tmp/old.pat   # 注意: 必须双 token 文件
 
+# 同一条命令换末尾 flag: --dry-run 先预览 (N repos x 2 sub-steps), 再 --confirm 真执行
 aether registry-auth rotate --pat-id forgejo-actions-ci-2026-Q2 \
   --new-token-file /tmp/new.pat \
   --old-token-file /tmp/old.pat \
-  --dry-run    # 预览: N repos × 2 sub-steps
-
-aether registry-auth rotate --pat-id forgejo-actions-ci-2026-Q2 \
-  --new-token-file /tmp/new.pat \
-  --old-token-file /tmp/old.pat \
-  --confirm    # 真执行
+  --dry-run
 
 # 完成后立即可 cleanup (无 24h grace, 无 _OLD sibling)
 aether registry-auth cleanup --pat-id forgejo-actions-ci-2026-Q2
@@ -301,6 +356,16 @@ forgejo backend 设计上拒绝 auto-resume (单 slot 无 _OLD 备份, OldToken 
 - **FORGEJO_MANUAL_RECOVERY_REQUIRED**: chaos-kill 后 resume → 走 emergency runbook
 - **CLEANUP_REFUSED_INCOMPLETE**: journal status 非 complete → resume 推到 complete (会触发 emergency 路径)
 
+> ⚠️ **`secret_name` 是 entry 级, 全部 repo 共用一个**（`forgejo_rotate.go` 取一次
+> `Consumers.SecretName` 后在 repo 循环里反复用）。所以一个 entry 装不下「不同 repo 用不同
+> secret 名」—— 那种情况要拆成多个 entry, 不是在一个 entry 里想办法。
+>
+> ⚠️ **`rolled_back` ≠ 已验证恢复**。best-effort rollback 的实际动作是: 按
+> `CompletedConsumers` **逆序**逐 repo「DELETE 新值 → PUT 回旧值」, 再对失败点那个 in-flight
+> repo 补一次 PUT 旧值。但这些调用的错误是**被直接丢弃的**（源码里是 `_ =`），既不中断也不上报。
+> 所以 journal 写 `rolled_back` 只说明**回滚流程跑完了**, 不说明每个 repo 的旧值真的回去了 ——
+> 必须自己逐 repo 核一遍 secret 的 `created_at`（`list` 那条实查路径, 或 Forgejo UI）。
+
 ---
 
 ## 操作员 checklist
@@ -311,7 +376,7 @@ forgejo backend 设计上拒绝 auto-resume (单 slot 无 _OLD 备份, OldToken 
 □ Forgejo web UI 生成新 PAT (匹配 scope)
 □ chmod 600 /tmp/new.pat
 □ aether registry-auth rotate --pat-id <id> --dry-run
-□ 核对 plan (若报准入拒绝 8 码之一 → 转手工路径, 不要 --confirm)
+□ 核对 plan (若报准入拒绝 9 码之一 → 转手工路径, 不要 --confirm)
 □ aether registry-auth rotate --pat-id <id> --new-token-file /tmp/new.pat --confirm
 □ aether status <jobname>                      — 验证 alloc running
 □ registry /v2 tags 探针 (新 token, -K 配置文件)  — 期望 200; **不要**用 ssh docker pull (另一套凭据, 恒绿)
@@ -334,7 +399,12 @@ forgejo backend 设计上拒绝 auto-resume (单 slot 无 _OLD 备份, OldToken 
 
 ---
 
-**Last updated**: 2026-08-23 (Aether #326 — pat_age 告警档追平 #302 cadence 相对标签 · 准入错误码
+**Last updated**: 2026-08-26 (Aether #338 — 追平 cli-v1.18.0: 准入 8 码表 → **9 码**
+(+`DECLARED_VAR_KEY_ABSENT`) · `PREFLIGHT_FAILED` 作用域由「仅 `--dry-run`」更正为
+`--dry-run`/`--confirm`/`resume` 三入口 + 两支 suggested_action 分流 · 明示 `cleanup`
+**刻意不跑**集群预检 · 新增 Mode 6 `RESUME_PRE_STATE_LOST` · `registry-auth list` 的
+Consumers 列对 host-docker-config 恒显示 0 (#340))
+2026-08-23 (Aether #326 — pat_age 告警档追平 #302 cadence 相对标签 · 准入错误码
 三码表扩为 8 码表 (+BACKEND_NOT_ROTATABLE/UNKNOWN_BACKEND/FORGEJO_SECRET_NAME_INVALID/
 FORGEJO_ORG_REQUIRED/PREFLIGHT_FAILED) · dry-run verify_class 说明 ·
 Step 4 验证改为真消费新 token 的 registry 探针 — 原 `ssh heavy-N docker pull` 验的是节点

@@ -3,7 +3,7 @@
 
 cli:
   min_version: "1.0.0"
-  recommended_version: "1.17.0"
+  recommended_version: "1.18.0"
   # 安装位置 (与 config.yaml 同目录)
   install_dir: "~/.aether"
   install_path:
@@ -77,6 +77,16 @@ compatibility:
     cli_min: "1.0.0"
     cli_recommended: "1.13.2"
     notes: "doctor heuristic refinements (Aether #47); migrate-script timestamp tightening (#48); host_volume_parity / docker_disk_pressure / docker_root_on_nfs driver-filter (Aether #67)"
+
+  - plugin_version: "1.12.2+"
+    cli_min: "1.0.0"
+    cli_recommended: "1.18.0"
+    notes: >-
+      Aether #338: aether-rotate-pat 准入码表 8 → 9 (+DECLARED_VAR_KEY_ABSENT),
+      且 PREFLIGHT_FAILED 不再只由 --dry-run 产生。两者都需 cli >= 1.18.0 (#334):
+      更早版本对「declared path 上缺 declared var key」的 entry 会照常 rotate,
+      把新 token 写进一个没人读的槽位并报 complete。skill 内已标注版本边界,
+      故 cli_min 保持 1.0.0 不上抬。
 
   - plugin_version: "1.12.x"
     cli_min: "1.0.0"
