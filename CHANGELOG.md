@@ -2,6 +2,20 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.12.3] - 2026-09-02 — #235 排障表补 L1 直跑路径 OOM 签名（裸 `Killed` 137）
+
+> 纯 reference 文档新增（`references/forgejo-ci-optimization.md` 错误签名表加一行），
+> 无 SKILL.md 内容变更 — 不触发 AB 门。
+
+### Added — `references/forgejo-ci-optimization.md`
+
+- **错误签名表新增 L1 act-job 直跑路径行**（#235 租户 08-09 请求，两种签名并列）:
+  裸 `Killed` + `exitcode '137'`（**无** `ResourceExhausted`/`npm error` 上下文，出现在
+  workflow 直跑步骤如 `run: npm run build`）= **L1 act-job 容器** memcg 命中 —— 与既有
+  builder 行（exit 102 + `ResourceExhausted`）是**两条不同路径**，按旧签名 grep 会漏判。
+  处置指向节点侧 `container.options`（改 workflow 无效）与
+  `forgejo-runner-memory-limits.md` §5.3 amendment（2026-09-02 L1 +2 GiB swap 头寸）。
+
 ## [1.12.2] - 2026-08-26 — #338 `aether-rotate-pat` 追平 cli-v1.18.0 + #335 `aether-conventions` 触发边界
 
 > Skill 内容变更 = **强制 AB 门**。PASS: **WITH 4/4 WITH_BETTER**
