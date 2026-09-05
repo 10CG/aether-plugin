@@ -1,6 +1,6 @@
 {
   "version": "1.12.3",
-  "description": "Aether 基础设施部署 Hooks 配置 - 13个 Skills + 2个 Agents + 3个 Hooks",
+  "description": "Aether 基础设施部署 Hooks 配置 - 17个 Skills + 2个 Agents + 4个 Hooks",
   "enabled": true,
   "hooks": {
     "PreToolUse": [
@@ -28,6 +28,43 @@
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/benchmark-aggregate-hook.sh",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/conn-guard-hook.sh posttooluse",
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/conn-guard-hook.sh posttooluse",
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/conn-guard-hook.sh observe",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/conn-guard-hook.sh stop",
+            "timeout": 15
           }
         ]
       }
