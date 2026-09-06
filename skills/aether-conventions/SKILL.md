@@ -80,6 +80,12 @@ allowed-tools: Bash, Read, AskUserQuestion, Skill
        进 HCL。
     3. 推荐装本地分流器 —— 完整可复制配方是维护者专属指针 (见 §关联)，不在本 skill
        verbatim 复制 (随集群演进腐化，且 canonical 明标该配方属 10cg.local 地界)。
+  - **自查**（改完，或接手他人写的配置时）：
+    ```bash
+    aether conn-guard <项目路径>          # aether-cli v1.19.0+
+    ```
+    输出末尾若提示扫描范围被截断（子目录超过深度上限、文件超过大小上限），
+    按提示加对应 flag 重扫 —— 否则那部分是没看过的。
 
 - **集群外/漫游设备 (case D，subnet router) / 无法改 resolver 的黑盒设备 (case E，VIP)**：
   依赖 #244 尚未落地，本域只给出上面的原理和指针，不发运机制细节。

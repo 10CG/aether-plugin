@@ -2,6 +2,38 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.12.4] - 2026-09-06 — aether-conventions case C 增加 conn-guard 自查命令（#366）
+
+> **SKILL.md 内容变更，已过 AB 门**（增量回归门，判定 PASS）。
+> 证据: `aether-plugin-benchmarks/ab-results/2026-09-06-366-conn-guard-selfcheck/`
+
+### Added
+
+`skills/aether-conventions/SKILL.md` §2 DNS 域 case C 的决策桥之后，新增一条自查命令：
+`aether conn-guard <项目路径>`（aether-cli v1.19.0+），并说明「输出提示扫描范围被截断时
+须按提示加 flag 重扫」。
+
+case C 此前**只有规则没有自查手段** —— 「绝不把 IP 钉进任何可能进 HCL 的文件」
+全靠自律，改完无从验证。该命令是 Aether #246 降级后保留的检出能力
+（放弃实时拦截，保留诊断）。
+
+### AB 门（增量回归门）
+
+既有两份 PASS 数据仍代表当前行为（2026-07-15 质量门 `c7555c9` / 2026-08-23 触发精度门
+`ad6ca7a`），故只为新增行为加一个场景，不重跑既有场景。
+
+判据不追求证明增益，而是**测有没有回归** —— 「加了工具指引会不会让 AI 只拄工具输出、
+放弃语义判断」。五维度 base×4 vs post×4，**无任何维度劣化**：召回 5/5 持平、
+误报 0 持平、`deploy.sh` 语义裁决 4/4 持平、截断处理 4/4 持平、`dig` 自测 post 略优。
+
+反向证据：post 臂 **4/4 主动实测了工具的判据边界**（`http` scheme 一律不报、
+拆分式 host/port 看不见），并明确声明结论是自己判的而非「工具说没事」。
+工具指引不仅没让 agent 变懒，反而多出一层对工具盲区的审视。
+
+**三条局限随结论引用**（详见 RESULTS.md）: fixture 的 D1 设计有误（它是真阳性不是干扰项）·
+证明的是无回归不是有增益（增益命题在此规模下有天花板，v1 轮已实证）·
+注入式对照不覆盖「skill 会不会被加载」（由 08-23 触发精度门承担）。
+
 ## [1.12.3] - 2026-09-02 — #235 排障表补 L1 直跑路径 OOM 签名（裸 `Killed` 137）
 
 > 纯 reference 文档新增（`references/forgejo-ci-optimization.md` 错误签名表加一行），
