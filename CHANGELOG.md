@@ -2,6 +2,23 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.12.5] - 2026-09-06 — 补 v1.12.4 漏更的 requirements.yaml（发版疏漏修正）
+
+> **无 SKILL.md 变更，不触发 AB 门。** 纯元数据补漏。
+
+### Fixed
+
+v1.12.4 发版时**漏更了 `.claude-plugin/requirements.yaml`** —— 该文件是版本要求的
+单一事实来源，但核对 7 文件清单时只在仓库根查找而未查 `.claude-plugin/` 子目录，
+误判为「文件不存在」。本版补上两处：
+
+- `cli.recommended_version`: `1.18.0` → **`1.19.0`**（aether-cli 已于 2026-09-06 发布 1.19.0）
+- 兼容性矩阵新增 `plugin_version: "1.12.4+"` 条目：记录 §2 case C 的
+  `aether conn-guard` 需 cli ≥ 1.19.0，更早版本执行会得 `unknown command`；
+  `cli_min` 保持 1.0.0 不上抬，因为其余 case A/C/D/E 决策路径不依赖该命令。
+
+跟踪：Aether #371。
+
 ## [1.12.4] - 2026-09-06 — aether-conventions case C 增加 conn-guard 自查命令（#366）
 
 > **SKILL.md 内容变更，已过 AB 门**（增量回归门，判定 PASS）。

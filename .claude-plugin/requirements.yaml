@@ -3,7 +3,7 @@
 
 cli:
   min_version: "1.0.0"
-  recommended_version: "1.18.0"
+  recommended_version: "1.19.0"
   # 安装位置 (与 config.yaml 同目录)
   install_dir: "~/.aether"
   install_path:
@@ -97,6 +97,15 @@ compatibility:
       这三码需 cli >= 1.16.74 (#281) / 1.16.75 (#287) 才会由 --dry-run 与 --confirm
       共用准入点一致给出;更早版本的 dry-run 对自定义 var_key entry 会打印假绿 5-step plan。
       skill 内已就此标注版本边界, 故 cli_min 保持 1.0.0 不上抬。
+
+  - plugin_version: "1.12.4+"
+    cli_min: "1.0.0"
+    cli_recommended: "1.19.0"
+    notes: >-
+      Aether #366: aether-conventions §2 case C 增加自查命令 `aether conn-guard <路径>`。
+      该子命令自 cli 1.19.0 起提供 (#246 降级后保留的检出能力); 更早版本执行会得
+      `unknown command`。skill 内已就此标注 "aether-cli v1.19.0+", 故 cli_min 保持
+      1.0.0 不上抬 —— 其余 case A/C/D/E 决策路径不依赖该命令。
 
 # 依赖 CLI 的 Skills
 dependent_skills:
