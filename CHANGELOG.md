@@ -2,6 +2,31 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.12.6] - 2026-09-07 — aether-rotate-pat 追平 cli-v1.20.0 的 4-step CAS 轮换（#339）
+
+`aether registry-auth rotate` 的 nomad-variables backend 在 cli-v1.20.0 把主写改成一次
+compare-and-swap PUT，序列从 5 步变 4 步（首步 `DELETE` 去掉）。SKILL.md 有 6 处仍写 5 步。
+
+### Changed
+
+- 5 处步数明文订正为 4 步，并说明 `PUT_NEW` 是带 ModifyIndex 的 CAS 写、并发写会被 409 拒
+- 补 journal schema **1.2 不向下兼容**：resume 必须用启动那次轮换的同一 CLI 版本
+- `Mode 6: RESUME_PRE_STATE_LOST` 补版本分支：>= 1.20.0 轮换本身不再产生这个状态，
+  仍报该错 = 别的东西删了那条 Variable；1.18.0~1.19.x 才是原来那个窗口
+- 同段补：schema 1.2 的 journal 在 `current_consumer.pre_item_keys` 里记着轮换前的**键名**
+  （不含值），手工重建时直接读，不用靠猜
+
+### AB 回归门（`ab-results/2026-09-07/`）
+
+判据是**回归**不是增益 —— 「文档写了 4 步 → agent 就说 4 步」是同义反复。
+
+**第一版候选 FAIL 且两轮复现**：它重写了 Mode 6、删掉「这是止血哨兵，不是修好了：只能响亮
+地停下，不能恢复」那句定性，结果读它的臂在 eval-2 上丢了「old token 明文丢了怎么办」那一支
+（post 4/5 vs base 5/5）。该条期望依赖的文本在两版里**逐字节相同** —— 掉的是语气，不是事实。
+
+**合入的是第二版**（只增不删：保留那句定性，只加版本限定），重测 post 5/5 vs base 4/5。
+**只合入被测的那一版。**
+
 ## [1.12.5] - 2026-09-06 — 补 v1.12.4 漏更的 requirements.yaml（发版疏漏修正）
 
 > **无 SKILL.md 变更，不触发 AB 门。** 纯元数据补漏。

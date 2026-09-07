@@ -42,7 +42,8 @@ PAT 即将过期或已过期?
 > 别混。
 
 **决策核心**: 双 backend 全部 GA (2026-05-08 nomad-variables + 2026-05-09 forgejo-secrets).
-- `nomad-variables` (runtime class) — 5-step + atomic rollback + 24h grace, chaos-kill 可 resume
+- `nomad-variables` (runtime class) — 4-step + atomic rollback + 24h grace, chaos-kill 可 resume
+  (cli-v1.20.0 起 4 步; 此前是 5 步, 头一步 `DELETE`)
 - `forgejo-secrets` (ci-build class) — 2-step + best-effort rollback, chaos-kill 必须走 emergency runbook (单 slot 语义不能 auto-resume)
 
 ---
@@ -146,12 +147,12 @@ aether doctor --check pat_inventory_drift   # drift detection
 > (自带台账条目的 repo 级覆盖另有 `declaredRepoOverride` 豁免，不会被报 shadowing。)
 
 > ⚠️ **cli < 1.16.74 存在假绿**: 旧版 `--dry-run` 不校验 var_key，对上表第一种 entry 会打印
-> 完整绿色 5-step plan 并 exit 0，直到 `--confirm` 才报晦涩的 `missing docker_auth_password key`。
+> 完整绿色 plan 并 exit 0，直到 `--confirm` 才报晦涩的 `missing docker_auth_password key`。
 > 撞到这个组合先 `aether version`。
 
 ---
 
-## 5-step 轮换流程 (`nomad-variables` backend)
+## 轮换流程 (`nomad-variables` backend)
 
 ### Step 1: 生成新 PAT (Forgejo web UI)
 
@@ -189,9 +190,15 @@ aether registry-auth rotate --pat-id <id> \
   --new-token-file /tmp/new.pat --confirm
 ```
 
-每个 consumer 走 5 sub-step: `DELETE_OK` → `PUT_NEW_OK` → `PUT_OLD_OK` →
-`RESTART_OK` → `VERIFY_OK`. journal 写入
-`.aether/tmp/rotation-state-<pat-id>.json`.
+每个 consumer 走 4 sub-step: `PUT_NEW_OK` → `PUT_OLD_OK` → `RESTART_OK` →
+`VERIFY_OK`. journal 写入 `.aether/tmp/rotation-state-<pat-id>.json` (schema 1.2)。
+
+`PUT_NEW` 是**一次 compare-and-swap 写**: 拿 pre-read 的 ModifyIndex 作 cas 条件, 并发
+写会被 409 拒掉而不是静默覆盖。cli-v1.20.0 之前是 5 步, 头一步先 `DELETE` 再 `PUT_NEW` ——
+那两步之间该 path 上什么都没有, 进程死在那里则兄弟键只剩内存里那一份 (见 Mode 6)。
+
+> **schema 1.2 不向下兼容**: 1.20.0 写的 journal, 老版本 CLI 读不了 (`ErrJournalSchemaMismatch`),
+> 反之亦然。**resume 必须用启动那次轮换的同一个 CLI 版本。**
 
 期望输出: `journal_status: complete`.
 
@@ -284,6 +291,11 @@ token scope / 排空节点) → 删 journal → 重新 rotate.
 
 ### Mode 6: `RESUME_PRE_STATE_LOST` (cli-v1.18.0 新增)
 
+**先看 `aether version`**:
+- **>= 1.20.0** — 轮换**本身**不会再产生这个状态 (主写改成一次 CAS PUT, 没有「path 上空无
+  一物」的瞬间, #339)。仍报这个错 = **别的东西删了那条 Variable**, 照下面走并去查是谁删的。
+- **1.18.0 ~ 1.19.x** — 轮换断在 `DELETE` 与 `PUT_NEW` 之间就会到这里。
+
 **根因**: journal 记的是该 consumer 的 Variable 已 `DELETE`，但那条 path 上**现在没有任何
 Variable** —— 轮换恰好断在 `DELETE` 与 `PUT_NEW` 之间。该 path 轮换前的其余键
 (`docker_auth_user` 以及这条 path 原本携带的任何兄弟键) 此刻**哪里都不存在**:
@@ -293,14 +305,19 @@ Variable** —— 轮换恰好断在 `DELETE` 与 `PUT_NEW` 之间。该 path �
 写回去，那正是这道哨兵拦下来的事。手工用 `aether env set --job <job> ... --from-file <file>`
 按该 path 应有的键集重建 Variable → 删 journal → 从干净状态重跑 rotate。
 
-> 这是**止血哨兵，不是修好了**: 该窗口目前只能响亮地停下，不能恢复。根治 (journal 持久化
-> pre-state 键集) 跟踪 [#339](https://forgejo.10cg.pub/10CG/Aether/issues/339)。
+> 这是**止血哨兵，不是修好了**: 在 **cli-v1.18.0 ~ 1.19.x** 上，该窗口只能响亮地停下，
+> 不能恢复 —— 撞上了就只有上面那条手工重建的路。根治已随 **cli-v1.20.0** 落地
+> ([#339](https://forgejo.10cg.pub/10CG/Aether/issues/339)): 主写变成单次 CAS 写，窗口不再存在。
+>
+> **该 path 原本有哪些键**: schema 1.2 (cli-v1.20.0+) 的 journal 在
+> `current_consumer.pre_item_keys` 里记着轮换前的**键名**(不含值)，重建时直接读它，
+> 不用靠猜。1.2 之前的 journal 没有这一栏。
 
 ---
 
 ## forgejo-secrets backend 流程 (TASK-2.7b GA, 2026-05-09)
 
-ci-build class PAT (例如 `forgejo-actions-ci-2026-Q2`) 走单 slot 2-step 流程, 与 nomad-variables 5-step 显著不同。
+ci-build class PAT (例如 `forgejo-actions-ci-2026-Q2`) 走单 slot 2-step 流程, 与 nomad-variables 的 4-step 显著不同。
 
 ### 关键差异
 
