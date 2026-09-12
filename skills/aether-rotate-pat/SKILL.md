@@ -39,8 +39,7 @@ PAT 即将过期或已过期?
 > `non_expiring` 的处理见 [admission-forensics.md](references/admission-forensics.md)。
 
 **决策核心**: 双 backend 全部 GA (2026-05-08 nomad-variables + 2026-05-09 forgejo-secrets).
-- `nomad-variables` (runtime class) — 4-step + atomic rollback + 24h grace, chaos-kill 可 resume
-  (cli-v1.20.0 起 4 步; 此前是 5 步, 头一步 `DELETE`)
+- `nomad-variables` (runtime class) — 4-step (cli-v1.20.0 起; 此前 5 步, 头一步 `DELETE`) + atomic rollback + 24h grace, chaos-kill 可 resume
 - `forgejo-secrets` (ci-build class) — 2-step + best-effort rollback, chaos-kill 必须走 emergency runbook (单 slot 语义不能 auto-resume)
 
 ---
@@ -57,11 +56,15 @@ aether doctor --check pat_inventory_drift   #    drift detection
 
 > `doctor` 只接受 `--check <name>`，**不接位置参数** (`Args: cobra.NoArgs`)。写成
 > `aether doctor pat_age` 会得 `unknown command` —— 该形态从未存在过 (Aether #275)。
+>
+> ⚠️ **台账含第四/第五类 backend 的仓 (本仓自 #393 起) 需 cli ≥ 1.20.4**。更早的 binary 内嵌 schema
+> 不认 `forgejo-push-mirror` / `github-actions-secrets`，会把**整份**台账拒载 (`INVENTORY_PARSE_FAILED`，
+> 列出 N 条「违例」并引导你去核对台账) —— 那是 **CLI 太旧，不是台账写错**。先升级，不要按报错改删条目。
 
 > ⚠️ **`registry-auth list` 的 Consumers 列: 后缀就是它的可信度** (cli-v1.20.3 起)。
 > `nomad-variables` 印 `<已核验>/<登记>`；`forgejo-secrets` 印 `N (deferred)`；
-> `host-docker-config` 与 `forgejo-push-mirror` 印 `N (declared)` —— 后两个 backend
-> **没有在线核验路径**，`(declared)` 明说这数字是**登记**而不是现场。
+> `host-docker-config` / `forgejo-push-mirror` / `github-actions-secrets` 印 `N (declared)` ——
+> 后三个 backend **没有在线核验路径**，`(declared)` 明说这数字是**登记**而不是现场。
 >
 > ⚠️ **但 cli ≤ 1.20.2 的机器上这两列是恒零的假零** ([#340](https://forgejo.10cg.pub/10CG/Aether/issues/340))：
 > 老版本算 total 只加 `paths + repos`，登记在 `hosts[]` / `mirrors[]` 的消费者一律印 `0` ——
@@ -70,14 +73,12 @@ aether doctor --check pat_inventory_drift   #    drift detection
 > 所以**先 `aether version`**；是老版本就别拿这一列去核防漏清单，改走 JSON：
 >
 > ```bash
-> aether registry-auth list --json \
->   | jq '.data.pats[] | select(.id=="heavy-runner-pull-docker-config") | .consumers.hosts | length'
+> aether registry-auth list --json | jq '.data.pats[] | select(.id=="heavy-runner-pull-docker-config") | .consumers.hosts | length'
 > ```
 >
-> 边界: 这是**该列在老版本上的**缺陷，别推广成「`list` 不可信」—— 同一条命令对
-> **forgejo-secrets 行会真的去查 Forgejo**: 设了 `AETHER_FORGEJO_TOKEN` 就逐 repo 实查，
-> 没设才回落成 `deferred` 占位。看到 `deferred` 应**先 export bootstrap PAT 再跑一次**,
-> 而不是转去手工翻 `.forgejo/workflows`。四列语义全表见 [admission-forensics.md](references/admission-forensics.md)。
+> 边界: 这是**该列在老版本上的**缺陷，别推广成「`list` 不可信」—— 同一条命令对 **forgejo-secrets 行
+> 会真的去查 Forgejo**: 设了 `AETHER_FORGEJO_TOKEN` 就逐 repo 实查，没设才回落成 `deferred` 占位。看到
+> `deferred` 应**先 export bootstrap PAT 再跑一次**，而不是转去手工翻 `.forgejo/workflows`。五列语义全表见 [admission-forensics.md](references/admission-forensics.md)。
 
 ---
 
@@ -95,8 +96,8 @@ aether doctor --check pat_inventory_drift   #    drift detection
 | `VAR_KEY_UNSUPPORTED` | consumer 用自定义 var key (非 `docker_auth_password`)，如 aria-build 的 `FORGEJO_BOT_PAT` | `aether env set --job <job> <KEY> --from-file <file>` → 手工更新 inventory `last_rotated` |
 | `ORG_LEVEL_UNSUPPORTED` | entry 是 **org 级** Actions secret (Tier 1 只做 repo 级) | Forgejo org Settings → Actions → Secrets 手工换 → 手工写 `last_rotated`。见 runbook **Mode 6** |
 | `NO_ROTATABLE_CONSUMERS` | entry **有** `consumers` 块但 `paths` / `repos` 为空 → 轮换会"成功"却零次 API 调用 | 修 `.aether/pat-inventory.yaml` 的 `consumers.paths` / `consumers.repos`。见 runbook **Mode 7** |
-| `BACKEND_NOT_ROTATABLE` | backend 登记得**没错**，但 Tier 1 不碰它。**两个成员**: `host-docker-config` (凭据住在节点上的某个 docker config) 与 `forgejo-push-mirror` (GitHub PAT，住在 Forgejo 的 push-mirror 配置里，#384) | **两支路径不同，别串**：`host-docker-config` → 在**报错列出的那些 host** 上 `docker login`（`--password-stdin`）；`forgejo-push-mirror` → 到 **GitHub 上重新生成**，再到**每个 repo 的 Settings → Mirror Settings 重新填入**。两者事后都要手工写 `last_rotated`。见 runbook **Mode 8** |
-| `UNKNOWN_BACKEND` | `consumers.type` 不是四个合法值之一 (typo)：`nomad-variables` / `forgejo-secrets` / `host-docker-config` / `forgejo-push-mirror` | 修 `.aether/pat-inventory.yaml`。见 runbook **Mode 8** |
+| `BACKEND_NOT_ROTATABLE` | backend 登记得**没错**，但 Tier 1 不碰它。**三个成员**: `host-docker-config` (凭据住在节点上的某个 docker config)、`forgejo-push-mirror` (GitHub PAT，住在 Forgejo 的 push-mirror 配置里，#384)、`github-actions-secrets` (第三方签发如 npmjs，存在 **GitHub** 仓的 Actions secret 里，#387) | **三支路径互不相通，别串**：`host-docker-config` → 在**报错列出的那些 host** 上 `docker login`（`--password-stdin`）；`forgejo-push-mirror` → 到 **GitHub 上重新生成**，再到**每个 repo 的 Settings → Mirror Settings 重新填入**；`github-actions-secrets` → 到**发行方**重新签发，再到 entry `github_repos[]` 列出的**每个 GitHub 仓** Settings → Secrets and variables → Actions 更新 `secret_name` 同名 secret（只写不回读，换没换成只能靠下一次 CI 实跑验证）。三者事后都要手工写 `last_rotated`。见 runbook **Mode 8** |
+| `UNKNOWN_BACKEND` | `consumers.type` 不是五个合法值之一 (typo)：`nomad-variables` / `forgejo-secrets` / `host-docker-config` / `forgejo-push-mirror` / `github-actions-secrets` | 修 `.aether/pat-inventory.yaml`。见 runbook **Mode 8** |
 | `FORGEJO_SECRET_NAME_INVALID` | forgejo-secrets entry 的 `consumers.secret_name` 缺失或不匹配 `^[A-Z][A-Z0-9_]*$` | 修 entry 字段后重跑。见 runbook **Mode 9** |
 | `FORGEJO_ORG_REQUIRED` | forgejo-secrets entry 缺 `consumers.org` (否则会打到 `/repos//<repo>/...`) | 补 `consumers.org` 后重跑。见 runbook **Mode 9** |
 | `PREFLIGHT_FAILED` | 集群预检**跑不起来**（不是跑出了坏结果）。cli-v1.18.0 起 `--dry-run` / `--confirm` / `resume` **三者都可能返回** —— 预检已从 dry-run 专属移到共用准入点；覆盖两个探针：#312 逐 path 父 job 分类（仅 dry-run）与 #334 declared var_key 检查（rotate + resume） | **先读报错分两支**：说 config 解不开 → 本地 `.aether/config.yaml` / `~/.aether/config.yaml` 某字段**类型**不对（标量放在该放块的位置、列表放在该放字符串的位置），**别去查集群**；说探针打不通 → 修 `NOMAD_ADDR` / `cluster.nomad_addr` 可达性（`aether doctor`）。两支都零集群写入 |
@@ -107,21 +108,20 @@ aether doctor --check pat_inventory_drift   #    drift detection
 > 后者 = **entry 是错的** (`consumers.type` 拼错了，去修台账)。
 > 把前者当后者处理，会让操作员去审一个本来就没问题的文件。
 >
-> ⚠️ 对这个码 **要读 `error.message`，别只读 `suggested_action`** (cli-v1.20.3 实测):
-> `classifyBackendRefusal` 对两个成员返回**同一条** `suggested_action`，措辞是 docker-config
-> 那一支的（"`docker login` on the hosts named in the message above"）—— push-mirror 照做
-> 等于跑去错误的机器上。逐成员正确的做法只写在 `error.message` 里，且它会**指名这条 entry
-> 自己的** host / mirror: 同一批节点上 `/root/.docker/config.json` 也存在且装着另一枚真凭据，
-> 照硬编码路径去 `docker login` 会成功地换错 store 然后 stamp `last_rotated`。
+> ⚠️ 对这个码 **要读 `error.message`，别只读 `suggested_action`**: `classifyBackendRefusal` 对三个成员
+> 返回**同一条** `suggested_action`。cli ≤ 1.20.3 那条措辞是 docker-config 那一支的（"`docker login` on
+> the hosts named in the message above"）—— push-mirror / Actions-secret 照做等于跑去错误的机器；
+> cli-v1.20.4 (#393) 起改为不指向任何 store 的中性文案。逐成员正确的做法**只写在 `error.message` 里**，
+> 且它会**指名这条 entry 自己的** host / mirror / repo + secret 名: 同一批节点上 `/root/.docker/config.json`
+> 也存在且装着另一枚真凭据，照硬编码路径去 `docker login` 会成功地换错 store 然后 stamp `last_rotated`。
 >
-> **push-mirror 注定进不了 Tier 1**: Forgejo 的 `GET push_mirrors` **从不返回凭据**
-> (连 `remote_address` 的 userinfo 都被剥掉)，既没有可指纹的旧值也无处写新值 ——
-> 不是没实现，是 API 面上就没有。字段全表见
-> [admission-forensics.md](references/admission-forensics.md)。
+> **push-mirror 与 Actions-secret 都注定进不了 Tier 1**: Forgejo 的 `GET push_mirrors` **从不返回凭据**
+> (连 `remote_address` 的 userinfo 都被剥掉)；GitHub Actions secret **只写不回读**，且发行方 (npmjs) 与
+> 存放处 (GitHub) 两个 API 工具都不说。既没有可指纹的旧值也无处写新值 —— 不是没实现，是 API 面上
+> 就没有。字段全表见 [admission-forensics.md](references/admission-forensics.md)。
 
-> 判定顺序固定 (backend 归属 → var_key → 可轮换性 → forgejo 字段 → 集群预检)，前四道只读
-> 台账文件、最后一道才问集群。由此推出的相邻结论（哪个码盖住哪个、`cleanup` 为何**刻意**不跑
-> 预检、残留 journal 挡不挡 rotate）见 [admission-forensics.md](references/admission-forensics.md)。
+> 判定顺序固定 (backend 归属 → var_key → 可轮换性 → forgejo 字段 → 集群预检)，前四道只读台账文件、
+> 最后一道才问集群。相邻结论（哪个码盖住哪个、`cleanup` 为何**刻意**不跑预检、残留 journal 挡不挡 rotate）见 [admission-forensics.md](references/admission-forensics.md)。
 
 **`--from-file` 不是可选项**: 手工路径一律用 `--from-file`。**绝不**把 token 值写成命令行
 参数 —— argv 会进 shell history、`ps aux`、以及 AI 会话 transcript，与 stdout 是否遮蔽

@@ -83,7 +83,7 @@ SKILL.md 的红线是「工具拒绝执行时不要顺手 stamp」。这里补�
 所以看到 `deferred` 的正确反应是**先 export bootstrap PAT 再跑一次**, 而不是转去手工翻
 `.forgejo/workflows`。
 
-四个 backend 的 Consumers 列语义:
+五个 backend 的 Consumers 列语义 (cli-v1.20.4 起; 1.20.3 是前四行):
 
 | backend | 列形态 | 含义 |
 |---|---|---|
@@ -91,13 +91,19 @@ SKILL.md 的红线是「工具拒绝执行时不要顺手 stamp」。这里补�
 | `forgejo-secrets` | `N (deferred)` | 没给 bootstrap PAT，这一趟没核验 |
 | `host-docker-config` | `N (declared)` | 无在线核验路径，数字 = 登记 |
 | `forgejo-push-mirror` | `N (declared)` | 同上 |
+| `github-actions-secrets` | `N (declared)` | 同上 (`github_repos[]` 条数, #387) |
 
-后两个的 `--json` `system_state.reachable/missing` 恒 `0/0` —— 那是诚实的「一个都没核验过」，
-不是坏了。
+后三个的 `--json` `system_state.reachable/missing` 恒 `0/0` —— 那是诚实的「一个都没核验过」，
+不是坏了。这行加数在 CLI 里是**手写枚举**，同一个假零已复发三次 (#340 / #384 / #387)；
+1.20.4 起有测试守着下一个 enum 成员。
+
+**版本地板**: 台账一旦含 `forgejo-push-mirror` / `github-actions-secrets` 条目 (本仓自 #393 起)，
+cli ≤ 1.20.3 的内嵌 schema 会把**整份**台账拒载 (`INVENTORY_PARSE_FAILED`，列出 N 条违例并引导
+去核对台账)。那是 CLI 太旧，不是台账写错 —— 先升级到 ≥ 1.20.4，不要按报错改删条目。
 
 ---
 
-## 为什么 `forgejo-push-mirror` 注定进不了 Tier 1
+## 为什么 `forgejo-push-mirror` 与 `github-actions-secrets` 注定进不了 Tier 1
 
 `GET /repos/{owner}/{repo}/push_mirrors` 只回 created / interval / last_error /
 last_update / public_key / remote_address / remote_name / repo_name / sync_on_commit，
@@ -105,6 +111,15 @@ last_update / public_key / remote_address / remote_name / repo_name / sync_on_co
 
 于是凭据**既读不回也写不进**: 没有可指纹的旧值 (fingerprint guard 无从建立)，
 没有 `*_OLD` sibling，也没有 CAS 可言。**这不是没实现，是 API 面上就没有。**
+
+`github-actions-secrets` (cli-v1.20.4 / #387) 是同一结论的第三个成员，成因不同: 凭据由**第三方**
+签发 (npmjs 之于 #376 的两把 token)，存放在 **GitHub** 仓的 Actions secret 里；工具只说 Forgejo 与
+Nomad 两种 API，两边都不沾。就算有 GitHub 客户端，Actions secret 也是**只写**的 —— 读不回就没有
+指纹，没有 `*_OLD`，没有 CAS。手工换完只能靠下一次 CI 实跑验证换没换成。它与 push-mirror 的
+对账口径有一处**不同**: `GET /repos/{o}/{r}/actions/secrets` 会回 `{name, created_at, updated_at}`，
+所以「列了个没装该 secret 的仓」与「凭空 stamp `last_rotated`」两条是**可证伪**的 (updated_at 对撞)；
+push-mirror 连 secret 名都不回，那一类才是真的双向静默。三个成员各有**自己的** `error.message`
+(指名本 entry 的 host / mirror / repo + secret 名)，`suggested_action` 三者共用一条中性文案。
 
 两条对账口径上的硬限制（`.aether/pat-inventory.yaml` 里也记着）:
 

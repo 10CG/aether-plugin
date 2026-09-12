@@ -5,6 +5,28 @@
 
 ---
 
+## 2026-09-12 (Aether #390 追加 — 第五类 backend `github-actions-secrets`, cli-v1.20.4 / #387 / PR #393)
+
+09-09 那版写于 PR #393 合并之前，与 cli-v1.20.4 有 4 处不符 (PR #393 pre_merge 审计 C4 →
+#390 评论)，本次补齐 (依据 `internal/registryauth/admission.go` "Three members as of #387"、
+`cmd/registry_auth_list.go`、`cmd/registry_auth_rotate.go` `ce63ef9`、runbook Mode 8 第五行):
+
+- `BACKEND_NOT_ROTATABLE` 成员 **两个 → 三个** (+`github-actions-secrets`: 第三方签发、存在
+  GitHub 仓 Actions secret 里)。第三条手工路径: 发行方重新签发 → entry `github_repos[]` 每个
+  GitHub 仓 Settings → Secrets and variables → Actions 更新 `secret_name` 同名 secret →
+  手工写 `last_rotated`。Actions secret 只写不回读，换没换成只能靠下一次 CI 实跑验证。
+- `UNKNOWN_BACKEND` 合法值 **四个 → 五个**。
+- Consumers 列 `N (declared)` 覆盖三个 backend (`github_repos[]` 计入)。
+- 下面 09-09 段的「`suggested_action` 是两成员共用、措辞是 docker-config 那一支」**限定为
+  cli ≤ 1.20.3**: cli-v1.20.4 (#393 `ce63ef9`) 起共用文案改为不指向任何 store 的中性措辞
+  ("Follow the manual path named in the message above — it names this entry's own store")。
+  「要读 `error.message`」这个结论不变。
+- 新增版本地板告诫: 台账含第四/第五类 backend 的仓需 cli ≥ 1.20.4，更早版本整份拒载
+  (`INVENTORY_PARSE_FAILED`)，是 CLI 太旧不是台账写错。frontmatter `min_version` 仍是
+  `registry-auth` 子命令的 1.16.7 —— 版本地板是**台账**的属性，在正文标注而非上抬 `min_version`。
+
+---
+
 ## 2026-09-09 (Aether #390 + #357 — cli-v1.20.3 追平 + references 拆分)
 
 **#390 内容追平** (依据 `internal/registryauth/admission.go`、
@@ -21,9 +43,9 @@ runbook `docs/guides/forgejo-pat-rotation.md` Mode 8，均为 cli-v1.20.3 / PR #
   Settings → Mirror Settings 重填」。
 - `UNKNOWN_BACKEND` 的合法值由三个补到**四个** (+`forgejo-push-mirror`)，与
   `inventory_schema.json` 的 `consumers.type` enum 对齐。
-- 新增一条实测告诫: 该码的 JSON `suggested_action` 是**两成员共用的单一字符串**
-  (`classifyBackendRefusal` 不按成员分派)，措辞是 docker-config 那一支的
-  ("`docker login` on the hosts named in the message above")。
+- 新增一条实测告诫 (**限 cli ≤ 1.20.3**，见上方 09-12 段): 该码的 JSON `suggested_action`
+  是**两成员共用的单一字符串** (`classifyBackendRefusal` 不按成员分派)，措辞是 docker-config
+  那一支的 ("`docker login` on the hosts named in the message above")。
   push-mirror 的正确路径**只在 `error.message` 里**。
 
 **#357 结构** ([#357](https://forgejo.10cg.pub/10CG/Aether/issues/357)): SKILL.md 越过
