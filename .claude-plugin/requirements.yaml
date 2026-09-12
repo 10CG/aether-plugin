@@ -3,7 +3,7 @@
 
 cli:
   min_version: "1.0.0"
-  recommended_version: "1.20.1"
+  recommended_version: "1.20.4"
   # 安装位置 (与 config.yaml 同目录)
   install_dir: "~/.aether"
   install_path:
@@ -106,6 +106,16 @@ compatibility:
       该子命令自 cli 1.19.0 起提供 (#246 降级后保留的检出能力); 更早版本执行会得
       `unknown command`。skill 内已就此标注 "aether-cli v1.19.0+", 故 cli_min 保持
       1.0.0 不上抬 —— 其余 case A/C/D/E 决策路径不依赖该命令。
+
+  - plugin_version: "1.12.7+"
+    cli_min: "1.0.0"
+    cli_recommended: "1.20.4"
+    notes: >-
+      Aether #390/#384/#387: aether-rotate-pat 追平 pat-inventory 的第四/第五类 backend
+      (forgejo-push-mirror 自 cli-v1.20.3 / github-actions-secrets 自 cli-v1.20.4)。skill
+      正文已标注「台账含这两类 backend 的仓需 cli ≥ 1.20.4, 旧版整份拒载 INVENTORY_PARSE_FAILED」,
+      故 cli_min 保持 1.0.0 不上抬 (版本地板是台账属性、非 skill 决策路径依赖); 但**接入了这两类
+      backend 的项目** (如本仓) 实际需 cli >= 1.20.4, 见 skill 正文与 Aether #400。
 
 # 依赖 CLI 的 Skills
 dependent_skills:

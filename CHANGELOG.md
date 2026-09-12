@@ -2,6 +2,32 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.12.7] - 2026-09-12 — aether-rotate-pat: references 拆分 (#357) + 追平 cli-v1.20.3/1.20.4 五类 backend (#390/#384/#387)
+
+`skills/aether-rotate-pat/SKILL.md` 从 430 行拆到 399 行（守门层 OK），深度层移入
+`references/{admission-forensics.md,changelog.md}`（#357）；并追平 CLI 的 backend 演进：
+
+### Changed
+- `BACKEND_NOT_ROTATABLE` 从两成员补到**三成员**：`host-docker-config` + `forgejo-push-mirror`
+  (#384) + `github-actions-secrets` (#387)。三支手工路径互不相通（docker login / GitHub 重新生成
+  再 Mirror Settings 重填 / 发行方重新签发再各 GitHub 仓 Actions secret 重填），错串会把操作员
+  指到错误的机器或平台。
+- `UNKNOWN_BACKEND` 合法值三 → **五个**，与 `inventory_schema.json` enum 对齐。
+- `registry-auth list` Consumers 列 `N (declared)` 覆盖后三个无在线核验路径的 backend（#340 假零修复）。
+- `classifyBackendRefusal` 共用 `suggested_action` 的告诫版本限定为 cli ≤ 1.20.3；1.20.4 起中性文案。
+
+### Added
+- 版本地板告诫：台账含第四/第五类 backend 的仓需 cli ≥ 1.20.4（旧版整份拒载 `INVENTORY_PARSE_FAILED`，
+  是 CLI 太旧不是台账写错）。
+- `.claude-plugin/requirements.yaml` `cli.recommended_version` 追平到 **1.20.4**。
+
+### 质量门
+AB 回归门 PASS（强制，无豁免）：base=改动前 vs post=改动后，suite v0.3.0 → v0.4.0（+eval-6 覆盖
+第四类、+eval-7 覆盖第五类）。R1/R2/R4 全过，eval-7 新行为门 B1 PASS。round-1 eval-5 掉一条 critical
+经复盘为单轮方差（该断言源文本两臂逐字节相同）、预注册确认轮清零。证据见主仓
+`aether-plugin-benchmarks/ab-results/2026-09-09-390-357-refs-split-regression/` 与
+`.../2026-09-12-390-fifth-backend-regression/`。两处 Minor 版本精度点跟踪于 Aether #400。
+
 ## [1.12.6] - 2026-09-07 — aether-rotate-pat 追平 cli-v1.20.0 的 4-step CAS 轮换（#339）
 
 `aether registry-auth rotate` 的 nomad-variables backend 在 cli-v1.20.0 把主写改成一次
