@@ -238,7 +238,7 @@ if [ $PUSH_EXIT -ne 0 ]; then
     echo "错误: Registry 认证失败 (${AETHER_REGISTRY})"
     echo "修复:"
     echo "  docker login ${AETHER_REGISTRY}"
-    echo "  # 或检查凭据: cat ~/.docker/config.json"
+    echo "  # 或看已登录哪些 registry (不打印凭据): jq -r '.auths // {} | keys[]' ~/.docker/config.json"
   elif echo "$PUSH_OUTPUT" | grep -qi "timeout\|connection refused\|no such host"; then
     echo "错误: 无法连接到 Registry (${AETHER_REGISTRY})"
     echo "修复:"

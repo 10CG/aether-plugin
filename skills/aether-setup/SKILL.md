@@ -255,7 +255,7 @@ Skills 使用发现的信息（如 node_class）而非硬编码值。
 | **网络不可达** | 000 | timeout/无响应 | `ping <ip>` | 检查网络连通性、VPN、防火墙规则 |
 | **服务未启动** | 000 | connection refused | `ssh root@<node> "systemctl status nomad"` | 启动服务或检查端口绑定 |
 | **地址错误** | 非 JSON 响应 | HTML 或空 | 确认 IP:端口 | Nomad 默认 4646、Consul 默认 8500 |
-| **认证失败** | 403 | `Permission denied` | `echo $NOMAD_TOKEN` | ACL 启用时需要有效 token |
+| **认证失败** | 403 | `Permission denied` | `[ -n "$NOMAD_TOKEN" ] && echo 已设置` (无输出 = 未设置; 不打印值) | ACL 启用时需要有效 token |
 | **TLS 错误** | 000 | `SSL` 相关 | `curl -k https://...` | 检查是否需要 `https://` 前缀 |
 
 **诊断输出示例**:

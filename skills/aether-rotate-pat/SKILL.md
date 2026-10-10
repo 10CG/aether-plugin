@@ -141,11 +141,11 @@ aether doctor --check pat_inventory_drift   #    drift detection
 ```
 1. forgejo.10cg.pub → Settings → Applications → Generate New Token
 2. Scope **精确匹配** inventory entry `scope` 字段 (不要给多余权限)
-3. 保存到本地, chmod 600:
+3. 保存到本地, chmod 600 —— 由操作员在自己的终端里做, 值不经过 AI 会话、不贴进对话:
 ```
 
 ```bash
-echo "<NEW_PAT_VALUE>" > /tmp/new.pat
+(umask 077; read -rs T && printf '%s' "$T" > /tmp/new.pat)   # 粘贴后回车, 不回显
 chmod 600 /tmp/new.pat
 ```
 
@@ -230,9 +230,9 @@ aether registry-auth cleanup --pat-id <id>
 
 **恢复**:
 ```bash
-# 准备新+旧 token 文件 (同 rotation 时使用的两个 token)
-echo "$NEW_PAT_VALUE" > /tmp/new.pat
-echo "$OLD_PAT_VALUE" > /tmp/old.pat
+# 准备新+旧 token 文件 (同 rotation 时使用的两个 token; 写法同 Step 1, 操作员终端里做, 值不经过 AI 会话)
+(umask 077; read -rs T && printf '%s' "$T" > /tmp/new.pat)
+(umask 077; read -rs T && printf '%s' "$T" > /tmp/old.pat)
 chmod 600 /tmp/new.pat /tmp/old.pat
 
 aether registry-auth resume --pat-id <id> \
@@ -318,7 +318,7 @@ ci-build class PAT (例如 `forgejo-actions-ci-2026-Q2`) 走单 slot 2-step 流�
 ```bash
 # ENV (按需)
 export AETHER_FORGEJO_ADDR="http://192.168.69.200:3000"   # 默认值
-export AETHER_FORGEJO_TOKEN="<bootstrap PAT, write:repository>"  # 必需 (勿用 write:user-only)
+export AETHER_FORGEJO_TOKEN="$(cat /tmp/bootstrap.pat)"  # 必需: bootstrap PAT (write:repository, 勿用 write:user-only); 文件写法同 Step 1
 
 chmod 600 /tmp/new.pat /tmp/old.pat   # 注意: 必须双 token 文件
 
@@ -332,7 +332,7 @@ aether registry-auth rotate --pat-id forgejo-actions-ci-2026-Q2 \
 aether registry-auth cleanup --pat-id forgejo-actions-ci-2026-Q2
 
 # Forgejo web UI revoke 旧 PAT, 删本地文件
-rm /tmp/new.pat /tmp/old.pat
+rm /tmp/new.pat /tmp/old.pat /tmp/bootstrap.pat
 ```
 
 ### 中断恢复 (chaos kill / SSH 断)
@@ -395,5 +395,5 @@ forgejo backend 设计上拒绝 auto-resume (单 slot 无 _OLD 备份, OldToken 
 
 ---
 
-**Last updated**: 2026-09-09 (Aether #390 追平 cli-v1.20.3 · Aether #357 深度层移入
-`references/`)。逐版内容见 [changelog.md](references/changelog.md)。
+**Last updated**: 2026-10-10 (Aether #481 token 文件改由操作员在自己的终端写入, 值不经过 AI 会话)。
+逐版内容见 [changelog.md](references/changelog.md)。

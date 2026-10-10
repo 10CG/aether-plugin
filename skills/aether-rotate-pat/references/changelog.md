@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-10-10 (Aether #481 — token 值不经过 AI 会话)
+
+Step 1 与 Mode 1 写 token 文件的示例原为 `echo "<NEW_PAT_VALUE>" > /tmp/new.pat` /
+`echo "$NEW_PAT_VALUE" > ...`，forgejo-secrets 用法里是 `export AETHER_FORGEJO_TOKEN="<bootstrap PAT, ...>"`。
+照做就要把真实值打进命令，值会进 AI 会话 transcript 和 shell history —— 与正文「`--from-file`
+不是可选项」同一个理由 (#282)。改为由操作员在自己的终端里
+`(umask 077; read -rs T && printf '%s' "$T" > /tmp/new.pat)` 写文件，`AETHER_FORGEJO_TOKEN`
+从文件读。`chmod 600` 保留: umask 只管新建的文件，管不到已经存在的那份。CLI 读 token 文件时
+`strings.TrimSpace`，所以 `printf '%s'` 不带换行与原先 `echo` 带换行等价。runbook
+`docs/guides/forgejo-pat-rotation.md` 的 Step 1 / Mode 1 / forgejo-secrets 用法同步改。
+
+---
+
 ## 2026-09-12 (Aether #390 追加 — 第五类 backend `github-actions-secrets`, cli-v1.20.4 / #387 / PR #393)
 
 09-09 那版写于 PR #393 合并之前，与 cli-v1.20.4 有 4 处不符 (PR #393 pre_merge 审计 C4 →
