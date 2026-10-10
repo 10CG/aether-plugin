@@ -2,6 +2,42 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.12.8] - 2026-10-10 — 三处命令不再把凭据打进会话 (Aether #481)
+
+### Fixed
+- `aether-rotate-pat`: Step 1 与 Mode 1 写 token 文件的示例原为 `echo "<NEW_PAT_VALUE>" > /tmp/new.pat` /
+  `echo "$NEW_PAT_VALUE" > ...`，forgejo-secrets 用法要求把真实值填进 `export AETHER_FORGEJO_TOKEN="<bootstrap PAT, ...>"`。
+  照做就要把值打进命令，进 AI 会话 transcript 和 shell history —— 与正文「`--from-file` 不是可选项」同一个理由 (#282)。
+  改为由操作员在自己的终端里 `(umask 077; read -rs T && printf '%s' "$T" > /tmp/new.pat)` 写文件，
+  `AETHER_FORGEJO_TOKEN` 从文件读，收尾一并删 bootstrap 文件；`chmod 600` 保留 (umask 管不到已经存在的文件)。
+- `aether-dev`: push 认证失败的提示原先让人把整份 `~/.docker/config.json` 打出来 (含 base64 的 user:token)，
+  改为 `jq -r '.auths // {} | keys[]'`，只列已登录的 registry。
+- `aether-setup`: 诊断表「认证失败」一行由 `echo $NOMAD_TOKEN` 改为 `[ -n "$NOMAD_TOKEN" ] && echo 已设置`
+  (无输出 = 未设置)，不打印值。
+- 主仓 runbook `docs/guides/forgejo-pat-rotation.md` 的 Step 1 / Mode 1 / forgejo-secrets 用法同步改。
+
+三个 SKILL.md 行数不变 (399 / 383 / 293)。替换后的命令用假值实测过: 新文件 600、无换行 (CLI 读 token 文件
+`strings.TrimSpace`)、变量不漏到父 shell；jq 对没有 `auths` 键的配置不报错。
+
+### Changed
+- `.claude-plugin/requirements.yaml` `cli.recommended_version` 追平到 **1.22.14** (只在 plugin 发版时对齐)。
+
+### 质量门
+AB 回归门 + 新行为门 **PASS (按预注册规则，无 `[skip-benchmark]` 豁免)**: 豁免 1 不成立 (改的正是要执行的命令)，
+豁免 2 不成立 (既有 eval 不测这几处，是新行为从未测过)。dev / setup 属 Step 3「错误处理改进: 推荐」，owner 决定各加一个
+新 eval 跑最小门。suite v1.5.0 (rotate-pat +eval-8、dev +eval-3、setup +eval-3)；base = v1.12.7 + master runbook，
+post = 本版文本，两臂 fixture 从 git 对象构建并逐文件钉 sha256。
+
+- round 1 (7 eval × 2 臂 × 双评): 三个新行为门 B1 全过；rotate-pat eval-1 post 掉一条 critical (24h grace —— post 附了
+  一段跳过 grace 的应急 fallback)。机械 diff: 两臂改动行里涉及 grace / 24h / 应急 / revoke 的 0 行，相关源文本逐字节相同。
+- 预注册确认轮 (开跑前提交): eval-1 / eval-8 两臂重跑 + 对照 eval-6，字母反转 → R1 / R4 清零，R3 判混淆不计入。
+- **残余观察**: eval-1 的 24h grace 断言在现网 PAT 已逾期 (`pat_age` FAIL) 时对两臂都失去判别力 —— 四份评分 post 4/4 FAIL、
+  base 2/4 FAIL，base 在零配置变化下由 3/3 掉到 1/3。eval-1 场景需刷新，跟踪于 Aether #486。
+- 20 臂 + 20 grader 的 transcript 全部机械核查: 无 Skill 调用、无越界读取、无写集群命令、答卷无凭据实际值或凭据形态、
+  blind_broken 0。
+
+证据: 主仓 `aether-plugin-benchmarks/ab-results/2026-10-10-481-credential-echo-regression/`。
+
 ## [1.12.7] - 2026-09-12 — aether-rotate-pat: references 拆分 (#357) + 追平 cli-v1.20.3/1.20.4 五类 backend (#390/#384/#387)
 
 `skills/aether-rotate-pat/SKILL.md` 从 430 行拆到 399 行（守门层 OK），深度层移入
