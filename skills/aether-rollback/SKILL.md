@@ -29,6 +29,8 @@ source "${CLAUDE_PLUGIN_ROOT}/scripts/cli-functions.sh"
 require_aether_cli || exit 1
 ```
 
+版本历史与标准回滚都用 `aether rollback`：它执行 Nomad revert 后按 job 的期望实例数带超时做健康检查，不用手写等待循环。
+
 ## 快速开始
 
 ### 使用场景
@@ -48,8 +50,14 @@ require_aether_cli || exit 1
 查询 Nomad Job 版本历史：
 
 ```bash
+# 每个版本对应的镜像
+aether rollback --list my-project --json | jq '.data.Versions[] | {Version, Image, DeployedAt}'
+# 哪些版本真正部署成功过（Nomad 的 Stable 标记）
 curl -s "${NOMAD_ADDR}/v1/job/my-project/versions" | jq '[.Versions[] | {version: .Version, stable: .Stable, submitTime: .SubmitTime}]'
 ```
+
+`--list` 的 `Status` 只按顺序标 current / previous / stable（第 3 个起都叫 stable，Aether #493），不代表那个版本部署成功过；
+推荐回滚目标看 Nomad 的 `Stable` 字段。
 
 ### Step 2: 显示版本列表
 
@@ -78,7 +86,7 @@ curl -s "${NOMAD_ADDR}/v1/job/my-project/versions" | jq '[.Versions[] | {version
 服务: my-project
 当前版本: v3 (abc123) - unhealthy
 目标版本: v2 (def456)
-回滚方案: A (Nomad Job Revert)
+回滚方案: A (aether rollback)
 
 确认执行回滚？ [y/N]
 ```
@@ -89,41 +97,45 @@ curl -s "${NOMAD_ADDR}/v1/job/my-project/versions" | jq '[.Versions[] | {version
 
 根据当前 Job 状态，选择合适的回滚方案：
 
-#### 方案 A: Nomad Job Revert（推荐，标准路径）
+#### 方案 A: aether rollback（推荐，标准路径）
 
 适用于：Job 存在、版本历史完整、标准回滚场景。
 
 ```bash
-# 使用 Nomad revert 命令
-nomad job revert my-project <version>
-
-# 或使用 API
-curl -s -X POST "${NOMAD_ADDR}/v1/job/my-project/revert" \
-  -d '{"JobID": "my-project", "JobVersion": <version>}'
+# 先预览，不改集群
+aether rollback my-project --to <version> --dry-run --json
+# 执行：Nomad revert + 带超时的健康检查（默认 3 分钟）
+aether rollback my-project --to <version> --yes --json [--timeout 5m]
 ```
 
-这是最安全的标准路径。Nomad 保留完整的版本历史，revert 会原子性地恢复到目标版本的 Job spec。
+按 `.data.status` 判定（`--json` 下只要拿到回滚结果，外层 `status` 就是 `ok`、退出码是 0，失败也一样（Aether #493），不能当结论）：
+
+| 结果 | 下一步 |
+|------|--------|
+| `rolled_back` 且 `.data.health_check.passed == true` | 回滚完成 → Step 5 |
+| `failed`，`error_code: ROLLBACK_FAILED` | revert 本身失败 → 方案 B |
+| `failed`，`error_code: ROLLBACK_HEALTH_CHECK_FAILED` | 已 revert 但不健康 → 「回滚失败处理」 |
+| 外层 `status == "error"` | job 或目标版本不存在等，读 `.error.message` |
+
+这是最安全的标准路径。Nomad 保留完整的版本历史，revert 以目标版本的 Job spec 提交一个**新**版本（版本号递增，镜像与目标版本相同）。
 
 #### 方案 B: 从 Git 重提交 Job Spec
 
 适用于：Job 配置已损坏、当前版本的 Job spec 有问题、或版本历史不可信。
 
 ```bash
-# 1. 从 Git 历史获取已知正常的 Job spec
-git log --oneline -- deploy/*.nomad.hcl
-git show <commit>:deploy/my-project.nomad.hcl > /tmp/my-project.nomad.hcl
+# 1. 从 Git 历史取已知正常的 Job spec（/aether:aether-init 生成的生产 spec 是 deploy/nomad-prod.hcl）
+git log --oneline -- deploy/nomad-prod.hcl
+git show <commit>:deploy/nomad-prod.hcl > /tmp/my-project.nomad.hcl
 
-# 2. 验证 Job spec 合法性
-nomad job validate /tmp/my-project.nomad.hcl
-
-# 3. Dry-run 检查差异
-nomad job plan /tmp/my-project.nomad.hcl
-
-# 4. 重新提交
-nomad job run /tmp/my-project.nomad.hcl
+# 2. 用 aether deploy 提交这份 spec：解析 HCL、把镜像设为指定 tag、验证镜像、注册、做健康检查
+aether deploy my-project <已知正常的 tag> --job-file /tmp/my-project.nomad.hcl --dry-run --json [--image-repo <org>/my-project]
+aether deploy my-project <已知正常的 tag> --job-file /tmp/my-project.nomad.hcl --yes --json [--image-repo <org>/my-project]
 ```
 
-注意：此方案会创建新版本（而非恢复旧版本），后续若需再次回滚，版本号会不同。
+结果按 `/aether:aether-deploy` 的 Step 2 / Step 4 判定（看 `.data.status`）。不要直接 `nomad job run` 这份文件：
+init 生成的模板里镜像是 `__IMAGE__` 占位符，原样提交会把字面量当镜像。
+与方案 A 一样会产生新版本号；区别是 spec 来自 Git 而不是 Nomad 版本历史，后续若需再次回滚，版本号会不同。
 
 #### 方案 C: 紧急部署旧版镜像
 
@@ -131,13 +143,17 @@ nomad job run /tmp/my-project.nomad.hcl
 
 ```bash
 # 1. 查询 Registry 中可用的镜像版本
-curl -s "https://${REGISTRY}/v2/my-project/tags/list" | jq '.tags'
+#    外网 forgejo.10cg.pub 在 Cloudflare Access 之后，裸 curl 拿到的是登录页；走内网并带 registry 凭据
+#    （token 从文件读进 curl 配置文件，不进 argv，用完即删）
+umask 077; printf 'user = "%s:%s"\n' "<registry-user>" "$(cat <token 文件>)" > /tmp/curlrc.$$
+curl -s -K /tmp/curlrc.$$ "http://192.168.69.200:3000/v2/<org>/my-project/tags/list" | jq '.tags'
+rm -f /tmp/curlrc.$$
 
-# 2. 确认目标镜像可用
-docker pull ${REGISTRY}/my-project:<old-tag>
+# 2. 确认目标镜像可用（本机有 docker 且能访问 registry 时）
+docker pull <registry>/<org>/my-project:<old-tag>
 
-# 3. 修改当前 Job spec 的镜像版本并提交
-# 将 image 字段改为旧版本镜像，然后:
+# 3. 把 Job spec 的镜像换成旧版本后提交（init 生成的模板里是 __IMAGE__ 占位符）
+sed "s|__IMAGE__|<registry>/<org>/my-project:<old-tag>|g" deploy/nomad-prod.hcl > /tmp/my-project-emergency.nomad.hcl
 nomad job run /tmp/my-project-emergency.nomad.hcl
 ```
 
@@ -148,22 +164,14 @@ nomad job run /tmp/my-project-emergency.nomad.hcl
 | 状况 | 推荐方案 |
 |------|---------|
 | 标准回滚（Job 正常，版本可用） | 方案 A |
-| `nomad job revert` 报错 / Job spec 损坏 | 方案 B |
+| `aether rollback` 报 `ROLLBACK_FAILED` / Job spec 损坏 | 方案 B |
 | Job 丢失 / namespace 错误 / revert 反复失败 | 方案 C |
 
 ### Step 4: 等待回滚完成
 
-```bash
-# 等待新 Allocation 启动
-while true; do
-  RUNNING=$(curl -s "${NOMAD_ADDR}/v1/job/my-project/allocations" | \
-    jq '[.[] | select(.ClientStatus == "running" and .JobVersion == <target_version>)] | length')
-  if [ "$RUNNING" -ge "$REPLICAS" ]; then
-    break
-  fi
-  sleep 3
-done
-```
+方案 A / B 的等待由 CLI 完成（`--timeout` 控制上限）。方案 C 手工提交后，用 `aether status my-project`
+确认新 allocation 全部 running；等待要设上限（如 3 分钟），超时转「回滚失败处理」，不要无限等。
+revert 产生的是新版本号，按「镜像等于目标版本的镜像」核对，不要按 `JobVersion == 目标版本号` 等待（永远等不到）。
 
 ### Step 5: 验证健康状态
 
@@ -194,6 +202,7 @@ curl -s "${CONSUL_HTTP_ADDR}/v1/health/service/my-project?passing" | jq 'length'
 ```
 
 这将跳过版本列表展示，但仍需执行确认（Step 2.5）后才会执行回滚。
+`aether rollback --to` 接的是 Nomad job 版本号（整数，如 `--to 2`），不是镜像 tag；不带 `--to` 时回滚到上一个版本。
 
 ## 回滚失败处理
 
@@ -269,22 +278,12 @@ openssl s_client -connect my-project.service.consul:443 2>/dev/null | openssl x5
 
 ### 配置读取
 
+CLI 先看环境变量，再读配置文件；配置文件只读找到的第一份（项目里有 `.aether/config.yaml` 时整份不读全局
+`~/.aether/config.yaml`，缺的字段用默认值），不读 `.env`。直接查询 Nomad / Consul 时用同一规则取地址：
+
 ```bash
-# 1. 检查项目配置
-if [ -f ".aether/config.yaml" ]; then
-  NOMAD_ADDR=$(yq '.cluster.nomad_addr' .aether/config.yaml)
-  CONSUL_HTTP_ADDR=$(yq '.cluster.consul_addr' .aether/config.yaml)
-fi
-
-# 2. 检查全局配置
-if [ -z "$NOMAD_ADDR" ] && [ -f "$HOME/.aether/config.yaml" ]; then
-  NOMAD_ADDR=$(yq '.cluster.nomad_addr' ~/.aether/config.yaml)
-  CONSUL_HTTP_ADDR=$(yq '.cluster.consul_addr' ~/.aether/config.yaml)
-fi
-
-# 3. 未配置则提示
-if [ -z "$NOMAD_ADDR" ]; then
-  echo "请先运行 /aether:aether-setup 配置集群"
-  exit 1
-fi
+f=.aether/config.yaml; [ -f "$f" ] || f="$HOME/.aether/config.yaml"
+NOMAD_ADDR=${NOMAD_ADDR:-$(yq '.cluster.nomad_addr // ""' "$f" 2>/dev/null)}
+CONSUL_HTTP_ADDR=${CONSUL_HTTP_ADDR:-$(yq '.cluster.consul_addr // ""' "$f" 2>/dev/null)}
+[ -z "$NOMAD_ADDR" ] && { echo "未配置 cluster.nomad_addr（读的是 ${f}）：运行 /aether:aether-setup"; exit 1; }
 ```

@@ -174,9 +174,9 @@ policy 的回填检查仍要执行。
 | 分析项 | 决策 |
 |--------|------|
 | Driver | Dockerfile/系统依赖 → docker; 纯脚本 → exec |
-| Node Class | API/后台 → heavy; 轻量脚本 → light |
+| Node Class | API/后台 → heavy_workload; 轻量脚本 → light_exec（以 `/v1/nodes` 为准） |
 | Registry | 从配置读取 |
-| Tag 策略 | dev=latest; prod=semver |
+| Tag 策略 | dev = commit SHA（workflow 同时推 latest，部署用 SHA）; prod = semver |
 
 ### Step 1.3: 输出部署方案
 
@@ -222,11 +222,11 @@ project/
 详见 [文件生成参考](references/file-generation.md)
 
 **变量替换**:
-- `__PROJECT_NAME__` → 项目名称
-- `__DOCKER_IMAGE__` → 镜像地址
-- `__PORT__` → 服务端口
-- `__NODE_CLASS__` → 节点类型
+- `__PROJECT_NAME__` → 项目名称；`__PORT__` → 服务端口；`__REPLICAS__` → 副本数
+- `__DOCKER_NODE_CLASS__` / `__EXEC_NODE_CLASS__` → 节点类型（从 `/v1/nodes` 发现，常见 heavy_workload / light_exec）
+- workflow: `__REGISTRY__` / `__REGISTRY_IP__` / `__IMAGE_NAME__` / `__NOMAD_ADDR__` / `__DEPLOY_HOST__`
 - `__JOB_NAME__` → Nomad job name（从已生成的 nomad-dev.hcl parse）
+- `__IMAGE__` 生成时**保留不替换**：CI 部署时 `sed "s|__IMAGE__|${IMAGE}|g"` 写入本次构建的镜像
 
 **文件生成顺序（MUST）** — CLAUDE.md 必须在 nomad HCL 之后生成，以便 parse 出 `__JOB_NAME__`：
 
@@ -330,22 +330,20 @@ aether init --lang go --port 8080
 Phase 1 分析阶段需要从集群配置读取 registry 信息，连接失败时降级处理：
 
 ```bash
-# 尝试从集群获取 registry 配置
-REGISTRY=""
-if [ -f "$HOME/.aether/config.yaml" ]; then
-  REGISTRY=$(yq '.cluster.registry' "$HOME/.aether/config.yaml" 2>/dev/null)
-fi
+# 与 CLI 相同：AETHER_REGISTRY 优先；配置文件只读找到的第一份（有项目级 .aether/config.yaml 时整份不读全局）
+f=.aether/config.yaml; [ -f "$f" ] || f="$HOME/.aether/config.yaml"
+REGISTRY=${AETHER_REGISTRY:-$(yq '.cluster.registry // ""' "$f" 2>/dev/null)}
 
-if [ -z "$REGISTRY" ] || [ "$REGISTRY" = "null" ]; then
+if [ -z "$REGISTRY" ]; then
   echo "⚠ 无法从配置中读取 registry 地址"
   echo ""
   echo "可选操作:"
   echo "  1. 运行 /aether:aether-setup 配置集群（推荐）"
-  echo "  2. 手动指定: aether init --registry forgejo.10cg.pub"
+  echo "  2. 设置 AETHER_REGISTRY=forgejo.10cg.pub（或在 .aether/config.yaml 写 cluster.registry）后重跑"
   echo "  3. 跳过 registry 配置，生成后手动编辑 workflow 文件"
 fi
 
-# 验证 registry 可达性（可选，非阻塞）
+# 验证 registry 可达性（可选，非阻塞；外网 forgejo.10cg.pub 在 CF Access 之后得 302 也算通过，只说明域名可达）
 if [ -n "$REGISTRY" ]; then
   if ! curl -sf --max-time 5 "https://${REGISTRY}/v2/" > /dev/null 2>&1; then
     echo "⚠ Registry (${REGISTRY}) 不可达，将继续生成文件"
@@ -366,7 +364,7 @@ if [ -z "$DETECTED_LANG" ]; then
   echo "已检查: go.mod, package.json, requirements.txt, pyproject.toml, Cargo.toml, pom.xml, build.gradle"
   echo ""
   echo "请选择:"
-  echo "  1. 手动指定语言: aether init --lang <go|node|python|rust|java>"
+  echo "  1. 手动指定语言: aether init --lang <go|node|python>（CLI 只支持这三种；其他语言选 2 或 3）"
   echo "  2. 仅生成基础 Nomad HCL（无 Dockerfile）"
   echo "  3. 提供自定义 Dockerfile 路径"
   # 等待用户选择后继续
@@ -404,10 +402,11 @@ fi
 占位符替换失败时的检查：
 
 ```bash
-# 生成后验证占位符是否全部替换
+# 生成后验证占位符是否全部替换（__IMAGE__ 是留给 CI 部署时替换的，不算残留，不要手工改掉）
 for file in Dockerfile deploy/nomad-dev.hcl deploy/nomad-prod.hcl .forgejo/workflows/deploy.yaml; do
-  if [ -f "$file" ] && grep -q '__[A-Z_]*__' "$file"; then
-    UNREPLACED=$(grep -o '__[A-Z_]*__' "$file" | sort -u | tr '\n' ', ')
+  [ -f "$file" ] || continue
+  UNREPLACED=$(grep -o '__[A-Z_]*__' "$file" | grep -vx '__IMAGE__' | sort -u | tr '\n' ' ')
+  if [ -n "$UNREPLACED" ]; then
     echo "⚠ ${file} 中仍有未替换的占位符: ${UNREPLACED}"
     echo "  请手动检查并替换，或重新运行 /aether:aether-init"
   fi

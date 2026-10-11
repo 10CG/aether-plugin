@@ -273,7 +273,7 @@ nomad var purge "nomad/jobs/build-container-${JOB_ID}" 2>/dev/null || true
 
 读写分离 (T2 pull / T4 push) 是 token-map 红线, 不把 write token 常驻宿主 config。
 
-**scp 目标节点任意性**: `/opt/aether-volumes` 是 NFS 经 virtiofs 重新挂载到 3 台 heavy, **同一 inode 空间** (CLAUDE.md #56)。scp 到哪台都行, Nomad 把 build 放到哪台, 那台都能读到 — **scp 目标与 build 落点解耦**。
+**scp 目标节点任意性**: `/opt/aether-volumes` 是 NFS 经 virtiofs 重新挂载到全部 heavy 节点 (heavy-1~5), **同一 inode 空间** (CLAUDE.md #56)。scp 到哪台都行, Nomad 把 build 放到哪台, 那台都能读到 — **scp 目标与 build 落点解耦**。
 
 **资源预留 vs 实际占用 (D5)**: HCL 里的 `cpu=2000/memory=3000` 是 Nomad **binpack 转向信号** (让调度排除饱和节点), **不是 build 实际开销的硬上限** — `docker build` 跑在宿主 daemon, 不在 Nomad 给 raw_exec task 的 cgroup 记账。skeleton 接受此限制, 真隔离 (专用节点 / kaniko) 留迭代。
 

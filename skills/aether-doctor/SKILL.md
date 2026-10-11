@@ -63,12 +63,25 @@ fi
 - 提供交互式安装选项
 - 详见 [CLI 安装流程](references/cli-installation.md)
 
+### Step 1.5: 运行 `aether doctor`（CLI 可用时先做这一步）
+
+CLI 自带集群侧诊断：Nomad / Consul 连通、Consul DNS、节点 driver、host volume、孤儿 job、模板陷阱、PAT 时效等数十项检查。
+
+```bash
+aether doctor --json | jq '{summary: .data.summary, problems: [.data.checks[] | select(.status != "PASS") | {name, status, message}]}'
+```
+
+- 完整运行会 SSH 到 heavy 节点，约一分钟；有 FAIL 时退出码为 1。
+- 按 FAIL / WARN 的 check 名深入：单项用 `aether doctor --check <name>`（只接受 `--check`，不接位置参数），单节点用 `--node <name>`。
+- CLI 不查的部分（本机 SSH 密钥与权限、CI secrets、配置文件格式）继续按下面 Step 2–7；CLI 不可用时整套按 Step 2–7 手工检查。
+
 ### Step 2: 检查配置文件
 
 ```bash
-# 检查配置
-cat ~/.aether/config.yaml 2>/dev/null
-cat ./.aether/config.yaml 2>/dev/null
+# 检查配置（配置里可能有 cluster.nomad_token / consul_token，只看去掉凭据键之后的内容）
+for f in ~/.aether/config.yaml ./.aether/config.yaml; do
+  [ -f "$f" ] && { echo "== $f"; yq '(.. | select(tag == "!!map")) |= with_entries(select(.key | test("(?i)token|secret|password") | not))' "$f"; }
+done
 
 # 配置优先级
 # 环境变量 > 项目配置 > 全局配置
@@ -76,7 +89,7 @@ cat ./.aether/config.yaml 2>/dev/null
 
 ### Step 3-4: 集群验证和连接测试
 
-详见 [集群拓扑和验证](references/cluster-validation.md)
+Step 1.5 已覆盖时只核对它没查的项；CLI 不可用时详见 [集群拓扑和验证](references/cluster-validation.md)
 
 ### Step 5-6: SSH 检查和连接测试
 
@@ -132,7 +145,12 @@ HEAVY_NODES=$(yq '.cluster.clients[] | select(.class == "heavy_workload") | .ip'
 # 检查 CLI
 aether version
 
-# 检查集群
+# 集群侧完整诊断 / 单项 / 单节点
+aether doctor --json
+aether doctor --check pat_age,orphan_jobs --json
+aether doctor --node heavy-1
+
+# 检查集群（CLI 不可用时）
 curl -s http://192.168.69.70:4646/v1/status/leader
 curl -s http://192.168.69.70:4646/v1/nodes
 

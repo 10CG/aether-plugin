@@ -37,7 +37,7 @@ Infra 层 (192.168.69.70-72): Nomad Server + Consul Server + dnsmasq
   → .service.consul DNS 解析依赖这 3 台 dnsmasq
   → Consul Raft 共识在这 3 台之间
 
-Heavy 节点 (heavy-1/2/3, 192.168.69.80-82): Docker workload
+Heavy 节点 (heavy-1~5, 192.168.69.80-84；以 GET /v1/nodes 为准): Docker workload
   → 所有容器服务运行在此
   → node_class = heavy_workload
 

@@ -270,7 +270,7 @@ RUN pip config set global.index-url "$PIP_INDEX_URL" && \
 
 ### Host-stage 自动注入(已生效)
 
-Forgejo runner 跨 3 heavy 节点已通过 `container.options --env` 全局注入
+全部 heavy 节点 (heavy-1~5) 的 Forgejo runner 已通过 `container.options --env` 全局注入
 这 5 个 env,所有 CI **host stage**(workflow 步骤直接跑 `npm ci` / `pip install`)
 自动走 build-cache,**无需 workflow 改动**。
 

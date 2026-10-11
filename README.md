@@ -19,7 +19,7 @@
 安装后，首先运行环境诊断：
 
 ```bash
-/aether:doctor
+/aether:aether-doctor
 ```
 
 这会检查 aether CLI、配置文件、集群连接、SSH 配置、CI 配置等，并给出修复建议。
@@ -27,7 +27,7 @@
 或手动配置集群入口：
 
 ```bash
-/aether:setup --global
+/aether:aether-setup --global
 ```
 
 这会创建 `~/.aether/config.yaml`，配置 Nomad、Consul、Registry 地址。配置一次后，所有项目共享。
@@ -69,70 +69,73 @@
 
 ```bash
 # 全局配置（推荐，一次配置所有项目可用）
-/aether:setup --global
+/aether:aether-setup --global
 
 # 项目级配置（仅当前项目）
-/aether:setup --project
+/aether:aether-setup --project
 
 # 查看当前配置
-/aether:setup --show
+/aether:aether-setup --show
 ```
 
 ### 新项目接入
 
 ```bash
-/aether:init
+/aether:aether-init
 # Phase 1: 扫描项目 → 生成部署方案 → 确认
-# Phase 2: 生成 Dockerfile、workflow、nomad.hcl (dev + prod)
+# Phase 2: 生成 Dockerfile、workflow、deploy/nomad-dev.hcl + nomad-prod.hcl
 ```
 
 ### 开发测试
 
 ```bash
 # 部署当前分支到 dev（不经过 CI）
-/aether:dev deploy
+/aether:aether-dev deploy
 
 # 运行临时测试 Job
-/aether:dev run --docker "nginx:alpine"
+/aether:aether-dev run --docker "nginx:alpine"
 
 # 查看 dev 服务日志
-/aether:dev logs my-project
+/aether:aether-dev logs my-project
 
 # 清理临时 Job
-/aether:dev clean
+/aether:aether-dev clean
 ```
 
 ### 查看状态
 
 ```bash
 # 集群概览
-/aether:status
+/aether:aether-status
 
 # 指定服务详情
-/aether:status my-project
+/aether:aether-status my-project
 ```
 
 ### 生产部署
 
 ```bash
 # 部署指定版本到生产
-/aether:deploy my-project v1.2.3
+/aether:aether-deploy my-project v1.2.3
 ```
 
 ### 回滚
 
 ```bash
 # 回滚到之前版本
-/aether:rollback my-project
+/aether:aether-rollback my-project
 ```
 
 ## 配置说明
 
 ### 配置层级（优先级从高到低）
 
-1. **项目级 `.env`** — 当前项目目录下
-2. **用户级 `~/.aether/config.yaml`** — 全局配置
-3. **插件默认值** — 无（必须配置入口地址）
+1. **环境变量** — `NOMAD_ADDR` / `CONSUL_HTTP_ADDR` / `AETHER_REGISTRY`
+2. **项目级 `.aether/config.yaml`** — 当前项目目录下；存在时整份替代全局配置（不逐字段合并），入口地址要写全
+3. **用户级 `~/.aether/config.yaml`** — 全局配置
+4. **插件默认值** — 无（必须配置入口地址）
+
+CLI 命令不读 `.env`（只有 `aether config get/show` 会读，所以它显示的来源可能与命令实际用的不同，Aether #491）。
 
 ### 必需配置项
 

@@ -60,9 +60,11 @@ CLI 参数 > .aether/config.yaml watch.job_name > AskUserQuestion
 ### 读取集群配置
 
 ```bash
-NOMAD_ADDR=$(yq '.cluster.nomad_addr' .aether/config.yaml 2>/dev/null)
-CONSUL_ADDR=$(yq '.cluster.consul_addr' .aether/config.yaml 2>/dev/null)
-REGISTRY=$(yq '.cluster.registry' .aether/config.yaml 2>/dev/null)
+# 与 CLI 相同：环境变量优先；配置文件只读找到的第一份（有项目级 .aether/config.yaml 时整份不读全局）
+f=.aether/config.yaml; [ -f "$f" ] || f="$HOME/.aether/config.yaml"
+NOMAD_ADDR=${NOMAD_ADDR:-$(yq '.cluster.nomad_addr // ""' "$f" 2>/dev/null)}
+CONSUL_ADDR=${CONSUL_HTTP_ADDR:-$(yq '.cluster.consul_addr // ""' "$f" 2>/dev/null)}
+REGISTRY=${AETHER_REGISTRY:-$(yq '.cluster.registry // ""' "$f" 2>/dev/null)}
 ```
 
 如果配置文件不存在或关键字段缺失，提示用户运行 `/aether:aether-setup` 初始化项目配置。
@@ -358,11 +360,10 @@ deploy-watch 是 CI 推送后监控链的终端环节：
 
 ## 8. 约束与已知限制
 
-### Bash Tool 超时
+### 长时间等待
 
-Claude Code Bash tool 单次调用约 120 秒超时。Step 2 (18x10s) 和 Step 3 (36x5s) 各自可能超过此限制。
-实际实现中，每个 Step 应作为独立的 Bash 调用，轮询次数根据剩余时间动态调整。
-对于更长监控场景，推荐 CronCreate 方式 (类似 `aether-ci --watch`)。
+Bash 工具默认 2 分钟超时，用 `timeout` 参数可设到 10 分钟：Step 2 (18x10s) 与 Step 3 (36x5s) 各作为一次 Bash 调用并调高 `timeout` 即可。
+更长的等待用 Bash 的 `run_in_background` 跑有上限的轮询，跑完自动通知；push 后的自动监控由 CronCreate 驱动（见 `aether-ci` 自动触发段）。
 
 ### 上游与架构限制
 

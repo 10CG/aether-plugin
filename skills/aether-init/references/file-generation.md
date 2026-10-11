@@ -26,21 +26,15 @@
 
 ### 变量占位符
 
-| 占位符 | 说明 | 示例值 |
-|--------|------|-------|
-| `__PROJECT_NAME__` | 项目名称 | my-api |
-| `__DOCKER_IMAGE__` | 镜像地址 | forgejo.10cg.pub/org/my-api |
-| `__PORT__` | 服务端口 | 8080 |
-| `__NODE_CLASS__` | 节点类型 | heavy_workload |
-| `__REPLICAS__` | 副本数 | 2 |
-| `__DATA_DIR__` | 数据目录 | /data/my-api |
+占位符清单与替换规则以 SKILL.md「Step 2.2: 填充模板」为准（`__IMAGE__` 生成时保留，由 CI 部署时替换）；
+模板原文见 [Nomad 模板](nomad-templates.md) 文件头的占位符表。
 
 ### dev vs prod 差异
 
 | 配置项 | dev | prod |
 |--------|-----|-----|
 | 副本数 | 1 | 2+ |
-| 镜像 tag | latest | semver |
+| 镜像 tag | commit SHA（workflow 同时推 latest） | semver |
 | 健康检查 | 宽松 | 严格 |
 | 滚动更新 | 无 | 有 |
 

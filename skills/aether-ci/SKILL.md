@@ -178,14 +178,17 @@ total_count == 0    → 该 commit 无 CI 运行记录（可能未触发或 SHA 
 
 ### Step 3a: 持续监控 (--watch)
 
-当 CI 仍在 pending 时，循环轮询：
+当 CI 仍在 pending 时，用 Bash 的 `run_in_background` 跑一个有上限的轮询，跑完自动通知（不要在前台 sleep 等待）。
+60 秒 × 15 次，与 push 后自动触发的 CronCreate 轮询一致；`--commit` 合并了 commit status 与 task 列表：
 
-- **轮询间隔**: 45 秒
-- **最大次数**: 20 次 (~15 分钟)
-- **每次轮询**: 查询 `/commits/${SHA}/status`，检查 `state`
-- **终止条件**: state 变为 `success`/`failure`/`error`，或超过最大次数
+```bash
+for i in $(seq 15); do
+  aether ci status --commit "$SHA" --expect "$N" --json > "/tmp/ci-$SHA.json"; rc=$?
+  [ "$rc" -ne 10 ] && break; sleep 60
+done; echo "rc=$rc"   # 0 全部成功 / 13 有 job 失败 → Step 4 / 10 超时仍未完成 / 11 N 写错 / 12 无法下结论
+```
 
-超时后提示可能原因：
+`$N` = 这次 push 触发的 job 总数（各 workflow 的 job 数之和，注意 `paths` 过滤）。超时后提示可能原因：
 - Runner 队列积压
 - Job 卡死
 - 建议直接查看 Web UI
@@ -200,23 +203,18 @@ total_count == 0    → 该 commit 无 CI 运行记录（可能未触发或 SHA 
 
 **4.2 执行对应复现命令**
 
-| Job Context | 本地复现命令 | 工作目录 |
-|-------------|-------------|---------|
-| `CI / test (push)` | `go test -v -race ./...` | `aether-cli/` |
-| `CI / lint (push)` | `golangci-lint run --timeout=5m` | `aether-cli/` |
-| `CI / build (push)` | `docker build -f Dockerfile .` | 项目根目录 |
-| 依赖异常 | `go mod download && go mod verify` | `aether-cli/` |
+在当前仓库 `.forgejo/workflows/*.yml` 里找到失败 job 的 `steps`，用相同的命令、工作目录与工具链版本在本地复现
+（版本看 `setup-go` 的 `go-version` / `env.GO_VERSION` 等）。常见形态：
 
-```bash
-# 示例: test 失败时
-cd aether-cli && go test -v -race ./... 2>&1
-
-# 示例: lint 失败时
-cd aether-cli && golangci-lint run --timeout=5m 2>&1
-```
+| 失败 job 在做什么 | 本地复现命令（在该 job 的工作目录下） |
+|-------------|-------------|
+| Go 测试 | `go test -v -race ./...` |
+| golangci-lint | `golangci-lint run --timeout=5m` |
+| 镜像构建 | `docker build -f <workflow 里的 Dockerfile 路径> .` |
+| 依赖异常 | `go mod download && go mod verify` |
 
 **4.3 注意事项**:
-- CI 使用 Go 1.22，确保本地版本一致
+- 本地工具链版本与 workflow 里声明的一致，不要凭记忆假设版本
 - CI 使用 `-race` flag，本地复现也应加上
 - 如果本地通过但 CI 失败，可能是环境差异 — 提示用户检查
 

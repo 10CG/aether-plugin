@@ -26,7 +26,7 @@ When a node needs maintenance (reboot, update, hardware repair), you orchestrate
 
 - Nomad Server: http://192.168.69.70:4646
 - Consul Server: http://192.168.69.70:8500
-- Heavy Nodes: heavy-1 (.80), heavy-2 (.81), heavy-3 (.82)
+- Heavy Nodes: heavy-1~5 (.80-.84); confirm with GET /v1/nodes
 - Light Nodes: light-1 (.90) through light-5 (.94)
 - PVE Nodes: pve-node1 (.11) through pve-node5 (.55)
 

@@ -159,7 +159,7 @@ Know these once, then every rule below makes sense:
    log reading uses the `aether-reader` SSH channel
    (see `docs/guides/aether-reader-ssh-setup.md`).
 
-7. **All 3 heavy runners (heavy-1/2/3) inject an aliyun apt mirror into
+7. **All heavy runners (heavy-1~5) inject an aliyun apt mirror into
    every job container.** `archive.ubuntu.com` is unreachable from these
    nodes (cross-border SYN timeouts, observed SilkNode CI 871, nexus runs
    2304/2306). Each runner bind-mounts its local
@@ -174,15 +174,19 @@ Know these once, then every rule below makes sense:
    (aliyun won on TCP connect + TTFB + throughput; tuna/ustc/tencent all
    hit 5.3s SYN-retry from these networks). See B11 for usage notes.
 
-8. **All cross-border egress from heavy runners funnels through a single
-   transparent-proxy gateway at `192.168.69.212`.** This is the mechanism
-   behind fact #3. On heavy-1/2/3, external hosts (`pypi.org`,
+8. **All cross-border egress from heavy runners funnels through the mihomo
+   transparent proxy, egress VIP `192.168.69.199`** (keepalived, the nodes'
+   default route; permanent since 2026-09-12 — the older `192.168.69.212`
+   was removed and is not a fallback, Aether #404). This is the mechanism
+   behind fact #3. On the heavy nodes, external hosts (`pypi.org`,
    `registry-1.docker.io`, `cdn.npmmirror.com`, `pypi.tuna.tsinghua.edu.cn`)
-   resolve to **fake-IP `198.18.0.x`** (RFC2544 TEST-NET range — the
+   resolve to **fake-IP `198.18.x.x`** (RFC2544 TEST-NET range — the
    signature of a TUN/transparent proxy), and `ip route get 198.18.0.7`
-   shows `via 192.168.69.212`. The dev workstation does **not** use this
-   path — which is exactly why a host is reachable (HTTP 200, ~1-2s) from a
-   laptop but intermittently times out from a runner.
+   shows `via 192.168.69.199`. A host can answer HTTP 200 in ~1-2s from a
+   machine that does not egress through mihomo and still intermittently
+   time out from a runner. Pick such a machine for the comparison: the dev
+   twins (308/309) also default-route via mihomo since 2026-07-23, so they
+   are not a neutral baseline.
    **Diagnostic property**: small requests (a `curl -I` HEAD, a manifest
    fetch) almost always pass; **sustained transfers** (`npm ci` /
    `uv sync` / `pip install` pulling tens of MB, docker layer pulls)
@@ -192,11 +196,12 @@ Know these once, then every rule below makes sense:
    **Internal mirrors bypass the proxy entirely**: verdaccio
    (`192.168.69.206:4873`, npm) and devpi (`192.168.69.206:3141`, pip) are
    on the internal subnet and are always reachable. The whole point of the
-   mirror rules below is to keep the CI hot path **off** the 212 proxy.
-   The proxy gateway's own stability is operator/infra-owned (`.212` is not
+   mirror rules below is to keep the CI hot path **off** the mihomo proxy.
+   The proxy gateway's own stability is operator/infra-owned (it is not
    in the documented infra trio `.70/.71/.72`); CI's job is to not depend on
-   it. (Empirical: Aether #172/#173, 2026-06-14 — live-probed across all 3
-   heavy nodes.)
+   it. (Empirical: Aether #172/#173, 2026-06-14 — live-probed across the
+   then 3 heavy nodes; route via `.199` and fake-IP re-checked on all 5 on
+   2026-10-11.)
 
 ---
 
@@ -206,8 +211,8 @@ Know these once, then every rule below makes sense:
 
 > **EVOLUTION (2026-06-11, Aether #151 ①+(i))**: docker-container driver 本身
 > 不再是反模式 — **节点 provision 的 `aether-build` builder**（docker-container
-> driver + 4 GiB memcg + `network=host` + buildkitd.toml CA pin，heavy-1/2/3
-> systemd 单元常驻）现在是**标准 build 路径**（新形态见 B1）。仍然坏的是
+> driver + 4 GiB memcg + `network=host` + buildkitd.toml CA pin，全部 heavy
+> 节点 systemd 单元常驻）现在是**标准 build 路径**（新形态见 B1）。仍然坏的是
 > `setup-buildx-action` 默认 spawn 的**裸** docker-container builder（无 CA
 > provisioning），失败形态与下文完全一致。`driver: docker`（宿主 daemon）在
 > 未迁移 repo 上仍可运行（#151 §9.4 R4 迁移期），但其嵌套 build **内存无界**
@@ -241,7 +246,7 @@ buildkitd 忽略 flag，而是该请求不在 buildkitd 里发生 — 所以任�
 **Fix (standard since 2026-06-11)**: 用节点 provision 的 `aether-build` builder
 （B1 新形态）— ① 由 buildkitd.toml `ca=` pin 解决（provisioning 单元建档拷入），
 ② 由 runner 给 job 容器注入的 CA bundle bind 解决（`container.options`
-`-v /etc/ssl/certs/ca-certificates.crt:...:ro`，heavy-1/2/3 已部署）。
+`-v /etc/ssl/certs/ca-certificates.crt:...:ro`，heavy-1~5 已部署）。
 
 **Legacy fix（未迁移 repo 仍在用）**: `driver: docker` 显式声明，build 走宿主
 daemon 的 `insecure-registries` — 可用但嵌套 build 内存无界（#149 路径）。
@@ -413,7 +418,7 @@ has broader tag coverage.
 
 > **ERRATUM (2026-06-14, Aether #172)**: "stable access to Docker Hub" is
 > only *mostly* true — `registry-1.docker.io` egress also rides the
-> `192.168.69.212` proxy (Environment fact #8) and **can intermittently
+> mihomo proxy (Environment fact #8) and **can intermittently
 > TLS-handshake-timeout under load**. SilkNode run 8155 failed at
 > `Head "https://registry-1.docker.io/v2/docker/dockerfile/manifests/1":
 > net/http: TLS handshake timeout` — buildkit pulling the **Docker Hub
@@ -553,11 +558,11 @@ entirely.
 
 > **NEW (2026-06-14, Aether #172/#173)**. Generalizes A5/A6: the failure
 > isn't about *which* external host — it's about touching the
-> `192.168.69.212` proxy egress at all (Environment fact #8).
+> mihomo proxy egress at all (Environment fact #8).
 
 **Pattern**: A workflow or Dockerfile reaches a cross-border host on the
 CI hot path — even one that "works from my laptop" and even a CN mirror.
-All of these ride the `192.168.69.212` proxy and fail **intermittently**:
+All of these ride the mihomo proxy and fail **intermittently**:
 
 - `PRISMA_ENGINES_MIRROR=registry.npmmirror.com` → `@prisma/engines`
   postinstall pulls from `cdn.npmmirror.com:443` (external CDN, **not** the
@@ -822,7 +827,7 @@ source of truth. Saves 4+ minutes per push event.
       /etc/apt/sources.list.d/ubuntu.sources
 ```
 
-The runners (heavy-1/2/3) already bind-mount an aliyun-backed
+The runners (heavy-1~5) already bind-mount an aliyun-backed
 `ubuntu.sources` over the job container's file. Per-workflow swaps are
 redundant and would have to be maintained in every project — drifting out
 of sync the moment the runner-side mirror changes (e.g. aliyun degrades
@@ -840,7 +845,7 @@ and we move to huaweicloud).
 **When you would still need a workflow-level swap**:
 - The job runs on a non-noble base (e.g. `container: ubuntu:22.04`) — the
   runner's mount only covers noble.
-- The job runs on a runner outside heavy-1/2/3 (none today, but
+- The job runs on a runner outside the heavy nodes (none today, but
   if `aria-runner-template` ever spawns one elsewhere).
 
 In those cases, do the swap inside the Dockerfile (B5/B6 pattern) rather
@@ -855,7 +860,7 @@ See Environment fact #7 for the runner-side mechanism.
 The counterpart to A11. Two independent habits; do both.
 
 **(a) Route every CI dependency through an internal mirror** (bypasses the
-`192.168.69.212` proxy — Environment fact #8). The internal mirrors are
+mihomo proxy — Environment fact #8). The internal mirrors are
 already provisioned and healthy:
 
 | Ecosystem | Internal mirror | Common leak to plug |
@@ -972,15 +977,15 @@ Match the error keyword to find the relevant section.
 ### Cross-border egress / proxy-gateway errors
 
 > All of these are one root cause: a CI hot-path fetch riding the
-> `192.168.69.212` proxy (Environment fact #8). Fix = internal-mirror it.
+> mihomo proxy (Environment fact #8). Fix = internal-mirror it.
 
 | Error fragment | Cause | Fix section |
 |----------------|-------|------------|
-| `EIDLETIMEOUT` for `cdn.npmmirror.com` (not npmjs) | Prisma engines / postinstall pulling external CDN via proxy 212 | [A11](#a11-any-external-cross-border-fetch-in-the-ci-hot-path) + [B12](#b12-internal-mirror-the-whole-hot-path--timeout-minutes-fast-fail) |
-| `TLS handshake timeout` to `registry-1.docker.io` | Docker Hub dockerfile frontend (`# syntax=...`) via proxy 212 | [A11](#a11-any-external-cross-border-fetch-in-the-ci-hot-path) + [B12](#b12-internal-mirror-the-whole-hot-path--timeout-minutes-fast-fail) |
-| `peer closed connection without sending TLS close_notify` (pypi) | uv/pip cross-border fallback (devpi cache miss) via proxy 212 | [A11](#a11-any-external-cross-border-fetch-in-the-ci-hot-path) + [B12](#b12-internal-mirror-the-whole-hot-path--timeout-minutes-fast-fail) |
-| `Read timed out` for `pypi.tuna.tsinghua.edu.cn` | Same (tuna also rides proxy 212) | [A11](#a11-any-external-cross-border-fetch-in-the-ci-hot-path) + [B12](#b12-internal-mirror-the-whole-hot-path--timeout-minutes-fast-fail) |
-| Host is HTTP 200 from laptop but times out in CI | Runner egress ≠ laptop egress (proxy 212) | Environment fact #8 — do not conclude "egress healthy" from one probe |
+| `EIDLETIMEOUT` for `cdn.npmmirror.com` (not npmjs) | Prisma engines / postinstall pulling external CDN via the mihomo proxy | [A11](#a11-any-external-cross-border-fetch-in-the-ci-hot-path) + [B12](#b12-internal-mirror-the-whole-hot-path--timeout-minutes-fast-fail) |
+| `TLS handshake timeout` to `registry-1.docker.io` | Docker Hub dockerfile frontend (`# syntax=...`) via the mihomo proxy | [A11](#a11-any-external-cross-border-fetch-in-the-ci-hot-path) + [B12](#b12-internal-mirror-the-whole-hot-path--timeout-minutes-fast-fail) |
+| `peer closed connection without sending TLS close_notify` (pypi) | uv/pip cross-border fallback (devpi cache miss) via the mihomo proxy | [A11](#a11-any-external-cross-border-fetch-in-the-ci-hot-path) + [B12](#b12-internal-mirror-the-whole-hot-path--timeout-minutes-fast-fail) |
+| `Read timed out` for `pypi.tuna.tsinghua.edu.cn` | Same (tuna also rides the mihomo proxy) | [A11](#a11-any-external-cross-border-fetch-in-the-ci-hot-path) + [B12](#b12-internal-mirror-the-whole-hot-path--timeout-minutes-fast-fail) |
+| Host is HTTP 200 from laptop but times out in CI | Runner egress ≠ laptop egress (runner goes through mihomo) | Environment fact #8 — do not conclude "egress healthy" from one probe |
 
 ### Workflow / runner errors
 
@@ -990,7 +995,7 @@ Match the error keyword to find the relevant section.
 | `Post Run actions/setup-node@v4` taking 4+ minutes | Same | [A4](#a4-cache-npm-in-actionssetup-node) |
 | `invalid pkt-len found` | Transient runner action git-clone glitch | Retry (not a code issue) |
 | `some refs were not updated` on `data.forgejo.org` | Non-fatal, always present | Ignore |
-| Run stuck `running` 30-190 min, no step progress, no kill | Egress idle-timeout via proxy 212 + missing step `timeout-minutes` (looks like a hung runner, isn't) | [A11](#a11-any-external-cross-border-fetch-in-the-ci-hot-path) + [B12](#b12-internal-mirror-the-whole-hot-path--timeout-minutes-fast-fail) |
+| Run stuck `running` 30-190 min, no step progress, no kill | Egress idle-timeout via the mihomo proxy + missing step `timeout-minutes` (looks like a hung runner, isn't) | [A11](#a11-any-external-cross-border-fetch-in-the-ci-hot-path) + [B12](#b12-internal-mirror-the-whole-hot-path--timeout-minutes-fast-fail) |
 | `cancel`/`rerun` API → `rc=22` (can't kill a stuck run) | Forgejo Actions API gap (related upstream gap: Aether #8) | Cut the root cause (B12 `timeout-minutes`) so runs don't need manual kill |
 
 ### Performance / scaling
@@ -1022,7 +1027,7 @@ Match the error keyword to find the relevant section.
 | `FROM node:22-alpine` (Docker Hub) | `docker.1ms.run/library/node:22-alpine` |
 | Fast-path check before expensive side-tasks | Unconditional clone + npm ci + test for "maybe publish" |
 | PR-only quality gates when Docker also builds | Duplicating `npm run build` on host and in Docker |
-| Internal-mirror every hot-path fetch (verdaccio/devpi @ `.206`); audit secondary fetches (Prisma engines, `# syntax` frontend) | CI hot-path fetch to any cross-border host (rides proxy `192.168.69.212`, intermittent timeout) |
+| Internal-mirror every hot-path fetch (verdaccio/devpi @ `.206`); audit secondary fetches (Prisma engines, `# syntax` frontend) | CI hot-path fetch to any cross-border host (rides the mihomo proxy `192.168.69.199`, intermittent timeout) |
 | `timeout-minutes` on every install/build step (fast-fail) | No step timeout (egress stall drags a run to 30-190 min) |
 | Conclude egress health from a sustained transfer | Conclude "egress healthy" from one `curl -I` HEAD (Env fact #8) |
 
@@ -1051,6 +1056,7 @@ Match the error keyword to find the relevant section.
 
 | Version | Date | Change |
 |---------|------|--------|
+| 1.2.1 | 2026-10-11 | Heavy-node references updated from heavy-1/2/3 to all five (builder unit + buildkitd.toml CA pin, runner apt-mirror / CA-bundle mounts and build-cache env verified live on heavy-1~5). Environment fact #8 and every section citing it: the egress proxy is mihomo at VIP `192.168.69.199` (`.212` removed 2026-09-12, Aether #404); the dev twins also egress through it, so they are not a neutral comparison. Aether #482. |
 | 1.2.0 | 2026-06-14 | Added Environment fact #8 (transparent-proxy egress gateway `192.168.69.212` / fake-IP `198.18.0.x`; small-probe-passes / sustained-transfer-fails diagnostic) + A11 (any cross-border fetch in the CI hot path) + B12 (internal-mirror everything + `timeout-minutes` fast-fail) + Troubleshooting § Cross-border egress / proxy-gateway errors + A6 erratum (Docker Hub also rides the proxy). From live-probed triage of Aether #172 (SilkNode) / #173 (nexus). |
 | 1.1.0 | 2026-04-10 | Added § CI Monitoring Policy — the push → CI → deploy-watch → report chain. Codified as the single most important operational rule for Aether projects. |
 | 1.0.0 | 2026-04-10 | Initial version — extracted from 4-project optimization effort (SilkNode, Nexus, Kairos, Kino). All patterns verified with measured data. |

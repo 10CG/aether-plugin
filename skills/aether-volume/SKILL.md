@@ -241,14 +241,6 @@ Host heavy-* light-*
 
 ---
 
-## 外部参考
-
-- [aether volume 使用指南](../../docs/guides/aether-volume-usage.md)
-- [SSH 配置指南](../../docs/guides/SSH_SETUP_GUIDE.md)
-- [完整测试报告](../../aether-cli/COMPLETE_TEST_REPORT.md)
-
----
-
 **Skill 版本**: 1.4.0
 **最后更新**: 2026-07-15
 **维护者**: 10CG Infrastructure Team

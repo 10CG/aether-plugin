@@ -142,7 +142,7 @@ job "__PROJECT_NAME__" {
 > 只需 Nomad 注册全覆盖即可。详见 [nfs-virtiofs-host-volumes.md](https://forgejo.10cg.pub/10CG/Aether/src/branch/master/docs/guides/nfs-virtiofs-host-volumes.md)。
 >
 > **node-class × 存储能力**: 有状态 Docker 服务用约束 `${node.class} = heavy_workload`
-> (heavy-1/2/3 — 唯一带 docker driver + NFS-virtiofs `/opt/aether-volumes/` 共享挂载);
+> (heavy-1~5 — 唯一带 docker driver + NFS-virtiofs `/opt/aether-volumes/` 共享挂载);
 > light 节点仅 exec driver, 无法消费 docker host_volume。
 >
 > 注册命令 (**对每个 heavy 节点**都执行):

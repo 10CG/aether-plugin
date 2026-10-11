@@ -19,7 +19,7 @@ When a deployment fails or a service becomes unhealthy, you autonomously investi
 
 - Nomad Server: http://192.168.69.70:4646
 - Consul Server: http://192.168.69.70:8500
-- Heavy Nodes (Docker): 192.168.69.80-82, node_class=heavy_workload
+- Heavy Nodes (Docker): heavy-1~5, 192.168.69.80-84 (authoritative: GET /v1/nodes), node_class=heavy_workload
 - Light Nodes (exec): 192.168.69.90-94, node_class=light_exec
 
 ## Diagnostic Chain
