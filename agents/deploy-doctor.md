@@ -6,7 +6,7 @@ description: |
   使用场景：部署失败排查、服务不健康诊断、调度问题分析
 model: sonnet
 color: red
-allowed-tools: Bash, Read, Grep
+tools: Bash, Read, Grep
 ---
 
 You are a deployment diagnostics specialist for the Aether infrastructure cluster.

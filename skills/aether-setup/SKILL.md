@@ -65,7 +65,7 @@ allowed-tools: Read, Write, Bash, AskUserQuestion
 ### 查看当前配置
 
 ```bash
-/aether:setup --show
+/aether:aether-setup --show
 ```
 
 输出：
@@ -98,7 +98,7 @@ Aether 集群配置
 ### 创建全局配置
 
 ```bash
-/aether:setup --global
+/aether:aether-setup --global
 ```
 
 交互流程：
@@ -135,17 +135,17 @@ Aether 集群配置
     则该项目使用项目级配置，其他项目仍用全局配置
 
 接下来可以使用这些 Skills:
-  /aether:status    → 查询集群状态（读取上述配置）
-  /aether:init      → 初始化项目部署（读取上述配置）
-  /aether:deploy    → 部署到生产（读取上述配置）
-  /aether:dev       → 部署到开发环境（读取上述配置）
+  /aether:aether-status    → 查询集群状态（读取上述配置）
+  /aether:aether-init      → 初始化项目部署（读取上述配置）
+  /aether:aether-deploy    → 部署到生产（读取上述配置）
+  /aether:aether-dev       → 部署到开发环境（读取上述配置）
 ```
 
 生成的文件 `~/.aether/config.yaml`：
 
 ```yaml
 # Aether 集群配置
-# 由 /aether:setup 生成
+# 由 /aether:aether-setup 生成
 
 cluster:
   nomad_addr: "http://192.168.69.70:4646"
@@ -156,7 +156,7 @@ cluster:
 ### 创建项目级配置
 
 ```bash
-/aether:setup --project
+/aether:aether-setup --project
 ```
 
 生成的文件 `.aether/config.yaml`：
@@ -173,13 +173,13 @@ cluster:
 
 ### 首次使用引导
 
-当其他 skill（如 `/aether:init`）检测到未配置时，自动触发引导，询问用户选择全局配置或项目配置。
+当其他 skill（如 `/aether:aether-init`）检测到未配置时，自动触发引导，询问用户选择全局配置或项目配置。
 
 ---
 
 ## 配置读取逻辑
 
-Skills 按优先级链读取配置：项目级 `.aether/config.yaml` → 全局 `~/.aether/config.yaml` → 环境变量。使用 `yq` 读取 `cluster.*` 字段。未找到任何配置时，提示用户运行 `/aether:setup`。
+Skills 按优先级链读取配置：项目级 `.aether/config.yaml` → 全局 `~/.aether/config.yaml` → 环境变量。使用 `yq` 读取 `cluster.*` 字段。未找到任何配置时，提示用户运行 `/aether:aether-setup`。
 
 ---
 
@@ -281,13 +281,13 @@ Skills 使用发现的信息（如 node_class）而非硬编码值。
 ## 与其他 Skills 的关系
 
 ```
-/aether:setup     → 配置集群入口（首次使用）
+/aether:aether-setup     → 配置集群入口（首次使用）
        ↓
        ↓ 提供 NOMAD_ADDR, CONSUL_HTTP_ADDR, AETHER_REGISTRY
        ↓
-/aether:init      → 读取配置 + API 发现 → 生成部署文件
-/aether:dev       → 读取配置 → 执行开发部署
-/aether:status    → 读取配置 → 查询集群状态
-/aether:deploy    → 读取配置 → 执行生产部署
-/aether:rollback  → 读取配置 → 执行回滚
+/aether:aether-init      → 读取配置 + API 发现 → 生成部署文件
+/aether:aether-dev       → 读取配置 → 执行开发部署
+/aether:aether-status    → 读取配置 → 查询集群状态
+/aether:aether-deploy    → 读取配置 → 执行生产部署
+/aether:aether-rollback  → 读取配置 → 执行回滚
 ```

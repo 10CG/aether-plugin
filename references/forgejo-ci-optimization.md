@@ -26,8 +26,8 @@ for CI/CD in the Aether environment. When in doubt, consult it by:
 3. **Cold-path verification** → § Anti-patterns (avoid these)
 4. **Measured impact** → § Case studies (real before/after data)
 
-If you are `/aether:init`, use this guide's patterns in the templates you generate.
-If you are `/aether:ci`, use this guide to interpret failures and propose fixes.
+If you are `/aether:aether-init`, use this guide's patterns in the templates you generate.
+If you are `/aether:aether-ci`, use this guide to interpret failures and propose fixes.
 
 ---
 
@@ -35,7 +35,7 @@ If you are `/aether:ci`, use this guide to interpret failures and propose fixes.
 
 ✅ **Consult this guide when**:
 - A project's CI takes >5 minutes and the user asks "why is it slow"
-- A new project is being set up via `/aether:init`
+- A new project is being set up via `/aether:aether-init`
 - CI push fails with `tls:`, `EIDLETIMEOUT`, `operation not supported`,
   or `invalid pkt-len` errors
 - Dockerfile uses `--mount=type=cache` (it will fail here)
@@ -1030,16 +1030,16 @@ Match the error keyword to find the relevant section.
 
 ## Related Skills
 
-- **`/aether:init`** — Generates workflows and Dockerfiles that follow
+- **`/aether:aether-init`** — Generates workflows and Dockerfiles that follow
   the patterns in this guide by default. The templates in
   `${CLAUDE_PLUGIN_ROOT}/skills/aether-init/references/` are the canonical
   starting point for new projects.
 
-- **`/aether:ci`** — Diagnoses CI failures. When a CI run fails with any
+- **`/aether:aether-ci`** — Diagnoses CI failures. When a CI run fails with any
   of the error fragments in § Troubleshooting decision tree, cross-reference
   this guide for root cause + fix.
 
-- **`/aether:deploy`** — Runtime deployment operations. Not directly
+- **`/aether:aether-deploy`** — Runtime deployment operations. Not directly
   concerned with CI optimization, but slow image builds (caused by
   anti-patterns in this guide) will slow down the deploy feedback loop.
   If a user complains about slow deploys, first check whether the CI

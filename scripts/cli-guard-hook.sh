@@ -59,7 +59,7 @@ if ! detect_cli; then
 
 您正在尝试执行 aether 命令，但 CLI 未安装。
 
-▸ 推荐: 运行 /aether:doctor 自动安装
+▸ 推荐: 运行 /aether:aether-doctor 自动安装
 
 ▸ 或手动安装 (检测到平台: ${_OS}/${_ARCH}):
 

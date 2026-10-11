@@ -199,7 +199,7 @@ print_cf_token_guidance() {
   3. 找到并复制 CF_Authorization cookie 值
 
 ▸ 配置后重试:
-  /aether:doctor
+  /aether:aether-doctor
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -302,7 +302,7 @@ print_install_guidance() {
 ❌ aether CLI 未检测到
 
 请运行以下命令安装:
-/aether:doctor
+/aether:aether-doctor
 
 或手动安装 (检测到平台: ${_os}/${_arch}):
 
@@ -331,7 +331,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
         if ! check_cli_version "$VERSION" "$CLI_MIN_VERSION"; then
             echo ""
             echo "⚠️  版本过低 (当前: $VERSION, 要求: >= $CLI_MIN_VERSION)"
-            echo "   请运行 /aether:doctor 更新 CLI"
+            echo "   请运行 /aether:aether-doctor 更新 CLI"
             exit 1
         fi
 

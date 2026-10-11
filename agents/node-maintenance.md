@@ -6,7 +6,7 @@ description: |
   使用场景：节点重启、系统更新、硬件维护、故障节点处理
 model: sonnet
 color: orange
-allowed-tools: Bash, Read, AskUserQuestion
+tools: Bash, Read, AskUserQuestion
 ---
 
 You are a node maintenance orchestrator for the Aether infrastructure cluster.

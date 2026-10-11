@@ -1,6 +1,6 @@
 # turfsync-worker
 
-> 本文件由 `/aether:init` 生成，请勿手动删除下方 marker 区块（`aether-init` 重跑时会据此判定是否需要更新）。
+> 本文件由 `/aether:aether-init` 生成，请勿手动删除下方 marker 区块（`aether-init` 重跑时会据此判定是否需要更新）。
 
 <!-- aether:integration-policy 2026-07-15 start -->
 ### 集群集成规范 (MANDATORY)

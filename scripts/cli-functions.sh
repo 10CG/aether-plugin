@@ -33,7 +33,7 @@ require_aether_cli() {
 ❌ aether CLI 未检测到
 
 请运行以下命令安装:
-/aether:doctor
+/aether:aether-doctor
 
 安装完成后重试此命令。
 EOF

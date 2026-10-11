@@ -2,6 +2,37 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.12.9] - 2026-10-11 — 斜杠命令改用可解析的长名；skill-benchmark 退役 (Aether #482 第一步)
+
+### Fixed
+- **103 处斜杠命令短名改为长名**（`/aether:setup` → `/aether:aether-setup` 等）：SKILL.md 81 处（11 个 skill）、
+  references 16 处、脚本 6 处。插件名是 `aether`、没有 `commands/`，skill 名都是 `aether-*`，短名一直解析不到；
+  其中 `scripts/ci-watch-hook.sh` 的 systemMessage 会让模型在 CI 成功后去调用 `/aether:deploy-watch`。
+- **两个 agent 的 `allowed-tools:` 改为 `tools:`**（subagent 的 frontmatter 字段），原本声明的工具限制开始生效：
+  deploy-doctor 只有 Bash / Read / Grep，node-maintenance 只有 Bash / Read / AskUserQuestion。此前两者实际拿到的是全部工具。
+- **aether-cli-guard 文档对齐 hooks.json**：「Hook 配置」一节换成真实结构 (`matcher: "Bash"` + command 执行脚本)；
+  手抄且已与脚本不符的检测逻辑改为指向 `scripts/cli-guard-hook.sh`，并注明已知问题 —— 脚本只读 `CLAUDE_TOOL_INPUT`、
+  用 `exit 1` 拦截，很可能从未拦下过命令 (Aether #489，脚本本版未改)。该文件模型和用户都加载不到。
+- skill 数量描述统一为「15 个 Skills + 2 个 Agents + 3 个 Hooks」（README / plugin.json / marketplace.json / hooks.json
+  原先分别写 15 / 14 / 14 / 13 个 skill、2 或 3 个 hook；按可调用的 skill 计，不含只作 hook 说明的 aether-cli-guard）。
+
+### Removed
+- **skill-benchmark 退役**: 项目自创的第一版基准工具 (2026-03-17)，「不实际运行 skill」的五维静态打分已被主仓
+  `aether-plugin-benchmarks/AB_TEST_OPERATIONS.md` 记为废弃，正文引用的 `evals/` 早已迁到主仓；description 里
+  「回归测试」「跑 eval」这类泛词会把普通测试请求路由过来。Skill 质量验证走主仓的 AB 流程；官方对应物是 Anthropic 的 `skill-creator` 插件。
+
+### 质量门
+- 短名修正套 `[skip-benchmark]` **豁免 1**，条件 a（决策树 / 调用 / 触发未变）、b（只改 typo 级内容）、c（diff 只落在 trivia）
+  由 owner 2026-10-11 逐条确认。机械核对：对 master 版本施加同一条替换，得到的 23 个文件与本版逐字节相同 —— diff 里没有别的改动。
+- skill-benchmark 删除、agent frontmatter、aether-cli-guard（模型不可见，AB_TEST_OPERATIONS 列为 Tier 3）、数量描述：不涉及 AB。
+- 脚本：4 个改动脚本 `bash -n` 通过；ci-watch-hook 在临时仓库里用假 `git push` 载荷实测，输出合法 JSON、命令名为长名，
+  阴性对照 (`git status`) 无输出；cli-guard-hook 在 CLI 缺失时的引导里为长名。
+- 守门层：改动的 11 个 SKILL.md 行数均不变。aether-init 的 references 合计 6188 词，超过 5000 词阻断线 —— 自 v1.12.0 起即如此
+  (与 master 词数相同)，本版未改变；1.12.10 修改 aether-init 前需先处理。
+
+#482 余下的实质修正（配置优先级、aether-init 模板与 flag、deploy / dev / doctor / rollback 改调 CLI、heavy 节点数、
+aether-ci 的 Go 版本与 `--watch` 分工、deploy-watch 的 120 秒说法、aether-volume 死链）随 1.12.10 发布，按 skill 跑 AB。
+
 ## [1.12.8] - 2026-10-10 — 三处命令不再把凭据打进会话 (Aether #481)
 
 ### Fixed

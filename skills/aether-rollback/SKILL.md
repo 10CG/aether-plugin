@@ -42,7 +42,7 @@ require_aether_cli || exit 1
 ### Step 1: 获取版本历史
 
 ```bash
-/aether:rollback my-project
+/aether:aether-rollback my-project
 ```
 
 查询 Nomad Job 版本历史：
@@ -190,7 +190,7 @@ curl -s "${CONSUL_HTTP_ADDR}/v1/health/service/my-project?passing" | jq 'length'
 如果需要快速回滚，可以直接指定版本跳过版本选择步骤：
 
 ```bash
-/aether:rollback my-project --to v2
+/aether:aether-rollback my-project --to v2
 ```
 
 这将跳过版本列表展示，但仍需执行确认（Step 2.5）后才会执行回滚。
@@ -252,7 +252,7 @@ openssl s_client -connect my-project.service.consul:443 2>/dev/null | openssl x5
 
 对策：确认证书配置（Vault PKI 或文件路径）在回滚后仍有效。
 
-**兜底手段**：如以上排查均无果，使用 `/aether:status my-project` 查看详细状态，或调用 `deploy-doctor` agent 进行深度诊断。
+**兜底手段**：如以上排查均无果，使用 `/aether:aether-status my-project` 查看详细状态，或调用 `deploy-doctor` agent 进行深度诊断。
 
 ## 预防措施
 
@@ -265,7 +265,7 @@ openssl s_client -connect my-project.service.consul:443 2>/dev/null | openssl x5
 
 ## 前置条件：集群配置
 
-执行前需要配置 Aether 集群入口，参考 `/aether:setup`。
+执行前需要配置 Aether 集群入口，参考 `/aether:aether-setup`。
 
 ### 配置读取
 
@@ -284,7 +284,7 @@ fi
 
 # 3. 未配置则提示
 if [ -z "$NOMAD_ADDR" ]; then
-  echo "请先运行 /aether:setup 配置集群"
+  echo "请先运行 /aether:aether-setup 配置集群"
   exit 1
 fi
 ```

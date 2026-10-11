@@ -65,7 +65,7 @@ CONSUL_ADDR=$(yq '.cluster.consul_addr' .aether/config.yaml 2>/dev/null)
 REGISTRY=$(yq '.cluster.registry' .aether/config.yaml 2>/dev/null)
 ```
 
-如果配置文件不存在或关键字段缺失，提示用户运行 `/aether:setup` 初始化项目配置。
+如果配置文件不存在或关键字段缺失，提示用户运行 `/aether:aether-setup` 初始化项目配置。
 
 ### 验证 Job 存在
 
@@ -75,7 +75,7 @@ curl -sf --max-time 5 --connect-timeout 3 "${NOMAD_ADDR}/v1/job/${JOB_NAME}" > /
 
 - **200**: Job 存在，继续。
 - **404**: 报告 "Job `${JOB_NAME}` not found in Nomad"，建议 `aether setup` 或手动 `nomad job run`。
-- **连接失败**: 报告 Nomad 不可达，建议 `/aether:doctor`。
+- **连接失败**: 报告 Nomad 不可达，建议 `/aether:aether-doctor`。
 
 ### target_tag 确定
 
@@ -311,10 +311,10 @@ done
   Consul: {passing}/{desired} passing
   Duration: {elapsed}s
 
-  /aether:rollback {job_name} — if anything looks wrong
+  /aether:aether-rollback {job_name} — if anything looks wrong
 ```
 
-成功后调用 `/aether:status {job_name}` 展示完整状态摘要。
+成功后调用 `/aether:aether-status {job_name}` 展示完整状态摘要。
 
 ### 失败输出
 
@@ -325,7 +325,7 @@ done
 
   Suggested actions:
   1. {specific fix based on error type}
-  2. Run /aether:status {job_name} --failed for details
+  2. Run /aether:aether-status {job_name} --failed for details
   3. Run deploy-doctor agent for deep diagnosis
 ```
 
@@ -368,7 +368,7 @@ Claude Code Bash tool 单次调用约 120 秒超时。Step 2 (18x10s) 和 Step 3
 
 - Forgejo Actions API 无 step 级别日志 (Aether#8，等待上游支持)。
 - 健康检查器在 rolling update grace period 期间可能短暂看到错误的 allocation 数量，Step 3 的 consecutive_pass 机制用于缓解。
-- Canary 部署: deploy-watch 报告状态但**不会**自动 promote，需用户手动执行或通过 `/aether:deploy` 完成。
+- Canary 部署: deploy-watch 报告状态但**不会**自动 promote，需用户手动执行或通过 `/aether:aether-deploy` 完成。
 - Forgejo commit status API 将 `cancelled` 表现为 `status: "failure"`，必须通过 Actions Tasks API 区分 (Aether#9)。
 
 ### 诊断安全原则

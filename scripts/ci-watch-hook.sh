@@ -71,7 +71,7 @@ EOF
 
 if [ -n "$INPUT" ]; then
   # Standard format: JSON output with systemMessage
-  MSG="[aether-ci-watch] git push detected: ${SHORT_SHA} on ${OWNER_REPO}/${BRANCH}. CI pipeline triggered. Automatically create a CronCreate job (cron: */1 * * * *, recurring: true) to poll CI status. Poll prompt: Check CI for ${SHA} in ${OWNER_REPO} — run forgejo GET /repos/${OWNER_REPO}/commits/${SHA}/status and parse state. If success: notify user + CronDelete + IMMEDIATELY invoke /aether:deploy-watch ${JOB_NAME} --version ${SHA} to verify deployment. If failure: notify + run /aether:aether-ci ${SHA} --reproduce. If pending: wait. Max 15 polls then timeout."
+  MSG="[aether-ci-watch] git push detected: ${SHORT_SHA} on ${OWNER_REPO}/${BRANCH}. CI pipeline triggered. Automatically create a CronCreate job (cron: */1 * * * *, recurring: true) to poll CI status. Poll prompt: Check CI for ${SHA} in ${OWNER_REPO} — run forgejo GET /repos/${OWNER_REPO}/commits/${SHA}/status and parse state. If success: notify user + CronDelete + IMMEDIATELY invoke /aether:aether-deploy-watch ${JOB_NAME} --version ${SHA} to verify deployment. If failure: notify + run /aether:aether-ci ${SHA} --reproduce. If pending: wait. Max 15 polls then timeout."
   echo "{\"systemMessage\":$(echo "$MSG" | jq -Rs .)}"
 else
   # Env var format: plain text output

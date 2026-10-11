@@ -131,7 +131,7 @@ Aether 环境诊断
 状态: ✗ 环境未就绪
 
 建议:
-1. 安装 aether CLI: /aether:doctor --fix
-2. 配置集群: /aether:setup
+1. 安装 aether CLI: /aether:aether-doctor --fix
+2. 配置集群: /aether:aether-setup
 3. 配置 SSH: ssh-keygen -t ed25519
 ```

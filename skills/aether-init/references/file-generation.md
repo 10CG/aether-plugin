@@ -180,7 +180,7 @@ line" —— 该函数从未实现: `static-benchmark.sh` 实测唯一函数是 
 >
 > 本节是**新增的独立注入机制**，服务两个目的：(1) 新项目 Phase 2 生成 CLAUDE.md 时的
 > 常规注入；(2) **老项目回填 (C1)** —— 已接入 Aether 但 CLAUDE.md 里没有这段 policy
-> 的项目（如 #241 触发源 TurfSync），重跑 `/aether:init` 即可幂等补上或刷新。
+> 的项目（如 #241 触发源 TurfSync），重跑 `/aether:aether-init` 即可幂等补上或刷新。
 
 ### 与 CI Monitoring Policy 注入的关系（两套独立机制，互不改造）
 

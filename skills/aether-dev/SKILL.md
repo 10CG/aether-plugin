@@ -41,16 +41,16 @@ require_aether_cli || exit 1
 
 ### 不使用场景
 
-- 部署到生产 → 使用 `/aether:deploy`
-- 查看集群整体状态 → 使用 `/aether:status`
-- 新项目接入 → 使用 `/aether:init`
+- 部署到生产 → 使用 `/aether:aether-deploy`
+- 查看集群整体状态 → 使用 `/aether:aether-status`
+- 新项目接入 → 使用 `/aether:aether-init`
 
 ## 子命令
 
 ### 1. `deploy` — 部署到 dev
 
 ```bash
-/aether:dev deploy [service-name]
+/aether:aether-dev deploy [service-name]
 ```
 
 **流程：**
@@ -81,7 +81,7 @@ nomad job run deploy/nomad.hcl
 
 **与 CI 部署的区别：**
 
-| 维度 | CI 自动部署 | /aether:dev deploy |
+| 维度 | CI 自动部署 | /aether:aether-dev deploy |
 |------|-----------|-------------------|
 | 触发 | push 到 main | 手动，任意分支 |
 | 镜像 tag | commit SHA | `dev-<short-sha>` |
@@ -91,7 +91,7 @@ nomad job run deploy/nomad.hcl
 ### 2. `run` — 运行临时测试 Job
 
 ```bash
-/aether:dev run [--docker|--exec] <command>
+/aether:aether-dev run [--docker|--exec] <command>
 ```
 
 快速在集群上运行一个一次性任务，无需手写 nomad.hcl。
@@ -100,13 +100,13 @@ nomad job run deploy/nomad.hcl
 
 ```bash
 # 在 heavy 节点上运行 Docker 容器
-/aether:dev run --docker "nginx:alpine"
+/aether:aether-dev run --docker "nginx:alpine"
 
 # 在 light 节点上运行命令
-/aether:dev run --exec "/opt/apps/my-script/test.sh"
+/aether:aether-dev run --exec "/opt/apps/my-script/test.sh"
 
 # 运行带端口映射的容器
-/aether:dev run --docker "my-api:dev-abc123" --port 3000
+/aether:aether-dev run --docker "my-api:dev-abc123" --port 3000
 ```
 
 **生成的临时 Job：**
@@ -145,7 +145,7 @@ Job 名称带 `dev-temp-` 前缀，便于识别和清理。
 ### 3. `logs` — 查看 dev 服务日志
 
 ```bash
-/aether:dev logs <service-name>
+/aether:aether-dev logs <service-name>
 ```
 
 **流程：**
@@ -165,7 +165,7 @@ nomad alloc logs -stderr ${ALLOC_ID}
 ### 4. `clean` — 清理临时 Job
 
 ```bash
-/aether:dev clean
+/aether:aether-dev clean
 ```
 
 清理所有 `dev-temp-*` 前缀的临时 Job：
@@ -183,7 +183,7 @@ done
 ### 5. `restart` — 重启 dev 服务
 
 ```bash
-/aether:dev restart <service-name>
+/aether:aether-dev restart <service-name>
 ```
 
 重启服务的所有 allocation（不重新部署）：
@@ -208,7 +208,7 @@ done
 if [ ! -f "Dockerfile" ]; then
   echo "错误: 当前目录未找到 Dockerfile"
   echo "修复:"
-  echo "  1. 运行 /aether:init 生成 Dockerfile"
+  echo "  1. 运行 /aether:aether-init 生成 Dockerfile"
   echo "  2. 或手动创建: touch Dockerfile"
   exit 1
 fi
@@ -263,7 +263,7 @@ JOB_EXIT=$?
 if [ $JOB_EXIT -ne 0 ]; then
   if echo "$JOB_OUTPUT" | grep -qi "connection refused"; then
     echo "错误: 无法连接到 Nomad (${NOMAD_ADDR})"
-    echo "修复: 检查 Nomad 服务状态或运行 /aether:setup 重新配置"
+    echo "修复: 检查 Nomad 服务状态或运行 /aether:aether-setup 重新配置"
   elif echo "$JOB_OUTPUT" | grep -qi "403\|permission\|token"; then
     echo "错误: Nomad ACL 认证失败"
     echo "修复: 检查 NOMAD_TOKEN 环境变量是否正确"
@@ -342,7 +342,7 @@ fi
 
 ## 前置条件：集群配置
 
-执行前需要配置 Aether 集群入口，参考 `/aether:setup`。
+执行前需要配置 Aether 集群入口，参考 `/aether:aether-setup`。
 
 ### 配置读取
 
@@ -363,7 +363,7 @@ fi
 
 # 3. 未配置则提示
 if [ -z "$NOMAD_ADDR" ]; then
-  echo "请先运行 /aether:setup 配置集群"
+  echo "请先运行 /aether:aether-setup 配置集群"
   exit 1
 fi
 ```
@@ -371,13 +371,13 @@ fi
 ## 与其他 Skills 的关系
 
 ```
-/aether:setup   → 配置集群入口（首次使用）
+/aether:aether-setup   → 配置集群入口（首次使用）
        ↓
 开发阶段                          生产阶段
 ─────────                        ─────────
-/aether:init    → 项目接入
-/aether:dev     → 开发测试部署
-/aether:status  → 状态查询        → 状态查询
-                                  /aether:deploy  → 生产部署
-                                  /aether:rollback → 生产回滚
+/aether:aether-init    → 项目接入
+/aether:aether-dev     → 开发测试部署
+/aether:aether-status  → 状态查询        → 状态查询
+                                  /aether:aether-deploy  → 生产部署
+                                  /aether:aether-rollback → 生产回滚
 ```

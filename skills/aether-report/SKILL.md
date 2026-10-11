@@ -45,10 +45,10 @@ GITHUB_TOKEN?                    → GitHub API
 解析用户调用参数：
 
 ```
-/aether:report bug      → Bug Report
-/aether:report feature  → Feature Request
-/aether:report question → Question
-/aether:report          → 从用户的自然语言推断，或用 AskUserQuestion 询问
+/aether:aether-report bug      → Bug Report
+/aether:aether-report feature  → Feature Request
+/aether:aether-report question → Question
+/aether:aether-report          → 从用户的自然语言推断，或用 AskUserQuestion 询问
 ```
 
 标签映射：bug → `bug` | feature → `enhancement` | question → `question`
@@ -264,11 +264,11 @@ Issue 内容已保存，请手动提交:
 
 ## 与其他 Skill 的集成
 
-- `aether-doctor` 诊断出 Aether 自身的 Bug 时，建议用户执行 `/aether:report bug`
-- `aether-deploy` / `aether-rollback` 遇到非预期错误时，建议用户执行 `/aether:report`
+- `aether-doctor` 诊断出 Aether 自身的 Bug 时，建议用户执行 `/aether:aether-report bug`
+- `aether-deploy` / `aether-rollback` 遇到非预期错误时，建议用户执行 `/aether:aether-report`
 - 用户说 "aether 有问题" 时，先判断意图：
-  - 需要本地诊断 → 引导到 `/aether:doctor`
-  - 需要向维护者反馈 → 使用 `/aether:report`
+  - 需要本地诊断 → 引导到 `/aether:aether-doctor`
+  - 需要向维护者反馈 → 使用 `/aether:aether-report`
 - Issue 提交后返回的 URL 可供用户在后续对话中引用
 
 ---

@@ -91,6 +91,6 @@ esac
 
 # 检查是否过期
 if is_older_than "$LAST_DIAGNOSIS" "$MAX_AGE hours"; then
-  echo "缓存已过期，建议运行 /aether:doctor"
+  echo "缓存已过期，建议运行 /aether:aether-doctor"
 fi
 ```

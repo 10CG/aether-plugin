@@ -9,7 +9,7 @@ for i in $(seq 1 $MAX_ITER); do
   # ... 执行 Deployment/Allocation 检查 ...
   if [ $? -ne 0 ]; then
     api_fail_count=$((api_fail_count + 1))
-    [ $api_fail_count -ge 3 ] && echo "❌ Nomad API 连续不可达，运行 /aether:doctor" && exit 1
+    [ $api_fail_count -ge 3 ] && echo "❌ Nomad API 连续不可达，运行 /aether:aether-doctor" && exit 1
   else
     api_fail_count=0
   fi

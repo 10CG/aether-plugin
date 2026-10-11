@@ -43,14 +43,14 @@ CLI=$(get_aether_cli)
 ### 不使用场景
 
 - 开发环境部署 → push 到 main 自动触发
-- 回滚 → 使用 `/aether:rollback`
+- 回滚 → 使用 `/aether:aether-rollback`
 
 ## 执行流程
 
 ### Step 1: 解析参数
 
 ```bash
-/aether:deploy my-project v1.2.3
+/aether:aether-deploy my-project v1.2.3
 ```
 
 提取：
@@ -184,11 +184,11 @@ Consul DNS: my-project.service.consul
 2. **镜像必须存在**: 部署前验证镜像
 3. **需要确认**: 显示差异后需要用户确认
 4. **健康检查**: 部署后等待健康检查通过
-5. **自动回滚**: 如果健康检查失败，提示使用 `/aether:rollback`
+5. **自动回滚**: 如果健康检查失败，提示使用 `/aether:aether-rollback`
 
 ## 前置条件：集群配置
 
-执行前需要配置 Aether 集群入口，参考 `/aether:setup`。
+执行前需要配置 Aether 集群入口，参考 `/aether:aether-setup`。
 
 ### 配置读取
 
@@ -209,7 +209,7 @@ fi
 
 # 3. 未配置则提示
 if [ -z "$NOMAD_ADDR" ]; then
-  echo "请先运行 /aether:setup 配置集群"
+  echo "请先运行 /aether:aether-setup 配置集群"
   exit 1
 fi
 ```

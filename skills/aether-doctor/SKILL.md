@@ -22,10 +22,10 @@ dependencies:
 ## 快速开始
 
 ```
-/aether:doctor           # 完整诊断
-/aether:doctor --ssh     # 仅 SSH 检查
-/aether:doctor --cluster # 仅集群连接
-/aether:doctor --fix     # 自动修复问题
+/aether:aether-doctor           # 完整诊断
+/aether:aether-doctor --ssh     # 仅 SSH 检查
+/aether:aether-doctor --cluster # 仅集群连接
+/aether:aether-doctor --fix     # 自动修复问题
 ```
 
 ## 诊断项目
@@ -120,9 +120,9 @@ HEAVY_NODES=$(yq '.cluster.clients[] | select(.class == "heavy_workload") | .ip'
 
 | 错误类型 | 建议 |
 |---------|-----|
-| `command not found` | 运行 `/aether:doctor` 安装 CLI |
-| `connection refused` | 运行 `/aether:doctor --cluster` |
-| `permission denied (SSH)` | 运行 `/aether:doctor --ssh` |
+| `command not found` | 运行 `/aether:aether-doctor` 安装 CLI |
+| `connection refused` | 运行 `/aether:aether-doctor --cluster` |
+| `permission denied (SSH)` | 运行 `/aether:aether-doctor --ssh` |
 
 ---
 

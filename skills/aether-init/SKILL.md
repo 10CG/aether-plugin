@@ -32,8 +32,8 @@ require_aether_cli || exit 1
 ## 快速开始
 
 ```
-/aether:init              # 交互式向导
-/aether:init my-project   # 指定项目名
+/aether:aether-init              # 交互式向导
+/aether:aether-init my-project   # 指定项目名
 ```
 
 ### 使用场景
@@ -45,7 +45,7 @@ require_aether_cli || exit 1
 ### 不使用场景
 
 - 项目已有配置 → 直接编辑文件
-- 查看集群状态 → `/aether:status`
+- 查看集群状态 → `/aether:aether-status`
 
 ---
 
@@ -126,7 +126,7 @@ See `references/file-generation.md` § Step 1.1c for implementation details.
 无论 Step 1.1 是否检测到"已有完整部署配置"，只要目标项目存在 CLAUDE.md（或即将由
 本 skill 创建 CLAUDE.md），都要跑一遍集成规范 policy 的四分支判定 —— 这正是**老项目
 回填 (C1)** 的入口：已接入 Aether 但从未拿到过这段 policy 的项目（如 #241 触发源
-TurfSync），只需重跑 `/aether:init`，无需其它操作。
+TurfSync），只需重跑 `/aether:aether-init`，无需其它操作。
 
 **四分支检测（精确锚定 marker，不与旧 `aether-ci-policy` 混淆）**:
 ```bash
@@ -340,7 +340,7 @@ if [ -z "$REGISTRY" ] || [ "$REGISTRY" = "null" ]; then
   echo "⚠ 无法从配置中读取 registry 地址"
   echo ""
   echo "可选操作:"
-  echo "  1. 运行 /aether:setup 配置集群（推荐）"
+  echo "  1. 运行 /aether:aether-setup 配置集群（推荐）"
   echo "  2. 手动指定: aether init --registry forgejo.10cg.pub"
   echo "  3. 跳过 registry 配置，生成后手动编辑 workflow 文件"
 fi
@@ -409,7 +409,7 @@ for file in Dockerfile deploy/nomad-dev.hcl deploy/nomad-prod.hcl .forgejo/workf
   if [ -f "$file" ] && grep -q '__[A-Z_]*__' "$file"; then
     UNREPLACED=$(grep -o '__[A-Z_]*__' "$file" | sort -u | tr '\n' ', ')
     echo "⚠ ${file} 中仍有未替换的占位符: ${UNREPLACED}"
-    echo "  请手动检查并替换，或重新运行 /aether:init"
+    echo "  请手动检查并替换，或重新运行 /aether:aether-init"
   fi
 done
 ```
@@ -443,7 +443,7 @@ done
 | 错误 | 原因 | 修复 |
 |------|------|------|
 | `未能自动识别项目类型` | 缺少语言标识文件 | 使用 `--lang` 手动指定 |
-| `无法从配置中读取 registry` | 未运行 setup | 运行 `/aether:setup` |
+| `无法从配置中读取 registry` | 未运行 setup | 运行 `/aether:aether-setup` |
 | `文件已存在` | 项目已有部署配置 | 选择覆盖（自动备份）或跳过 |
 | `未替换的占位符` | 缺少项目参数 | 检查项目名、端口、registry 配置 |
 | `Dockerfile 语法检查失败` | 模板与项目结构不匹配 | 手动调整 Dockerfile |

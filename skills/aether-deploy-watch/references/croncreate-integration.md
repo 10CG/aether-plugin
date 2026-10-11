@@ -15,7 +15,7 @@ git push
 ci-watch-hook 在 CI 成功后，CronCreate 的 prompt 包含命令式指令：
 
 ```
-IMMEDIATELY invoke /aether:deploy-watch {JOB_NAME} --version {SHA}
+IMMEDIATELY invoke /aether:aether-deploy-watch {JOB_NAME} --version {SHA}
 Do not summarize. Invoke the skill now.
 ```
 
@@ -43,4 +43,4 @@ yq -i ".phase = \"deploy\"" .aether/deploy-watch.state
 状态流转: `image → deploy → health → done` (正常) 或任意阶段 → `failed` (异常)。
 
 用户也可以不依赖 ci-watch-hook，直接调用：
-`/aether:deploy-watch my-api --version abc1234def567890abc1234def567890abc1234d`
+`/aether:aether-deploy-watch my-api --version abc1234def567890abc1234def567890abc1234d`

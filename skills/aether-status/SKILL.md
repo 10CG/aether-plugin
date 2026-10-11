@@ -109,10 +109,10 @@ Light 节点 (light-1~5, 192.168.69.90-94): exec only
 ## 降级策略
 
 - **Nomad 可达 + Consul 不可达**: 展示 Nomad 数据，同时主动诊断 Consul 为何不可达（Raft? Serf? 网络?）
-- **双不可达**: 报错 + 建议 `/aether:setup --show` 确认配置
+- **双不可达**: 报错 + 建议 `/aether:aether-setup --show` 确认配置
 
 ---
 
 ## 前置条件
 
-执行前需要 Aether 集群配置。读取 `.aether/config.yaml` 或 `~/.aether/config.yaml` 中的 `cluster.nomad_addr` 和 `cluster.consul_addr`。未配置时提示运行 `/aether:setup`。
+执行前需要 Aether 集群配置。读取 `.aether/config.yaml` 或 `~/.aether/config.yaml` 中的 `cluster.nomad_addr` 和 `cluster.consul_addr`。未配置时提示运行 `/aether:aether-setup`。

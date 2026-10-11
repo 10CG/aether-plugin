@@ -1,6 +1,6 @@
 # Forgejo Actions Workflow 模板
 
-> 这些模板由 `/aether:init` 根据项目分析结果生成。所有模板都已经编码了
+> 这些模板由 `/aether:aether-init` 根据项目分析结果生成。所有模板都已经编码了
 > **在 Aether 环境下经过验证的最佳实践**。如果要理解每一项设计决策的
 > "为什么"，以及进阶模式（monorepo 多镜像、集成测试前置、Nexus/Kino
 > 双 job pattern 等），参见插件顶层文档：

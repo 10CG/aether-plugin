@@ -235,7 +235,7 @@ Aether 集群跑了一个 build-cache LXC (CT 306, `192.168.69.206`)：
 
 模板默认走**公网镜像**(`npmmirror.com` / `mirrors.aliyun.com`),目的是
 保持 Dockerfile 在集群内外都可移植。**若构建发生在 Aether 集群内**
-(`/aether:dev` / Forgejo runner 上),把 `--build-arg` 指到内网 cache
+(`/aether:aether-dev` / Forgejo runner 上),把 `--build-arg` 指到内网 cache
 可省大量跨境流量,首次冷启动也快 3-5×:
 
 ```bash

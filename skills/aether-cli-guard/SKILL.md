@@ -1,10 +1,10 @@
 ---
 name: aether-cli-guard
 description: |
-  CLI 命令执行前的自动检测 Hook。在执行 aether CLI 命令前检测 CLI 是否已安装。
-  如果未安装，阻止命令执行并引导用户安装。
+  CLI 命令执行前的自动检测 Hook 的说明文档。在执行 aether CLI 命令前检测 CLI 是否已安装，
+  未安装时给出安装引导。
 
-  此 Skill 由 PreToolUse Hook 自动触发，不需要用户直接调用。
+  PreToolUse Hook 直接执行 scripts/cli-guard-hook.sh，不会加载本文件；本文件不需要用户调用。
 disable-model-invocation: true
 user-invocable: false
 allowed-tools: Bash
@@ -12,93 +12,53 @@ allowed-tools: Bash
 
 # Aether CLI Guard (Hook Skill)
 
-> **版本**: 1.0.0 | **类型**: Hook Skill
+> 本文件只是 hook 的说明：`disable-model-invocation: true` + `user-invocable: false`，任何东西都不会加载它。
+> 行为以 `scripts/cli-guard-hook.sh` 为准。
 
 ## 触发条件
 
-当用户执行的 Bash 命令包含 `aether` 关键字时自动触发：
+hooks.json 的 PreToolUse 以 `matcher: "Bash"` 匹配**所有** Bash 调用并执行脚本；脚本自己判断命令里是否含 `aether`：
 
 ```bash
-# 会触发检测的命令示例
+# 会进入检测的命令示例
 aether volume list
 aether init
 ~/.aether/aether version
 ```
 
-## 检测逻辑
+## 脚本行为
 
-```bash
-#!/bin/bash
-# 检测 CLI 是否可用
+1. 从环境变量 `CLAUDE_TOOL_INPUT` 取命令；为空或不含 `aether` 时 `exit 0` 放行。
+2. 依次在 PATH、`~/.aether/aether`（且可执行）、`~/.aether/aether.exe` 查找 CLI；找到即 `exit 0`。
+3. 找不到时按平台打印安装引导（推荐 `/aether:aether-doctor`，或从 GitHub releases 手动下载、Forgejo 源备用），然后 `exit 1`。
 
-# 1. 检查命令是否包含 aether
-if [[ "$COMMAND" != *"aether"* ]]; then
-    exit 0  # 不是 aether 命令，放行
-fi
-
-# 2. 查找 CLI 二进制文件
-CLI_PATH=""
-if command -v aether &> /dev/null; then
-    CLI_PATH="$(command -v aether)"
-elif [ -f "$HOME/.aether/aether" ]; then
-    CLI_PATH="$HOME/.aether/aether"
-elif [ -f "$HOME/.aether/aether.exe" ]; then
-    CLI_PATH="$HOME/.aether/aether.exe"
-fi
-
-# 3. 检测结果处理
-if [ -z "$CLI_PATH" ]; then
-    echo "❌ 检测到 aether 命令，但 CLI 未安装"
-    echo "请运行 /aether:doctor 安装，或手动安装:"
-    echo "  curl -sL https://forgejo.10cg.pub/api/v1/repos/10CG/Aether/releases/latest | \\"
-    echo "    jq -r '.assets[] | select(.name | test(\"aether-linux\")) | .browser_download_url' | \\"
-    echo "    head -1 | xargs curl -sL -o ~/.aether/aether && chmod +x ~/.aether/aether"
-    echo "⚠️  安装提示: 如网络不通，请检查 DNS 或使用代理; 下载后请用 file 命令验证为 ELF 二进制"
-    exit 1
-elif [ ! -x "$CLI_PATH" ]; then
-    echo "❌ CLI 存在但不可执行: $CLI_PATH"
-    echo "请运行: chmod +x $CLI_PATH"
-    exit 1
-elif ! "$CLI_PATH" version &> /dev/null; then
-    echo "❌ CLI 二进制可能损坏: $CLI_PATH"
-    echo "请删除后重新安装: rm $CLI_PATH && /aether:doctor"
-    exit 1
-fi
-
-exit 0  # CLI 可用，放行
-```
+> **已知问题（[#489](https://forgejo.10cg.pub/10CG/Aether/issues/489)，待修）**：Claude Code 通过 stdin 的 JSON 传入 hook 载荷，
+> 脚本只读 `CLAUDE_TOOL_INPUT`、没有像同插件 `ci-watch-hook.sh` 那样回退到 stdin；且 PreToolUse 只有 exit 2 才会拦截，
+> exit 1 是非阻断错误。两处任一成立，这道守卫都拦不下任何命令。
 
 ## Hook 配置
 
-在 `hooks.json` 中配置：
+`.claude-plugin/hooks.json` 中的实际配置：
 
 ```json
-{
-  "hooks": {
-    "PreToolUse": {
-      "skill": "aether:aether-cli-guard",
-      "enabled": true,
-      "filter": {
-        "tools": ["Bash"],
-        "patterns": ["aether"]
-      },
-      "description": "执行 aether 命令前检测 CLI"
-    }
+"PreToolUse": [
+  {
+    "matcher": "Bash",
+    "hooks": [
+      {
+        "type": "command",
+        "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/cli-guard-hook.sh",
+        "timeout": 10
+      }
+    ]
   }
-}
+]
 ```
 
-## 行为说明
+## 行为说明（脚本的设计意图；实际是否拦截见上方已知问题）
 
-| 检测结果 | 行为 | 输出 |
+| 检测结果 | 脚本动作 | 输出 |
 |---------|------|------|
-| CLI 可用 | `exit 0` 放行，命令正常执行 | 无（透传至原命令） |
-| CLI 未安装 | `exit 1` 阻止，显示安装引导 | 安装命令 + 网络/验证提示 |
-| 存在但不可执行 | `exit 1` 阻止，提示 chmod | `chmod +x` 修复命令 |
-| 二进制损坏 | `exit 1` 阻止，提示重装 | 删除 + 重装命令 |
-| 非 aether 命令 | `exit 0` 跳过检测，放行 | 无 |
-
----
-
-**Skill 版本**: 1.0.0
-**最后更新**: 2026-03-12
+| CLI 可用 | `exit 0` 放行 | 无 |
+| CLI 未安装 / 不可执行 | 打印安装引导后 `exit 1`，意图是阻止命令 | 平台检测 + 安装命令 + 验证命令 |
+| 非 aether 命令 | `exit 0` 跳过检测 | 无 |

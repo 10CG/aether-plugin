@@ -376,7 +376,7 @@ aether-ci (CI 状态层)
 
 ```
 git push → Hook 检测 → CronCreate (每 60s 轮询)
-  → success: 通知 + CronDelete + /aether:deploy-watch
+  → success: 通知 + CronDelete + /aether:aether-deploy-watch
   → failure: 诊断 + CronDelete
   → 15 次超时: 警告 + CronDelete
 ```
