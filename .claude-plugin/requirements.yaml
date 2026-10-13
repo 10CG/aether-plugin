@@ -143,6 +143,13 @@ compatibility:
       访问 registry 时会把登录页当成镜像存在, #480), skill 的 min_version 为 1.22.14; 提交前另用 nomad CLI
       跑 `nomad job plan`。cli_min 保持 1.0.0 不上抬 (其余 skill 不依赖)。aether-dev / aether-setup 仍沿用 1.12.9 的正文。
 
+  - plugin_version: "1.12.13+"
+    cli_min: "1.0.0"
+    cli_recommended: "1.22.14"
+    notes: >-
+      Aether #496: aether-setup 的配置说明与 CLI 一致 (项目级整份替代全局、不读 .env, #491), 写入配置改用 yq -i 只改 cluster.*;
+      不依赖新的 CLI 版本。aether-dev 未过 AB, 仍沿用 1.12.9 的正文。
+
 # 依赖 CLI 的 Skills
 dependent_skills:
   - name: aether-doctor

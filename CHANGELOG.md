@@ -2,6 +2,48 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.12.13] - 2026-10-13 — aether-setup：配置语义与 CLI 一致，补回按 curl 退出码的失败分类与写入防呆、写后复测；aether-dev 未过 AB、本版不发 (Aether #496)
+
+### Changed
+- **aether-setup 的配置语义与 CLI 一致**（1.12.10 摘出的候选，本版原样保留）：项目级 `.aether/config.yaml` 存在时整份替代全局、不逐字段合并，
+  缺的字段落到默认值（Nomad 为 `127.0.0.1:4646`），所以项目级要写全入口地址；CLI 命令不读 `.env`（Aether #491）。示例拓扑改为 heavy 5 台。
+- **连接失败按 curl 退出码分类**：连不上时 HTTP 状态码一律是 000，分类要靠退出码（6 解析、7 拒绝 / 不可达、28 超时、35 / 60 TLS、52 / 56 空响应 / 重置）；
+  本机走代理时失败形态会变，先确认集群网段在 `no_proxy` 里。
+- **写入配置：防呆与写后复测**（新小节）：
+  - 地址格式与 registry 先做防呆；
+  - 用 `yq -i` 只改 `cluster.*` 三个键，文件里其他段保留，值经 `strenv` 传入；
+  - 写完用文件里读回的值再测一次，复测失败就不报完成；
+  - 项目级整份替代全局时，全局里的 `ci` / `doctor` 等段也要一并写进项目文件。
+
+### Fixed
+- 1.12.10「已知问题」第 2 条：setup 的配置说明改为与 CLI 同一规则，剩 dev。
+- 示例拓扑写的 3 台 heavy 改为 5 台，与 1.12.10 已改的 status / build-container / init 等处一致（Aether #368）。
+
+### 本版未发布（未过 AB，沿用 1.12.9 正文，Aether #496）
+- **aether-dev**：修复目标门 D1 没过。eval-1 要求部署后建议用 `/aether:aether-dev logs` 或 deploy-watch 看状态，两名 grader 都判 post 的答复没有给出这条建议：
+  正文里写了，答复没转述，只给了裸 `nomad alloc logs`。按预注册规则，D1 不过不走确认轮，dev 的改动整份撤出。
+  撤出的改动里有一处事实订正：配置片段补 `export NOMAD_ADDR`，不 export 时 nomad CLI 会连 127.0.0.1。这一处跟踪在 #496，下次 dev 重测一并带上。
+
+### 已知问题（Aether #496，按测过的文本发布，下次改 setup 时修）
+- aether-setup 的优先级列表仍写「4. 插件默认值 → 无（必须配置入口地址）」，与同一节新加的「缺的字段 CLI 用默认值，Nomad 为 `127.0.0.1:4646`」矛盾。
+  两名 grader 在 eval-1 都指出了这一点。
+- 写入步骤用了 `strenv()`，只有 mikefarah yq v4 支持；「必要工具检查」没写明要哪一种 yq。
+
+### 守门层
+- aether-setup SKILL.md 338 行（1.12.12 为 293 行），在线内。
+
+### 质量门（AB）
+- 协议与全部证据在主仓 `aether-plugin-benchmarks/ab-results/2026-10-13-496-dev-setup-1-12-13/`：协议在任何一臂开跑前提交（`85abbcd`，ab-suite 1.6.0 不改）；
+  base = 1.12.12（`8eb5737`），post = 候选 `ad8c8ac`。7 个 eval / 14 臂一波，每个 eval 两名 grader 盲评；两个 skill 各自独立判定。
+- **setup PASS**：R1–R4 全过；新行为 eval-4 的 B1 过；凭据卫生 eval-3（排查 403 时不打印 token，本轮改了它依赖的那一节）两臂全过。
+  四条 eval 两臂期望项都是满分，winner 依次为 post / base、post / post、post / post、post / post。
+- **dev FAIL**：D1 不过（见上）。其余门不劣化：eval-1 的 post 多过一条 high #4（缺 dev HCL 时指向 init），两名 grader 都判 post 胜；eval-3 的 winner 一 base 一 post。
+- 噪声对照 status eval-2（两臂正文逐字节相同）本轮有一名 grader 判 post 漏了一条 critical、winner 一 base 一 post：期望项层面也有样本方差。
+- **测的就是发的**：发布树里 setup 的 SKILL.md 与 post 臂读到的 fixture 逐字节相同，dev 的两个文件与 base 臂的逐字节相同，status 两臂相同；
+  阴性对照 —— 1.12.12 树恰好 1 处不一致（setup），候选树恰好 1 处（dev）。
+- 装置：14 臂 / 14 名 grader 的 prompt 与登记版逐字相同；臂零越界读取、零 Bash；grader 零越界标记；零残留门禁 2 个 eval 各 1 处 RESIDUE，
+  书面裁决为正当用法、副本不改；凭据扫描 0 命中。
+
 ## [1.12.12] - 2026-10-13 — aether-deploy 改调 `aether deploy`，补回提交前全量差异与部署后按新版本核对 (Aether #496)
 
 ### Changed
