@@ -35,6 +35,9 @@ allowed-tools: Read, Write, Bash, AskUserQuestion
 4. 插件默认值           → 无（必须配置入口地址）
 ```
 
+配置文件只读找到的第一份：项目级文件存在时整份替代全局文件（不逐字段合并，缺的字段 CLI 用默认值，Nomad 为 `127.0.0.1:4646`），
+所以项目级配置要写全入口地址。CLI 命令不读 `.env`（只有 `aether config get/show` 会读，所以它显示的来源可能与命令实际用的不同，Aether #491）。
+
 ---
 
 ## 配置内容
@@ -74,7 +77,7 @@ allowed-tools: Read, Write, Bash, AskUserQuestion
 Aether 集群配置
 ===============
 配置来源: ~/.aether/config.yaml (全局)
-配置优先级: 环境变量 > 项目级 .aether/config.yaml > 全局 ~/.aether/config.yaml > 默认值
+配置优先级: 环境变量 > 项目级 .aether/config.yaml（存在时整份替代全局）> 全局 ~/.aether/config.yaml > 默认值
 
 入口地址:
   Nomad:    http://192.168.69.70:4646 ✓ 可达 (v1.11.2)
@@ -83,13 +86,15 @@ Aether 集群配置
   DNS:      ✓ .service.consul 可解析 (dnsmasq)
 
 集群拓扑 (从 API 发现):
-  heavy_workload (3 nodes): Docker 29.2.1, exec, raw_exec
+  heavy_workload (5 nodes): Docker 29.2.1, exec, raw_exec
     - heavy-1 (192.168.69.80) host_volumes: [data-vol, log-vol]
     - heavy-2 (192.168.69.81) host_volumes: [data-vol]
     - heavy-3 (192.168.69.82) host_volumes: [data-vol]
+    - heavy-4 (192.168.69.83) host_volumes: [data-vol]
+    - heavy-5 (192.168.69.84) host_volumes: [data-vol]
   light_exec (5 nodes): exec only
     - light-1~5 (192.168.69.90~94)
-  总节点数: 8
+  总节点数: 10
   运行中 Jobs: 5
 
 其他 Skills (init, deploy, status, rollback, dev) 自动读取此配置连接集群。
@@ -130,7 +135,7 @@ Aether 集群配置
 │ 3. 全局      ~/.aether/config.yaml  ← 当前生效   │
 │ 4. 默认值    无（必须配置入口地址）                 │
 └─────────────────────────────────────────────────┘
-  → 项目级配置会覆盖全局配置的对应字段
+  → 项目级配置存在时整份替代全局配置（不逐字段合并），入口地址要写全
   → 例: 在 /home/dev/payment-service 创建 .aether/config.yaml
     则该项目使用项目级配置，其他项目仍用全局配置
 
@@ -163,13 +168,35 @@ cluster:
 
 ```yaml
 # Aether 项目级配置
-# 覆盖全局配置中的对应字段
+# 存在时整份替代全局配置（不逐字段合并），入口地址要写全
 
 cluster:
   nomad_addr: "http://192.168.69.70:4646"
   consul_addr: "http://192.168.69.70:8500"
   registry: "forgejo.10cg.pub"
 ```
+
+### 写入配置：防呆与写后复测
+
+全局与项目级都按这一段写（`f` 换成 `.aether/config.yaml` 即项目级）：
+
+```bash
+f=~/.aether/config.yaml
+for v in "$NOMAD_IN" "$CONSUL_IN"; do      # 用户确认过的地址
+  echo "$v" | grep -Eq '^https?://[0-9A-Za-z.-]+:[0-9]+$' || { echo "地址为空或格式不对: '$v'"; exit 1; }
+done
+[ -n "$REGISTRY_IN" ] || { echo "registry 为空"; exit 1; }
+mkdir -p "$(dirname "$f")" && touch "$f"
+# 只改 cluster.* 三个键，文件里其他段（ci、doctor 等）原样保留，不整份覆盖
+NOMAD_IN="$NOMAD_IN" CONSUL_IN="$CONSUL_IN" REGISTRY_IN="$REGISTRY_IN" \
+  yq -i '.cluster.nomad_addr = strenv(NOMAD_IN) | .cluster.consul_addr = strenv(CONSUL_IN) | .cluster.registry = strenv(REGISTRY_IN)' "$f"
+# 写后复测：用文件里读回来的值再测一次，不用内存里的变量
+curl -sS -m 10 "$(yq '.cluster.nomad_addr' "$f")/v1/agent/self" | jq -r '.config.Version.Version'
+curl -sS -m 10 "$(yq '.cluster.consul_addr' "$f")/v1/status/leader"
+```
+
+复测拿不到版本号或 leader，就回到「连接失败诊断引导」，不要报配置完成。
+项目级文件存在时整份替代全局：全局文件里的 `ci`、`doctor` 等段在该项目下也不再生效，需要的话一并写进项目文件。
 
 ### 首次使用引导
 
@@ -179,7 +206,7 @@ cluster:
 
 ## 配置读取逻辑
 
-Skills 按优先级链读取配置：项目级 `.aether/config.yaml` → 全局 `~/.aether/config.yaml` → 环境变量。使用 `yq` 读取 `cluster.*` 字段。未找到任何配置时，提示用户运行 `/aether:aether-setup`。
+Skills 与 CLI 命令按同一规则读取配置：环境变量优先；配置文件只读找到的第一份（项目级 `.aether/config.yaml` 存在时不读全局 `~/.aether/config.yaml`），不读 `.env`。使用 `yq` 读取 `cluster.*` 字段。未找到任何配置时，提示用户运行 `/aether:aether-setup`。
 
 ---
 
@@ -196,7 +223,7 @@ Skills 按优先级链读取配置：项目级 `.aether/config.yaml` → 全局 
 
 | 类别 | API 字段 | 输出示例 |
 |------|---------|---------|
-| 节点分类 | `NodeClass` | heavy_workload (3), light_exec (5) |
+| 节点分类 | `NodeClass` | heavy_workload (5), light_exec (5) |
 | 可用 Drivers | `Drivers` | docker, exec, raw_exec |
 | Docker 版本 | `Attributes["driver.docker.version"]` | 29.2.1 |
 | Host Volumes | `HostVolumes` | data-vol → /opt/data, log-vol → /var/log |
@@ -207,10 +234,12 @@ Skills 按优先级链读取配置：项目级 `.aether/config.yaml` → 全局 
 
 ```
 集群拓扑:
-  heavy_workload (3 nodes): Docker 29.2.1, exec, raw_exec
+  heavy_workload (5 nodes): Docker 29.2.1, exec, raw_exec
     - heavy-1 (192.168.69.80) host_volumes: [data-vol, log-vol]
     - heavy-2 (192.168.69.81) host_volumes: [data-vol]
     - heavy-3 (192.168.69.82) host_volumes: [data-vol]
+    - heavy-4 (192.168.69.83) host_volumes: [data-vol]
+    - heavy-5 (192.168.69.84) host_volumes: [data-vol]
   light_exec (5 nodes): exec only
     - light-1~5 (192.168.69.90~94)
 ```
@@ -247,6 +276,22 @@ Skills 使用发现的信息（如 node_class）而非硬编码值。
 ```
 
 ### 失败原因分类与处理
+
+探测时同时拿 HTTP 状态码和 curl 退出码 —— 连不上时状态码一律是 000，分类要靠退出码：
+
+```bash
+curl -sS -o /dev/null -w '%{http_code} %{time_total}s\n' --connect-timeout 5 -m 10 "$URL/v1/agent/self"; echo "curl exit=$?"
+```
+
+| curl 退出码 | 含义 | 先查什么 |
+|---|---|---|
+| 6 | 主机名解析失败 | DNS / `/etc/hosts`，或直接用 IP |
+| 7 | 连接被拒或主机不可达 | 服务是否在跑、端口对不对（Nomad 4646 / Consul 8500）、路由 |
+| 28 | 超时 | 防火墙丢包、VPN / 隧道没连 |
+| 35 / 60 | TLS 握手失败 / 证书不受信 | 多半是 `http://` 与 `https://` 写反 |
+| 52 / 56 | 空响应 / 连接被重置 | 端口上不是这个服务；或请求走了代理 |
+
+本机设了 `http_proxy` 时，不在 `no_proxy` 里的地址会走代理，上面几类失败都可能变成 52 / 56 或代理返回的 5xx：先确认集群网段在 `no_proxy` 里。
 
 连接失败时，**必须**根据 HTTP 状态码和响应特征进行分类诊断：
 
