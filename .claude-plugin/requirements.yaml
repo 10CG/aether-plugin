@@ -121,12 +121,11 @@ compatibility:
     cli_min: "1.0.0"
     cli_recommended: "1.22.14"
     notes: >-
-      Aether #482: aether-deploy 改为直接调用 `aether deploy` (dry-run 验证镜像 → 部署 →
-      健康检查), 需 cli >= 1.22.14 —— 更早版本在本机没有 docker、经 Cloudflare Access 访问
-      registry 时会把登录页当成镜像存在 (#480); skill frontmatter 的 min_version 已上抬到
-      1.22.14。aether-rollback 标准路径改调 `aether rollback` (0.7.0 起即有), 方案 B 借用
-      `aether deploy --job-file`, 镜像校验同样以 1.22.14 为准。aether-doctor 先跑
-      `aether doctor --json`, CLI 不可用时回退 skill 内的手工检查。cli_min 保持 1.0.0 不上抬。
+      Aether #482: aether-rollback 标准路径改调 `aether rollback` (0.7.0 起即有), 方案 B 借用
+      `aether deploy --job-file` 提交 Git 里的 spec, 镜像校验以 cli >= 1.22.14 为准 —— 更早版本
+      在本机没有 docker、经 Cloudflare Access 访问 registry 时会把登录页当成镜像存在 (#480)。
+      cli_min 保持 1.0.0 不上抬。aether-deploy / aether-doctor / aether-dev / aether-setup 的改动
+      未过 AB 回归门, 不在本版, 四者沿用 1.12.9 的正文。
 
 # 依赖 CLI 的 Skills
 dependent_skills:
@@ -144,7 +143,7 @@ dependent_skills:
 
   - name: aether-deploy
     cli_required: true
-    min_version: "1.22.14"
+    min_version: "0.9.0"
 
   - name: aether-dev
     cli_required: true

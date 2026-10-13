@@ -55,12 +55,12 @@ require_aether_cli || exit 1
 
 **流程：**
 
-1. 检测当前项目的部署配置（`deploy/nomad-dev.hcl` + `Dockerfile`）
+1. 检测当前项目的部署配置（`deploy/nomad.hcl` + `Dockerfile`）
 2. 确定部署模式（Docker / exec）
 3. Docker 模式：
    - 在本地或 Runner 上构建镜像
    - 推送到 Registry（tag 使用分支名或 commit SHA）
-   - 替换 nomad-dev.hcl 中的镜像占位符 `__IMAGE__`
+   - 替换 nomad.hcl 中的镜像占位符
 4. exec 模式：
    - 同步文件到 NFS 共享路径
 5. 提交 Job 到 Nomad
@@ -72,11 +72,11 @@ require_aether_cli || exit 1
 IMAGE="forgejo.10cg.pub/${ORG}/${PROJECT}:dev-$(git rev-parse --short HEAD)"
 docker build -t ${IMAGE} .
 docker push ${IMAGE}
-sed "s|__IMAGE__|${IMAGE}|g" deploy/nomad-dev.hcl | nomad job run -
+sed "s|__IMAGE__|${IMAGE}|g" deploy/nomad.hcl | nomad job run -
 
 # exec 模式
 rsync -avz --exclude '.git' ./ root@192.168.69.90:/opt/apps/${PROJECT}/
-nomad job run deploy/nomad-dev.hcl
+nomad job run deploy/nomad.hcl
 ```
 
 **与 CI 部署的区别：**
@@ -257,7 +257,7 @@ fi
 
 ```bash
 # 提交 Job 并捕获错误
-JOB_OUTPUT=$(sed "s|__IMAGE__|${IMAGE}|g" deploy/nomad-dev.hcl | nomad job run - 2>&1)
+JOB_OUTPUT=$(nomad job run deploy/nomad.hcl 2>&1)
 JOB_EXIT=$?
 
 if [ $JOB_EXIT -ne 0 ]; then
@@ -271,10 +271,10 @@ if [ $JOB_EXIT -ne 0 ]; then
     echo "错误: 没有节点满足 Job 约束条件"
     echo "修复:"
     echo "  1. 检查节点状态: nomad node status"
-    echo "  2. 检查 nomad-dev.hcl 中的 constraint 配置"
+    echo "  2. 检查 nomad.hcl 中的 constraint 配置"
   elif echo "$JOB_OUTPUT" | grep -qi "invalid\|parse error\|syntax"; then
-    echo "错误: nomad-dev.hcl 配置文件语法错误"
-    echo "修复: nomad job validate deploy/nomad-dev.hcl"
+    echo "错误: nomad.hcl 配置文件语法错误"
+    echo "修复: nomad job validate deploy/nomad.hcl"
   else
     echo "错误: Job 提交失败"
     echo "详情: ${JOB_OUTPUT}"
@@ -347,12 +347,25 @@ fi
 ### 配置读取
 
 ```bash
-# 与 CLI 相同：环境变量优先；配置文件只读找到的第一份（有项目级 .aether/config.yaml 时整份不读全局），不读 .env
-f=.aether/config.yaml; [ -f "$f" ] || f="$HOME/.aether/config.yaml"
-NOMAD_ADDR=${NOMAD_ADDR:-$(yq '.cluster.nomad_addr // ""' "$f" 2>/dev/null)}
-CONSUL_HTTP_ADDR=${CONSUL_HTTP_ADDR:-$(yq '.cluster.consul_addr // ""' "$f" 2>/dev/null)}
-AETHER_REGISTRY=${AETHER_REGISTRY:-$(yq '.cluster.registry // ""' "$f" 2>/dev/null)}
-[ -z "$NOMAD_ADDR" ] && { echo "未配置 cluster.nomad_addr（读的是 ${f}）：运行 /aether:aether-setup"; exit 1; }
+# 1. 项目级配置
+if [ -f ".aether/config.yaml" ]; then
+  NOMAD_ADDR=$(yq '.cluster.nomad_addr' .aether/config.yaml)
+  CONSUL_HTTP_ADDR=$(yq '.cluster.consul_addr' .aether/config.yaml)
+  AETHER_REGISTRY=$(yq '.cluster.registry' .aether/config.yaml)
+fi
+
+# 2. 全局配置 fallback
+if [ -z "$NOMAD_ADDR" ] && [ -f "$HOME/.aether/config.yaml" ]; then
+  NOMAD_ADDR=$(yq '.cluster.nomad_addr' ~/.aether/config.yaml)
+  CONSUL_HTTP_ADDR=$(yq '.cluster.consul_addr' ~/.aether/config.yaml)
+  AETHER_REGISTRY=$(yq '.cluster.registry' ~/.aether/config.yaml)
+fi
+
+# 3. 未配置则提示
+if [ -z "$NOMAD_ADDR" ]; then
+  echo "请先运行 /aether:aether-setup 配置集群"
+  exit 1
+fi
 ```
 
 ## 与其他 Skills 的关系

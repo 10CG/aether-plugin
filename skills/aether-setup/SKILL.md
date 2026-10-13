@@ -35,9 +35,6 @@ allowed-tools: Read, Write, Bash, AskUserQuestion
 4. 插件默认值           → 无（必须配置入口地址）
 ```
 
-配置文件只读找到的第一份：项目级文件存在时整份替代全局文件（不逐字段合并，缺的字段 CLI 用默认值，Nomad 为 `127.0.0.1:4646`），
-所以项目级配置要写全入口地址。CLI 命令不读 `.env`（只有 `aether config get/show` 会读，所以它显示的来源可能与命令实际用的不同，Aether #491）。
-
 ---
 
 ## 配置内容
@@ -77,7 +74,7 @@ allowed-tools: Read, Write, Bash, AskUserQuestion
 Aether 集群配置
 ===============
 配置来源: ~/.aether/config.yaml (全局)
-配置优先级: 环境变量 > 项目级 .aether/config.yaml（存在时整份替代全局）> 全局 ~/.aether/config.yaml > 默认值
+配置优先级: 环境变量 > 项目级 .aether/config.yaml > 全局 ~/.aether/config.yaml > 默认值
 
 入口地址:
   Nomad:    http://192.168.69.70:4646 ✓ 可达 (v1.11.2)
@@ -86,15 +83,13 @@ Aether 集群配置
   DNS:      ✓ .service.consul 可解析 (dnsmasq)
 
 集群拓扑 (从 API 发现):
-  heavy_workload (5 nodes): Docker 29.2.1, exec, raw_exec
+  heavy_workload (3 nodes): Docker 29.2.1, exec, raw_exec
     - heavy-1 (192.168.69.80) host_volumes: [data-vol, log-vol]
     - heavy-2 (192.168.69.81) host_volumes: [data-vol]
     - heavy-3 (192.168.69.82) host_volumes: [data-vol]
-    - heavy-4 (192.168.69.83) host_volumes: [data-vol]
-    - heavy-5 (192.168.69.84) host_volumes: [data-vol]
   light_exec (5 nodes): exec only
     - light-1~5 (192.168.69.90~94)
-  总节点数: 10
+  总节点数: 8
   运行中 Jobs: 5
 
 其他 Skills (init, deploy, status, rollback, dev) 自动读取此配置连接集群。
@@ -135,7 +130,7 @@ Aether 集群配置
 │ 3. 全局      ~/.aether/config.yaml  ← 当前生效   │
 │ 4. 默认值    无（必须配置入口地址）                 │
 └─────────────────────────────────────────────────┘
-  → 项目级配置存在时整份替代全局配置（不逐字段合并），入口地址要写全
+  → 项目级配置会覆盖全局配置的对应字段
   → 例: 在 /home/dev/payment-service 创建 .aether/config.yaml
     则该项目使用项目级配置，其他项目仍用全局配置
 
@@ -168,7 +163,7 @@ cluster:
 
 ```yaml
 # Aether 项目级配置
-# 存在时整份替代全局配置（不逐字段合并），入口地址要写全
+# 覆盖全局配置中的对应字段
 
 cluster:
   nomad_addr: "http://192.168.69.70:4646"
@@ -184,7 +179,7 @@ cluster:
 
 ## 配置读取逻辑
 
-Skills 与 CLI 命令按同一规则读取配置：环境变量优先；配置文件只读找到的第一份（项目级 `.aether/config.yaml` 存在时不读全局 `~/.aether/config.yaml`），不读 `.env`。使用 `yq` 读取 `cluster.*` 字段。未找到任何配置时，提示用户运行 `/aether:aether-setup`。
+Skills 按优先级链读取配置：项目级 `.aether/config.yaml` → 全局 `~/.aether/config.yaml` → 环境变量。使用 `yq` 读取 `cluster.*` 字段。未找到任何配置时，提示用户运行 `/aether:aether-setup`。
 
 ---
 
@@ -201,7 +196,7 @@ Skills 与 CLI 命令按同一规则读取配置：环境变量优先；配置�
 
 | 类别 | API 字段 | 输出示例 |
 |------|---------|---------|
-| 节点分类 | `NodeClass` | heavy_workload (5), light_exec (5) |
+| 节点分类 | `NodeClass` | heavy_workload (3), light_exec (5) |
 | 可用 Drivers | `Drivers` | docker, exec, raw_exec |
 | Docker 版本 | `Attributes["driver.docker.version"]` | 29.2.1 |
 | Host Volumes | `HostVolumes` | data-vol → /opt/data, log-vol → /var/log |
@@ -212,12 +207,10 @@ Skills 与 CLI 命令按同一规则读取配置：环境变量优先；配置�
 
 ```
 集群拓扑:
-  heavy_workload (5 nodes): Docker 29.2.1, exec, raw_exec
+  heavy_workload (3 nodes): Docker 29.2.1, exec, raw_exec
     - heavy-1 (192.168.69.80) host_volumes: [data-vol, log-vol]
     - heavy-2 (192.168.69.81) host_volumes: [data-vol]
     - heavy-3 (192.168.69.82) host_volumes: [data-vol]
-    - heavy-4 (192.168.69.83) host_volumes: [data-vol]
-    - heavy-5 (192.168.69.84) host_volumes: [data-vol]
   light_exec (5 nodes): exec only
     - light-1~5 (192.168.69.90~94)
 ```
