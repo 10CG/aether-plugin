@@ -2,6 +2,44 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.12.11] - 2026-10-13 — aether-doctor：CLI 先行诊断、配置展示不再带出凭据，补回逐节点 SSH 检查 (Aether #496)
+
+### Changed
+- **aether-doctor 先跑 `aether doctor --json`**（CLI 可用时，Step 1.5），按 FAIL / WARN 的 check 名用 `--check` / `--node` 深入。
+  退出码先存再接管道（接了管道，`$?` 就是 jq 的）：0 = 全部 PASS / WARN，1 = 至少一项 FAIL，2 / 3 = doctor 本身没跑成（配置读不了、连不上 Nomad），看 `.error`。
+  **CLI 的结果只决定先查哪里，不替代手工检查**：配置地址是否在 Server 列表、配置文件格式、本机 SSH 密钥 / `~/.ssh/config` / 逐台 SSH、CI secrets
+  这几项 CLI 不查，照常做；用户报了具体症状时，对应步骤查到底。
+- **SSH 检查每次都做三项**（Step 5-6）：本机密钥存在 / 权限 / 是否有口令，`ssh -G` 看 `~/.ssh/config` 对 heavy / light 的配置；
+  按 CLI 的条件（节点 IP、root、CLI 用的密钥、不读 `~/.ssh/config`、不走 ssh-agent）逐台测 Nomad 里的全部节点，再按节点名测终端路径 ——
+  两种结果不同，差别就在 `~/.ssh/config`；给完整报告，按错误类型给修法，`--fix` 只动本机、动手前先问。
+  1.12.10 摘出的候选版在这里只列了「CLI 不查的部分」，两轮 AB 的答复都据此跳过了 `~/.ssh/config` 的检查。
+- 诊断结果逐项标 ✓ / ✗ / !，最后按输出示例汇总。
+
+### Fixed
+- **aether-doctor 展示配置不再原样 `cat`**：两份 `config.yaml` 用 yq 去掉 token / secret / password 键后再显示，没有 yq 时只 grep 地址行。
+  1.12.10 及以前，配置里有 `cluster.nomad_token` 一类字段时会原样进会话。
+- 配置优先级注释改为与 CLI 一致：项目级文件存在时整份替代全局、缺的字段用默认值，命令不读 `.env`（Aether #491）。
+- `references/ssh-diagnostics.md`：CLI 用的密钥是 `--ssh-key` 指定的，否则依次试 `id_ed25519` / `id_rsa` / `id_ecdsa`；
+  原写「配置文件中指定」，CLI 没有这个配置项（节点探针同样如此，记在 Aether #452）。
+
+### 仍未发布（Aether #496）
+- aether-deploy / aether-dev / aether-setup 仍沿用 1.12.9 正文；1.12.10「已知问题」两条（rollback 方案 B 指向 deploy 未发布的步骤、
+  配置读取规则在 skill 之间不一致）仍在，随这三个 skill 修。
+
+### 守门层
+- aether-doctor SKILL.md 189 行（1.12.10 为 147 行），references 2404 词（1.12.10 为 2400 词），均在线内。
+
+### 质量门（AB）
+- 协议与全部证据在主仓 `aether-plugin-benchmarks/ab-results/2026-10-13-496-doctor-1-12-11/`：协议在任何一臂开跑前提交（`de24c7b`，ab-suite 1.6.0 不改）；
+  base = 1.12.10（`98d073b`，doctor 正文同 1.12.9），post = 候选 `04ff14b`。4 个 eval / 8 臂一波，每个 eval 两名 grader 盲评。
+- **PASS**：R1–R4 全过；本轮修复目标门 D1（eval-2 的 post 过 critical「检查密钥存在性与权限，以及 `~/.ssh/config`」）双评都过；新行为 eval-3 的 B1 过。
+  三个 doctor eval 都是 post 双胜，没有 base 双胜，不触发确认轮。
+- 噪声对照 status eval-2（两臂正文逐字节相同）同样是 post 双胜：winner 指标单轮不可靠，PASS 的依据是期望项不劣化且修复目标行为出现，不是「post 更好」。
+  base 这一轮在 eval-2 漏了上轮四份评分都过的 critical #2，也是单个样本的方差。
+- **测的就是发的**：发布树里 doctor 7 个文件与 status 1 个文件和 post 臂读到的 fixture 逐字节相同；阴性对照 —— 1.12.10 树恰好 2 处不一致。
+- 装置：8 臂 / 8 名 grader 的 prompt 与登记版逐字相同；臂零越界读取，1 臂跑了一条只列自己 fixture 目录的 `ls`（只记录）；
+  grader 1 处越界标记是校验自己评分文件时的 `>/dev/null`；零残留门禁 1 个 eval 报 2 处 RESIDUE，书面裁决为正当用法、副本不改；凭据扫描 0 命中。
+
 ## [1.12.10] - 2026-10-13 — rollback 改调 CLI，ci / deploy-watch / init 订正与过时事实修正；deploy / doctor / dev / setup 未过 AB、本版不发 (Aether #482 第二步)
 
 ### Changed

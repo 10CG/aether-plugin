@@ -127,6 +127,14 @@ compatibility:
       cli_min 保持 1.0.0 不上抬。aether-deploy / aether-doctor / aether-dev / aether-setup 的改动
       未过 AB 回归门, 不在本版, 四者沿用 1.12.9 的正文。
 
+  - plugin_version: "1.12.11+"
+    cli_min: "1.0.0"
+    cli_recommended: "1.22.14"
+    notes: >-
+      Aether #496: aether-doctor 新增 Step 1.5, CLI 可用时先跑 `aether doctor --json`, 再按 check 名用
+      `--check` 深入 —— `--check` 自 cli 1.10.0 起提供, 更早版本报 unknown flag;
+      CLI 不可用时 skill 走原来的手工检查流程, 故 cli_min 保持 1.0.0 不上抬。aether-deploy / aether-dev / aether-setup 仍沿用 1.12.9 的正文。
+
 # 依赖 CLI 的 Skills
 dependent_skills:
   - name: aether-doctor
