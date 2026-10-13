@@ -135,6 +135,14 @@ compatibility:
       `--check` 深入 —— `--check` 自 cli 1.10.0 起提供, 更早版本报 unknown flag;
       CLI 不可用时 skill 走原来的手工检查流程, 故 cli_min 保持 1.0.0 不上抬。aether-deploy / aether-dev / aether-setup 仍沿用 1.12.9 的正文。
 
+  - plugin_version: "1.12.12+"
+    cli_min: "1.0.0"
+    cli_recommended: "1.22.14"
+    notes: >-
+      Aether #496: aether-deploy 改调 `aether deploy`, 镜像校验以 cli >= 1.22.14 为准 (更早版本经 CF Access
+      访问 registry 时会把登录页当成镜像存在, #480), skill 的 min_version 为 1.22.14; 提交前另用 nomad CLI
+      跑 `nomad job plan`。cli_min 保持 1.0.0 不上抬 (其余 skill 不依赖)。aether-dev / aether-setup 仍沿用 1.12.9 的正文。
+
 # 依赖 CLI 的 Skills
 dependent_skills:
   - name: aether-doctor
@@ -151,7 +159,7 @@ dependent_skills:
 
   - name: aether-deploy
     cli_required: true
-    min_version: "0.9.0"
+    min_version: "1.22.14"
 
   - name: aether-dev
     cli_required: true

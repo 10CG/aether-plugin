@@ -2,6 +2,43 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.12.12] - 2026-10-13 — aether-deploy 改调 `aether deploy`，补回提交前全量差异与部署后按新版本核对 (Aether #496)
+
+### Changed
+- **aether-deploy 改调 `aether deploy`**（1.12.10 摘出的候选，本版原样保留）：dry-run 验证镜像 → 确认 → `--yes` 部署 → 健康检查，
+  按 `.data.status` 判定（`--json` 下失败也是外层 `ok`、退出码 0，Aether #493）；镜像路径带 org 时加 `--image-repo`；
+  镜像校验失败按 `.data.message` 诊断；需 cli ≥ 1.22.14（#480）；配置读取与 CLI 同一规则（项目级文件整份替代全局、不读 `.env`，#491）。
+- **提交前四项只读核对**（Step 3）：
+  - `nomad job plan -address=…` 看本地 `--job-file` 与线上 job 的全量差异。dry-run 的 diff 只比镜像 tag，`--yes` 注册的却是整份文件，所以镜像以外的变更逐条列进确认单。
+  - 有没有在飞的 deployment。
+  - 回滚目标镜像是否仍在（`aether deploy <当前版本> --dry-run`）。
+  - `update` 策略与 canary。
+- **提交前复核 `JobModifyIndex`**（Step 4）：预览之后有人改过 job 就重来（`aether deploy` 没有 `-check-index`）。
+- **部署后按新版本核对**（新 Step 5，不可跳过）：CLI 的健康检查数所有 `DesiredStatus=run` 的实例，Consul 也只按服务名数 passing，
+  注册后紧接着的检查可能凭旧实例判通过（CLI 侧见 Aether #500）。按 job `.Version` 过滤新 alloc，把 Consul service ID 里的 alloc ID 逐个对上；
+  canary 待 promote、滚动中、failed、没有 deployment 各有判法。
+
+### Fixed
+- 1.12.10「已知问题」第 1 条：aether-rollback 方案 B 指向的「`/aether:aether-deploy` 的 Step 2 / Step 4（看 `.data.status`）」随本版生效，rollback 正文未改。
+- 1.12.10「已知问题」第 2 条：deploy 的配置读取改为与 CLI 同一规则，剩 dev / setup。
+- `requirements.yaml`：aether-deploy 的 `min_version` 回到 1.22.14（1.12.10 摘出时退回了 0.9.0）。
+
+### 仍未发布（Aether #496）
+- aether-dev / aether-setup 仍沿用 1.12.9 正文。
+
+### 守门层
+- aether-deploy SKILL.md 208 行（1.12.11 为 215 行），在线内。
+
+### 质量门（AB）
+- 协议与全部证据在主仓 `aether-plugin-benchmarks/ab-results/2026-10-13-496-deploy-1-12-12/`：协议在任何一臂开跑前提交（`4199366`，ab-suite 1.6.0 不改）；
+  base = 1.12.11（`da93d55`，deploy 正文同 1.12.9），post = 候选 `9535f54`。4 个 eval / 8 臂一波，每个 eval 两名 grader 盲评。
+- **PASS**：R1–R4 全过；本轮修复目标门 D1（eval-1 的 post 过 high #4「部署后验证实例状态和 Consul 服务健康」）双评都过；新行为 eval-3 的 B1 过。
+  三个 deploy eval 两臂的期望项都是满分，winner 依次为 post / post、post / TIE、post / post，没有 base 双胜，不触发确认轮。
+- 噪声对照 status eval-2（两臂正文逐字节相同）本轮是 base 双胜，同日 doctor 轮是 post 双胜：winner 单轮不可靠，PASS 依据是期望项不劣化且修复目标行为出现。
+- **测的就是发的**：发布树里 deploy 的 SKILL.md、`scripts/cli-functions.sh` 与 status 的 SKILL.md 和 post 臂读到的 fixture 逐字节相同；阴性对照 —— 1.12.11 树恰好 1 处不一致。
+- 装置：8 臂 / 8 名 grader 的 prompt 与登记版逐字相同；臂零越界读取、零 Bash；grader 1 处启发式标记（用 python 读自己的两份副本）书面裁决为非破盲；
+  零残留门禁 4/4 exit 0；凭据扫描 0 命中。
+
 ## [1.12.11] - 2026-10-13 — aether-doctor：CLI 先行诊断、配置展示不再带出凭据，补回逐节点 SSH 检查 (Aether #496)
 
 ### Changed
