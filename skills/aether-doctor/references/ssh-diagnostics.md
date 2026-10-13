@@ -98,7 +98,7 @@ aether CLI 使用 Go 的 `x/crypto/ssh` 库，与系统 SSH 客户端行为不�
 
 - **不解析** `~/.ssh/config` (Host 别名、ProxyJump 等无效)
 - 节点名解析依赖：Nomad API 查询节点列表 → IP 映射
-- 密钥路径依赖：配置文件中指定或默认 `~/.ssh/id_ed25519`
+- 密钥：`--ssh-key` 指定的，否则依次试 `~/.ssh/id_ed25519`、`id_rsa`、`id_ecdsa`；不走 ssh-agent，带口令的私钥用不了
 - 终端 SSH 正常但 CLI 失败 → 多半是 config 解析差异
 
 ---
@@ -124,7 +124,7 @@ TCP 端口 22 是否可达？
                            ├─ 否 → SSH 正常
                            └─ 是 → Go SSH 库差异
                                    CLI 不读 ~/.ssh/config
-                                   检查 aether 配置中的密钥路径
+                                   检查 CLI 用的密钥 (--ssh-key 或默认那几把)
 ```
 
 ---
