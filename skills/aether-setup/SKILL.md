@@ -32,7 +32,7 @@ allowed-tools: Read, Write, Bash, AskUserQuestion
 1. 环境变量              → NOMAD_ADDR, CONSUL_HTTP_ADDR 等
 2. 项目级配置            → ./.aether/config.yaml (当前项目目录)
 3. 用户级全局配置        → ~/.aether/config.yaml
-4. 插件默认值           → 无（必须配置入口地址）
+4. 默认值               → CLI 内置（Nomad 为 127.0.0.1:4646）；入口地址要配置，否则连到本机
 ```
 
 配置文件只读找到的第一份：项目级文件存在时整份替代全局文件（不逐字段合并，缺的字段 CLI 用默认值，Nomad 为 `127.0.0.1:4646`），
@@ -133,7 +133,7 @@ Aether 集群配置
 │ 1. 环境变量  NOMAD_ADDR, CONSUL_HTTP_ADDR       │
 │ 2. 项目级    .aether/config.yaml (当前目录)       │
 │ 3. 全局      ~/.aether/config.yaml  ← 当前生效   │
-│ 4. 默认值    无（必须配置入口地址）                 │
+│ 4. 默认值    CLI 内置 (Nomad 127.0.0.1:4646)      │
 └─────────────────────────────────────────────────┘
   → 项目级配置存在时整份替代全局配置（不逐字段合并），入口地址要写全
   → 例: 在 /home/dev/payment-service 创建 .aether/config.yaml
@@ -255,7 +255,7 @@ Skills 使用发现的信息（如 node_class）而非硬编码值。
 - 验证 URL 格式：必须有 `http://` 前缀 + 端口号，缺少时提示补全
 - 验证 Nomad 连通性：`curl ${NOMAD_ADDR}/v1/agent/self`，检查 HTTP 状态码
 - 验证 Consul 连通性：`curl ${CONSUL_HTTP_ADDR}/v1/status/leader`，检查 HTTP 状态码
-- 必要工具检查：确认 `curl`、`jq`、`yq` 已安装，未安装时给出安装命令
+- 必要工具检查：确认 `curl`、`jq`、`yq` 已安装，未安装时给出安装命令；`yq` 要用 mikefarah 版 v4（`yq --version` 输出含 mikefarah），写入步骤的 `strenv()` 只有它支持
 
 ### 多候选地址探测
 
