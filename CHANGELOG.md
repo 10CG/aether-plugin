@@ -2,6 +2,63 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.12.10] - 2026-10-13 — rollback 改调 CLI，ci / deploy-watch / init 订正与过时事实修正；deploy / doctor / dev / setup 未过 AB、本版不发 (Aether #482 第二步)
+
+### Changed
+- **aether-rollback 标准路径改调 `aether rollback`**（`--list` / `--dry-run` / `--yes` / `--timeout`，`--to` 接整数版本号）。
+  `--list` 的 current / previous / stable 只是按顺序贴的标签 (Aether #493)，推荐回滚目标改看 Nomad versions API 的 `Stable`。
+  方案 B 从 Git 取回的 spec 经 `aether deploy --job-file` 提交 —— aether-init 生成的 `deploy/nomad-prod.hcl` 镜像是 `__IMAGE__`，
+  原样 `nomad job run` 会把字面量当镜像；方案 C 显式替换占位符、补上 `<org>` 路径段，查 tag 走内网 registry、凭据经 curl 配置文件传入（不进 argv）。
+  Step 4 不再按 `JobVersion == 目标版本` 等待（revert 产生的是新版本号，永远等不到）。镜像校验以 cli ≥ 1.22.14 为准 (#480)。
+- **aether-ci `--watch`**：用 Bash 的 `run_in_background` 跑 60 秒 × 15 次的有界轮询（与 push 后自动触发的 CronCreate 轮询一致），
+  查 `aether ci status --commit <sha> --expect N` 并按退出码分支；本地复现按 workflow 声明的工具链版本（删掉写死的 Go 1.22）。
+- **aether-deploy-watch**：删掉「Bash 单次约 120 秒超时」的过时说法 —— 可用 `timeout` 参数调到 10 分钟，更长的等待走 `run_in_background`。
+- **配置读取与 CLI 命令同一规则**（aether-rollback / aether-deploy-watch / aether-init 的 shell 片段，README 与 `.aether/config.yaml` 的说明）：
+  环境变量优先；配置文件只读找到的第一份 —— 项目里有 `.aether/config.yaml` 时整份不读全局文件、缺的字段不会从全局补；命令不读 `.env`。
+  原写法逐字段回退，skill 自己查得到集群而 CLI 连的是 127.0.0.1。`aether config get/show` 与命令解析不一致记在 Aether #491。
+
+### Fixed
+- **aether-init**：决策表 node class 写实际值 `heavy_workload` / `light_exec`；tag 策略 dev = commit SHA（workflow 同时推 latest）；
+  变量清单与模板里的占位符一一对应（`__DOCKER_IMAGE__` / `__NODE_CLASS__` / `__DATA_DIR__` 在模板里从未出现）；`__IMAGE__` 生成时保留、
+  残留检查放过它；不存在的 `aether init --registry` 改为设 `AETHER_REGISTRY` 或写 `cluster.registry`；`--lang` 只列 CLI 支持的 go / node / python。
+- **heavy 节点 3 台 → 5 台**（heavy-1~5，.80-.84）：aether-status、aether-build-container、两个 agent、aether-init references 三处、
+  插件级 CI 指南 (Aether #368)。2026-10-11 对 5 台只读实测：builder 单元与 buildkitd CA pin、runner 的 apt 源 / CA bundle 挂载与 build-cache env 注入一致。
+- **`references/forgejo-ci-optimization.md`** (1.2.1)：mihomo 出口 `192.168.69.212` → `192.168.69.199`（.212 已于 09-12 摘除，Aether #404）；
+  dev 双子星也经 mihomo 出网，不能当「不经代理」的对照。
+- **aether-volume**：删掉「外部参考」一节 —— 3 个链接指向的文件从未存在。
+- **README**：14 处斜杠命令短名改长名（1.12.9 只改了 skills / references / scripts，漏了 README）；「配置层级」一节原写「项目级 `.env`」为第一优先级，按实际规则重写。
+
+### 本版未发布（未过 AB 回归门，沿用 1.12.9 正文，Aether #496）
+按预注册协议，确认轮里仍判真回归的 skill 整份摘出改动：
+- **aether-deploy**（改调 `aether deploy`）：确认轮 eval-1 仍是 base 双胜。base 对要提交的 spec 跑 `nomad job plan` 全量差异并带 `-check-index`、
+  Consul passing 作必过关卡并对应新 alloc、核对回滚镜像；候选版的确认单只比对线上 job 与目标镜像。
+- **aether-doctor**（Step 1.5 先跑 `aether doctor --json`、配置展示过滤凭据）：eval-2 两轮都漏 critical「检查 `~/.ssh/config`」（R1 / R4 劣化）。
+  **配置展示的凭据过滤随之一并摘出 —— 本版 doctor 仍原样显示两份 `config.yaml`**，配置里有 `cluster.nomad_token` 一类字段时会进会话，1.12.11 优先修。
+- **aether-dev**（`nomad-dev.hcl`、提交前替换 `__IMAGE__`）：确认轮 eval-3 仍是 base 双胜（base 另做镜像架构核对、提交前 plan、同 tag 覆盖不触发重部署的提醒）。
+- **aether-setup**（配置优先级说明、示例拓扑 5 台 heavy）：确认轮 eval-2 仍是 base 双胜（base 的连接失败分类、写入防呆与写后复测更全）。
+
+### 已知问题（Aether #496，1.12.11 修）
+- aether-rollback 方案 B 写「结果按 `/aether:aether-deploy` 的 Step 2 / Step 4 判定（看 `.data.status`）」，指向的是本版没发布的 deploy 新版。
+  判法：`aether deploy --json` 失败时外层 `status` 仍是 `ok`、退出码 0，只看 `.data.status` (Aether #493)。rollback 按测试过的文本发布，本版不改。
+- 配置读取规则在 skill 之间不一致：rollback / deploy-watch / init 按 CLI 规则；deploy / dev / setup 仍是 1.12.9 的逐字段回退。
+
+### 守门层
+- 改动的 7 个 SKILL.md 均 ≤ 500 行；aether-init 456 行（>400 警告，基线 457）。
+- **aether-init references 合计 6160 词，仍超 5000 词阻断线**（基线 6188，自 v1.12.0 起超线）：owner 2026-10-11 决定本版例外放行，精简另立 Aether #494。
+  当时说定改动只落在 SKILL.md 与 file-generation.md；之后 heavy 节点实测又改了 nomad-templates / workflow-templates / dockerfile-templates 各一行事实，总词数仍是减少。
+- `static-benchmark.sh` 本身有两个问题（BLOCKED 仍退出 0；references 下没有 .md 时中途退出 —— aether-build-container 必现），记在 Aether #495。
+
+### 质量门（AB）
+- 协议与全部证据在主仓 `aether-plugin-benchmarks/ab-results/2026-10-11-482-plugin-1-12-10/`：协议在任何一臂开跑前提交 (`ea5d423`，ab-suite 1.6.0)；
+  base = 1.12.9 (`7445616`)，post = 候选 `8f48d07`。首轮 28 个 eval / 56 臂分 4 波，每个 eval 两名 grader 盲评；回归门 R1–R4，新行为门 B1。
+  deploy / doctor / dev / setup 触线后各跑一轮确认轮（增补协议均在开跑前提交，字母与首轮相反、各带对照）。
+- PASS：rollback（4 条 eval 都是 post 双胜，新行为 eval-3 / 4 过）、volume、status、build-container、init、ci（新行为 eval-3 过：base 的轮询占住会话）、deploy-watch。
+  FAIL：deploy、doctor、dev、setup（见上）。rotate-pat 是噪声对照（正文未改），两臂满分。
+- **测的就是发的**：发布树里 60 个插件文件与各臂读到的 fixture 逐字节相同（PASS 取候选、FAIL 取 1.12.9）；阴性对照 —— 1.12.9 树 13 处不一致，候选树恰好 4 处（四个 FAIL skill）。
+- 装置：transcript 机械核查 82 臂 / 82 名 grader 的 prompt 与登记版逐字相同，臂零越界读取；grader 的 6 处越界标记逐条书面裁决，均非破盲。
+  零残留门禁 4 个 eval 报 RESIDUE，均书面裁决为正当用法、副本不改；setup 确认轮一行被盲化脚本误删 (Aether #497，判定不依赖它)；
+  7 名 grader 被周限额截断在写完评分之后，核对后全部计入、未重发。
+
 ## [1.12.9] - 2026-10-11 — 斜杠命令改用可解析的长名；skill-benchmark 退役 (Aether #482 第一步)
 
 ### Fixed
