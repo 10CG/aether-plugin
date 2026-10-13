@@ -2,6 +2,46 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.12.14] - 2026-10-13 — aether-dev：deploy 先 validate / plan 再带 `-check-index` 提交，部署后指向 dev logs；aether-setup 订正默认值说法与 yq 版本要求 (Aether #496)
+
+### Changed
+- **aether-dev 的 deploy 流程**（1.12.10、1.12.13 两次未过 AB 的候选，本版第二次修正后通过）：
+  - 第 1 步检测 `deploy/nomad-dev.hcl` + `Dockerfile`，缺任一就停下，用 `/aether:aether-init` 生成；
+  - `__IMAGE__` 渲染到 `/tmp/${PROJECT}-dev.hcl`，`nomad job validate` → `nomad job plan`（退出码 1 = 会替换实例，属正常；记下 Job Modify Index）→ `nomad job run -check-index` 提交；
+  - 第 6 步：等部署完成，告诉用户用 `/aether:aether-dev logs <service-name>` 看新实例的日志、确认新版本已起来；
+  - 新增「提交前后要核对的」：缺文件指向 init；镜像架构对节点 `cpu.arch`（arm64 笔记本构建加 `--platform linux/amd64`）；同一 tag 覆盖推送不触发重新部署，要换 tag；
+    提交前记下版本，起不来就 `nomad job revert`；部署后看 dev logs 与新 alloc。
+- **aether-dev 的配置读取与 CLI 同一规则**：环境变量优先；配置文件只读找到的第一份（有项目级 `.aether/config.yaml` 时整份不读全局），不读 `.env`（Aether #491）。
+
+### Fixed
+- aether-dev 的配置片段 `export NOMAD_ADDR CONSUL_HTTP_ADDR`：nomad CLI 只从环境变量（或 `-address`）取地址，不 export 时连 127.0.0.1（1.12.13 随 dev 一起撤出的订正，本版带上）。
+- aether-dev 的 HCL 文件名改为 `/aether:aether-init` 实际生成的 `deploy/nomad-dev.hcl`（原文写 `deploy/nomad.hcl`，init 不生成这个文件）；错误处理里的提交命令同样先替换 `__IMAGE__`。
+- aether-setup 优先级第 4 层「插件默认值 → 无（必须配置入口地址）」改为「默认值 → CLI 内置（Nomad 为 127.0.0.1:4646）；入口地址要配置，否则连到本机」，
+  与同节「缺的字段 CLI 用默认值」一致，方框图同改（1.12.13「已知问题」第 1 条）。
+- aether-setup 的必要工具检查写明 `yq` 要用 mikefarah 版 v4（`yq --version` 输出含 mikefarah），写入步骤的 `strenv()` 只有它支持（1.12.13「已知问题」第 2 条）。
+
+### 已知问题
+- aether-setup 的「逐节点详情」只写 `GET /v1/node/{id}` → 提取详细属性，没写字段名。本轮两臂各有一份答复对详情接口取 `.Address`：这个字段只在列表接口 `/v1/nodes` 里有，
+  详情里会打印 null（已对真集群核实）。这一节两臂逐字节相同，不是本版引入的；跟踪在 Aether #503，下次改 setup 时一起测。
+
+### 守门层
+- aether-dev SKILL.md 382 行（1.12.13 为 383 行）；aether-setup SKILL.md 338 行（不变），都在线内。
+
+### 质量门（AB）
+- 协议与全部证据在主仓 `aether-plugin-benchmarks/ab-results/2026-10-13-496-dev-setup-1-12-14/`：协议在任何一臂开跑前提交（`9ab2037`，ab-suite 1.6.0 不改）；
+  base = 1.12.13（`8b033a0`），post = 候选 `8e78c3d`。6 个 eval / 12 臂一波，每个 eval 两名 grader 盲评；两个 skill 各自独立判定，字母与前一轮相反。
+- **dev PASS**：R1–R4 全过；修复目标门 D1 过 —— eval-1 的 post 两名 grader 都判过 high #5（部署后建议 `/aether:aether-dev logs`）。
+  eval-1 的 post 还多过一条 high #4（缺 dev HCL 时指向 init）；两条 eval 的 winner 都是 post 双胜。
+  但 base 也过了 #5：base 的 dev 正文（1.12.9）在四次运行里逐字节相同，#5 依次是过、不过、不过、过，所以这条期望在两臂上都随抽样起伏，
+  D1 过了也不能证明第 6 步的改动有效；post 答复的措辞与新加的第 6 步逐字吻合。
+- **setup PASS**：R1–R4 全过，三条 eval 两臂期望项都是满分；eval-1、eval-2 post 双胜，eval-4（只记录）base 双胜。
+  eval-2 两名 grader 都点名 base 答复里「默认值 无」与「会变成 127.0.0.1:4646」自相矛盾、post 写对了 —— 正是本版订正的那一行。
+- 噪声对照 status eval-2（两臂正文逐字节相同）本轮 base 双胜，post 还少过一条 high：winner 与期望项层面的样本方差都还在，上面的 winner 不能单独当证据。
+- **测的就是发的**：发布树里 dev、setup 的 SKILL.md 与 post 臂读到的 fixture 逐字节相同，`scripts/cli-functions.sh` 与 status 两臂相同；
+  阴性对照 —— 1.12.13 树恰好 2 处不一致（dev、setup 的 SKILL.md）。
+- 装置：12 臂 / 12 名 grader 的 prompt 与登记版逐字相同；臂零越界读取、零 Bash；grader 无破盲（一名 grader 把只写不读的辅助脚本写到了评分目录之外，
+  另一处标记是 `/dev/null` 重定向，都有书面裁决）；零残留门禁 2 个 eval 各 1 处 RESIDUE，书面裁决为正当用法、副本不改；凭据扫描 0 命中。
+
 ## [1.12.13] - 2026-10-13 — aether-setup：配置语义与 CLI 一致，补回按 curl 退出码的失败分类与写入防呆、写后复测；aether-dev 未过 AB、本版不发 (Aether #496)
 
 ### Changed

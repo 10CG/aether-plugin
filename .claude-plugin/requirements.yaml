@@ -150,6 +150,14 @@ compatibility:
       Aether #496: aether-setup 的配置说明与 CLI 一致 (项目级整份替代全局、不读 .env, #491), 写入配置改用 yq -i 只改 cluster.*;
       不依赖新的 CLI 版本。aether-dev 未过 AB, 仍沿用 1.12.9 的正文。
 
+  - plugin_version: "1.12.14+"
+    cli_min: "1.0.0"
+    cli_recommended: "1.22.14"
+    notes: >-
+      Aether #496: aether-dev 的 deploy 改为渲染 → `nomad job validate` → `nomad job plan` → `nomad job run -check-index`
+      (都是 nomad CLI 的功能, 与 aether CLI 版本无关), 配置读取与 CLI 同一规则 (#491) 并 export NOMAD_ADDR;
+      aether-setup 订正默认值说法、写明 yq 要用 mikefarah v4。均不依赖新的 CLI 版本, cli_min 保持 1.0.0 不上抬。
+
 # 依赖 CLI 的 Skills
 dependent_skills:
   - name: aether-doctor
