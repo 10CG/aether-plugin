@@ -158,6 +158,13 @@ compatibility:
       (都是 nomad CLI 的功能, 与 aether CLI 版本无关), 配置读取与 CLI 同一规则 (#491) 并 export NOMAD_ADDR;
       aether-setup 订正默认值说法、写明 yq 要用 mikefarah v4。均不依赖新的 CLI 版本, cli_min 保持 1.0.0 不上抬。
 
+  - plugin_version: "1.12.15+"
+    cli_min: "1.0.0"
+    cli_recommended: "1.22.14"
+    notes: >-
+      Aether #503: aether-setup 的集群发现写明字段取自哪个接口 (详情 /v1/node/<id> 没有 Address; 可用 driver 只算
+      Detected 且 Healthy 的)。只涉及 Nomad HTTP API, 不依赖新的 CLI 版本, cli_min 保持 1.0.0 不上抬。
+
 # 依赖 CLI 的 Skills
 dependent_skills:
   - name: aether-doctor

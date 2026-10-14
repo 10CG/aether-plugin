@@ -2,6 +2,35 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.12.15] - 2026-10-14 — aether-setup：集群发现写明字段取自哪个接口（详情接口没有 `Address`；可用 driver 只算 Detected 且 Healthy 的）(Aether #503)
+
+### Fixed
+- **aether-setup「集群信息发现」写明字段取自哪个接口**（1.12.14「已知问题」，Aether #503）：
+  - 「必须展示的信息」的字段（NodeClass、Drivers、Docker 版本、HostVolumes、Status、Address）`GET /v1/nodes` 每一项都有，一次请求就够；
+    Docker 版本改为列表里的路径 `Drivers.docker.Attributes["driver.docker.version"]`，HostVolumes 写明键是卷名、`.Path` 是宿主路径；
+  - 逐节点详情 `GET /v1/node/{id}` 改为只在要列表里没有的属性（`Attributes` 下的硬件 / 系统信息）时才调；写明详情对象**没有** `Address`（取出来是 null），
+    IP 用 `Attributes["unique.network.ip-address"]` 或沿用列表里的 `Address`，`HTTPAddr` 带端口。
+- **可用 driver 只算 `Detected` 与 `Healthy` 都为 true 的**（「自动发现」表与「必须展示的信息」表两处）：没启用的 driver 也列在 `Drivers` 里，两项为 false
+  （现网 heavy 节点列着 java / qemu / raw_exec），原文只写「提取 Drivers」。
+- 以上字段说法逐节点对现网核过（10 个节点，只读 GET）。
+
+### 守门层
+- aether-setup SKILL.md 341 行（1.12.14 为 338 行），在线内。
+
+### 质量门（AB）
+- 协议与全部证据在主仓 `aether-plugin-benchmarks/ab-results/2026-10-14-503-setup-1-12-15/`：协议在任何一臂开跑前提交（`dbf6c81`；ab-suite 1.7.0，aether-setup 新增 eval-5
+  「要 CPU 架构、必须调详情接口」）；base = 1.12.14（`45a6ac1`），post = 候选 `bb50a6a`。4 个 eval / 6 个实例 / 12 臂一波（eval-5 跑三对），每个实例两名 grader 盲评。
+- **setup PASS**：R1–R4 全过；6 个实例两臂期望项全满分，两名 grader 逐条判分零分歧；eval-5 三对 B1 全过；修复目标机械门 D1 过 ——
+  6 份 post 答复里对详情接口取 `.Address` 为 0 处（扫描器开跑前在 28 份历史答复上与手工结果一致）。
+- **本轮没有证明修好**：base 在 eval-5 也一次没错（机械扫描 0 处，#1 六次评分全过）。PASS 只说明 post 不比 base 差、正文的字段说法与现网一致。
+  设门前列过的历史基线：既有 eval 上这个错误约一成（10 月各轮 28 份答复里 3 份）。
+- grader 理由里的定性差别（不进门）：eval-1 一名 grader 指出 base 答复误称 Docker 版本和 host volume 只在节点详情里、多出 N+1 次请求，post 一次 `/v1/nodes` 即可；
+  eval-5 第二对两名 grader 都指出 base 把探测到但不健康的 driver 列进「可用」一列、与它自己的说明矛盾，post 只列 Detected 且 Healthy 的。
+- winner：eval-1 base 双胜，eval-2 一比一，eval-4 base / 平，eval-5 三对依次 post 双胜、post 双胜、base 双胜 —— winner 仍不能单独当证据。
+- **测的就是发的**：发布树里 setup 的 SKILL.md 与 post 臂读到的 fixture 逐字节相同；阴性对照 —— 1.12.14 树恰好 1 处不一致。
+- 装置：12 臂 / 12 名 grader 的 prompt 与登记版逐字相同；臂零越界读取、零 Bash；两名 grader 往 scratchpad 根目录写过临时文件又自己删掉
+  （除了读回自己刚写的那个文件，没读别的；内容从 transcript 原样恢复入库），不构成破盲；零残留门禁 2 个实例共 3 处 skill 字样，书面裁决为两臂相同的正文用语、副本不改；凭据扫描 0 命中。
+
 ## [1.12.14] - 2026-10-13 — aether-dev：deploy 先 validate / plan 再带 `-check-index` 提交，部署后指向 dev logs；aether-setup 订正默认值说法与 yq 版本要求 (Aether #496)
 
 ### Changed
