@@ -57,7 +57,7 @@ allowed-tools: Read, Write, Bash, AskUserQuestion
 | 信息 | 发现方式 |
 |------|---------|
 | 节点类型 (node_class) | `GET /v1/nodes` → 提取 NodeClass |
-| 可用 Driver | `GET /v1/nodes` → 提取 Drivers |
+| 可用 Driver | `GET /v1/nodes` → 提取 Drivers 里 Detected 且 Healthy 的 |
 | 节点 IP | `GET /v1/nodes` → 提取 Address |
 | 节点状态 | `GET /v1/nodes` → 提取 Status |
 
@@ -216,19 +216,22 @@ Skills 与 CLI 命令按同一规则读取配置：环境变量优先；配置�
 
 ### 发现步骤
 
-1. **节点拓扑**: `GET /v1/nodes` → 按 NodeClass 分组
-2. **逐节点详情**: 对每个节点 `GET /v1/node/{id}` → 提取详细属性
+1. **节点拓扑**: `GET /v1/nodes` → 按 NodeClass 分组。下表的字段列表接口每一项都有，一次请求就够
+2. **逐节点详情**: 只在要列表里没有的属性（详情对象 `Attributes` 下的硬件 / 系统信息）时，再对节点 `GET /v1/node/{id}`。
+   详情对象**没有** `Address`（取出来是 null）：IP 用 `Attributes["unique.network.ip-address"]`，或沿用列表里的 `Address`；`HTTPAddr` 带端口（`IP:4646`）
 
 ### 必须展示的信息
+
+字段都取自 `GET /v1/nodes` 的每一项：
 
 | 类别 | API 字段 | 输出示例 |
 |------|---------|---------|
 | 节点分类 | `NodeClass` | heavy_workload (5), light_exec (5) |
-| 可用 Drivers | `Drivers` | docker, exec, raw_exec |
-| Docker 版本 | `Attributes["driver.docker.version"]` | 29.2.1 |
-| Host Volumes | `HostVolumes` | data-vol → /opt/data, log-vol → /var/log |
+| 可用 Drivers | `Drivers` 里 `Detected` 与 `Healthy` 都为 true 的键（没启用的 driver 也在 `Drivers` 里，这两项为 false） | docker, exec, raw_exec |
+| Docker 版本 | `Drivers.docker.Attributes["driver.docker.version"]` | 29.2.1 |
+| Host Volumes | `HostVolumes`（键是卷名，`.Path` 是宿主路径） | data-vol → /opt/data, log-vol → /var/log |
 | 节点状态 | `Status` | ready / down |
-| 节点 IP | `Address` | 192.168.69.80 |
+| 节点 IP | `Address`（只有列表接口有） | 192.168.69.80 |
 
 ### 输出格式（setup 完成后的集群概览）
 
