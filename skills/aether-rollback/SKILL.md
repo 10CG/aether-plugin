@@ -12,24 +12,26 @@ allowed-tools: Bash, AskUserQuestion
 dependencies:
   cli:
     required: true
-    min_version: "0.7.0"
+    min_version: "1.23.0"
 ---
 
 # Aether 生产回滚 (aether-rollback)
 
-> **版本**: 0.4.0 | **优先级**: P1
+> **版本**: 0.5.0 | **更新**: 2026-10-15 | **优先级**: P1
 
 ## 前置检查
 
-**⚠️ 此 Skill 需要 aether CLI**
+**⚠️ 此 Skill 需要 aether CLI ≥ 1.23.0**：回滚的健康检查按 revert 产生的版本及其 deployment 判定（1.22.15 起）；
+方案 B 用 `aether deploy` 的 Nomad plan 与 `--check-index`（1.23.0 起）。
 
 ```bash
 # 使用共享检测脚本
 source "${CLAUDE_PLUGIN_ROOT}/scripts/cli-functions.sh"
 require_aether_cli || exit 1
+aether version    # 低于 1.23.0 先升级 (/aether:aether-doctor)
 ```
 
-版本历史与标准回滚都用 `aether rollback`：它执行 Nomad revert 后按 job 的期望实例数带超时做健康检查，不用手写等待循环。
+版本历史与标准回滚都用 `aether rollback`：它执行 Nomad revert 后，按 revert 产生的版本带超时做健康检查，不用手写等待循环。
 
 ## 快速开始
 
@@ -58,6 +60,9 @@ curl -s "${NOMAD_ADDR}/v1/job/my-project/versions" | jq '[.Versions[] | {version
 
 `--list` 的 `Status` 只按顺序标 current / previous / stable（第 3 个起都叫 stable，Aether #493），不代表那个版本部署成功过；
 推荐回滚目标看 Nomad 的 `Stable` 字段。
+
+刚部署失败、而 job 的 `update` 开了 `auto_revert` 时，Nomad 可能已经自动退回（`aether deploy` 的 message 含 `rolling back to job version N`）：
+最新版本是退回产生的，与 version N 相同；紧邻的上一个版本是刚失败的那个，`Stable` 为 false。退回后的版本健康，就不需要再回滚。
 
 ### Step 2: 显示版本列表
 
@@ -114,10 +119,12 @@ aether rollback my-project --to <version> --yes --json [--timeout 5m]
 |------|--------|
 | `rolled_back` 且 `.data.health_check.passed == true` | 回滚完成 → Step 5 |
 | `failed`，`error_code: ROLLBACK_FAILED` | revert 本身失败 → 方案 B |
-| `failed`，`error_code: ROLLBACK_HEALTH_CHECK_FAILED` | 已 revert 但不健康 → 「回滚失败处理」 |
+| `failed`，`error_code: ROLLBACK_HEALTH_CHECK_FAILED` | 已 revert，但 revert 产生的版本没通过：超时，或它的 deployment 失败 / 暂停 / 在等 promote，`.data.message` 写明是哪种 → 「回滚失败处理」 |
+| `failed`，`error_code: JOB_MODIFIED_CONCURRENTLY` | 已 revert，紧接着又有别的注册，认不出 revert 产生的版本：先看 `nomad job history -address="$NOMAD_ADDR" my-project`，不要再执行回滚 |
 | 外层 `status == "error"` | job 或目标版本不存在等，读 `.error.message` |
 
 这是最安全的标准路径。Nomad 保留完整的版本历史，revert 以目标版本的 Job spec 提交一个**新**版本（版本号递增，镜像与目标版本相同）。
+`.data.health_check.job_version` 就是这个新版本号（不是 `--to` 的目标版本号）；`deployment_id` / `deployment_status` 是 CLI 判定所依据的 deployment，为空表示该版本没有 deployment。
 
 #### 方案 B: 从 Git 重提交 Job Spec
 
@@ -128,12 +135,14 @@ aether rollback my-project --to <version> --yes --json [--timeout 5m]
 git log --oneline -- deploy/nomad-prod.hcl
 git show <commit>:deploy/nomad-prod.hcl > /tmp/my-project.nomad.hcl
 
-# 2. 用 aether deploy 提交这份 spec：解析 HCL、把镜像设为指定 tag、验证镜像、注册、做健康检查
+# 2. 用 aether deploy 提交这份 spec：解析 HCL、把镜像设为指定 tag、验证镜像、Nomad plan 预演；
+#    确认后带上 plan 的 job_modify_index 提交，并做健康检查
 aether deploy my-project <已知正常的 tag> --job-file /tmp/my-project.nomad.hcl --dry-run --json [--image-repo <org>/my-project]
-aether deploy my-project <已知正常的 tag> --job-file /tmp/my-project.nomad.hcl --yes --json [--image-repo <org>/my-project]
+aether deploy my-project <已知正常的 tag> --job-file /tmp/my-project.nomad.hcl --yes --check-index <.data.plan.job_modify_index> --json [--image-repo <org>/my-project]
 ```
 
-结果按 `/aether:aether-deploy` 的 Step 2 / Step 4 判定（看 `.data.status`）。不要直接 `nomad job run` 这份文件：
+结果按 `/aether:aether-deploy` 的 Step 2 / Step 4 判定（看 `.data.status`）。dry-run 的 `.data.plan.changes` 就是这份 Git spec 与线上 job 的全部差异，确认前给用户看。
+不要直接 `nomad job run` 这份文件：
 init 生成的模板里镜像是 `__IMAGE__` 占位符，原样提交会把字面量当镜像。
 与方案 A 一样会产生新版本号；区别是 spec 来自 Git 而不是 Nomad 版本历史，后续若需再次回滚，版本号会不同。
 
@@ -169,16 +178,20 @@ nomad job run /tmp/my-project-emergency.nomad.hcl
 
 ### Step 4: 等待回滚完成
 
-方案 A / B 的等待由 CLI 完成（`--timeout` 控制上限）。方案 C 手工提交后，用 `aether status my-project`
-确认新 allocation 全部 running；等待要设上限（如 3 分钟），超时转「回滚失败处理」，不要无限等。
+方案 A / B 的等待由 CLI 完成（`--timeout` 控制上限）：它只数 revert / 注册产生的那个版本的实例，不会把还没下线的旧实例算进去。
+方案 C 手工提交后，用 `aether status my-project` 确认新 allocation 全部 running；等待要设上限（如 3 分钟），超时转「回滚失败处理」，不要无限等。
 revert 产生的是新版本号，按「镜像等于目标版本的镜像」核对，不要按 `JobVersion == 目标版本号` 等待（永远等不到）。
 
 ### Step 5: 验证健康状态
 
+方案 A / B：CLI 已按新版本判过，报告 `.data.health_check.job_version`、`deployment_status` 与 `.data.allocations`。
+再查一次 Consul（服务名以 job spec 的 `service` 块为准，不一定等于 job 名），数量应与 `.data.allocations.desired` 一致：
+
 ```bash
-# Consul 健康检查
-curl -s "${CONSUL_HTTP_ADDR}/v1/health/service/my-project?passing" | jq 'length'
+curl -s "${CONSUL_HTTP_ADDR}/v1/health/service/<service>?passing" | jq 'length'
 ```
+
+方案 C 没有 CLI 的判定：Step 4 确认新 allocation 全部 running 后，同样查上面的 Consul。
 
 ### Step 6: 输出结果
 
@@ -186,9 +199,9 @@ curl -s "${CONSUL_HTTP_ADDR}/v1/health/service/my-project?passing" | jq 'length'
 回滚成功
 ========
 服务: my-project
-当前版本: v2 (def456)
+当前版本: v2 (def456)，revert 产生的 Nomad job version 9
 实例: 2/2 running
-健康检查: all passing
+健康检查: deployment successful，Consul 2/2 passing
 
 回滚完成，服务已恢复。
 ```
@@ -202,7 +215,8 @@ curl -s "${CONSUL_HTTP_ADDR}/v1/health/service/my-project?passing" | jq 'length'
 ```
 
 这将跳过版本列表展示，但仍需执行确认（Step 2.5）后才会执行回滚。
-`aether rollback --to` 接的是 Nomad job 版本号（整数，如 `--to 2`），不是镜像 tag；不带 `--to` 时回滚到上一个版本。
+`aether rollback --to` 接的是 Nomad job 版本号（整数，如 `--to 2`），不是镜像 tag。不带 `--to` 时回滚到紧邻的上一个版本，不看它是否健康过：
+刚 auto_revert 过时，它就是失败的那个（#514）。目标一律按 Step 1 的 `Stable` 选，用 `--to` 指定。
 
 ## 回滚失败处理
 
