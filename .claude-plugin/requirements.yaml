@@ -3,7 +3,7 @@
 
 cli:
   min_version: "1.0.0"
-  recommended_version: "1.22.14"
+  recommended_version: "1.23.1"
   # 安装位置 (与 config.yaml 同目录)
   install_dir: "~/.aether"
   install_path:
@@ -165,6 +165,15 @@ compatibility:
       Aether #503: aether-setup 的集群发现写明字段取自哪个接口 (详情 /v1/node/<id> 没有 Address; 可用 driver 只算
       Detected 且 Healthy 的)。只涉及 Nomad HTTP API, 不依赖新的 CLI 版本, cli_min 保持 1.0.0 不上抬。
 
+  - plugin_version: "1.12.16+"
+    cli_min: "1.0.0"
+    cli_recommended: "1.23.1"
+    notes: >-
+      Aether #508: aether-deploy / aether-rollback 改用 CLI 1.23 的 dry-run plan (`.data.plan`)、`--check-index` 与按版本判定的
+      健康检查 (`health_check.job_version` / `deployment_status`、`DEPLOYMENT_*` 错误码), 两个 skill 的 min_version 为 1.23.0 ——
+      更早的 CLI 不认 `--check-index` (unknown flag, 不会提交), dry-run 也没有 `.data.plan` (skill 写明这时先升级)。
+      其余 skill 不依赖, cli_min 保持 1.0.0 不上抬。
+
 # 依赖 CLI 的 Skills
 dependent_skills:
   - name: aether-doctor
@@ -181,7 +190,7 @@ dependent_skills:
 
   - name: aether-deploy
     cli_required: true
-    min_version: "1.22.14"
+    min_version: "1.23.0"
 
   - name: aether-dev
     cli_required: true
@@ -189,7 +198,7 @@ dependent_skills:
 
   - name: aether-rollback
     cli_required: true
-    min_version: "0.9.0"
+    min_version: "1.23.0"
 
   - name: aether-status
     cli_required: false

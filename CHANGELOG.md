@@ -2,6 +2,51 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.12.16] - 2026-10-15 — aether-deploy / aether-rollback 改用 CLI 1.23 的 plan、`--check-index` 与按版本判定；部署失败且 Nomad 已自动退回时不再回滚 (Aether #508)
+
+### Changed
+- **aether-deploy**（0.6.0，CLI ≥ 1.23.0）：
+  - Step 2 / 3：确认单改读 dry-run 的 `.data.plan`（`changes` / `groups` / `failed_placements` / `warnings` / `job_modify_index`）；`plan_error` 非空时先解决，
+    不凭只比镜像 tag 的 `.data.diff` 确认。去掉手工 `nomad job plan` 与「更新策略」一项，保留「在飞的部署」「回滚目标还在」两项只读核对。
+  - Step 4：`--yes` 带 `--check-index <plan.job_modify_index>`，由 Nomad 强制：预览之后 job 被改过就拒绝提交，`JOB_MODIFIED_SINCE_PLAN` 时回到 Step 2。
+    去掉提交前手工复读 `JobModifyIndex`。结果表按 `DEPLOYMENT_AWAITING_PROMOTION` / `DEPLOYMENT_FAILED` / `HEALTH_CHECK_TIMEOUT` /
+    `DEPLOYMENT_PAUSED`·`CANCELLED` / `JOB_MODIFIED_CONCURRENTLY` 分行。
+  - Step 5：去掉手工按版本核对（CLI 1.22.15 起按这次注册产生的版本与它的 deployment 判定），改为报告 `health_check.job_version` /
+    `deployment_status`，最后查一次 Consul passing（服务名取自 job spec 的 `service` 块）。
+- **aether-rollback**（0.5.0，CLI ≥ 1.23.0）：判定表补 `JOB_MODIFIED_CONCURRENTLY` 与 `health_check.job_version`（revert 产生的新版本号）的读法；
+  方案 B 带 `--check-index`，确认前给用户看 `.data.plan.changes`；Consul 服务名取自 `service` 块；CLI 门槛从 0.7.0 改为 1.23.0
+  （方案 B 用到的 `aether deploy` 本来就晚于 0.7.0）。
+
+### Fixed
+- **部署失败、Nomad 已按 `auto_revert` 自动退回时，不再顺着 CLI 的提示回滚**（Aether #514）：这时 `aether deploy` 报 `DEPLOYMENT_FAILED`，
+  message 含 `rolling back to job version N`，suggested_action 却建议 `aether rollback <job> --yes`；不带 `--to` 的回滚退到紧邻的上一个版本，
+  也就是刚失败的那个。本机 Nomad 1.11.2 dev agent 上实测：照做会把失败的 spec 重新部署一遍。deploy Step 4 写明这时不要回滚、核对退回后的版本；
+  rollback Step 1 与「紧急回滚」写明自动退回后的版本关系，目标一律按 `Stable` 用 `--to` 指定。CLI 本身的修复跟踪在 #514。
+
+### 守门层
+- aether-deploy SKILL.md 214 行（1.12.15 为 208 行），aether-rollback SKILL.md 303 行（1.12.15 为 289 行），都在线内。
+
+### 质量门（AB）
+- 协议与全部证据在主仓 `aether-plugin-benchmarks/ab-results/2026-10-15-508-deploy-rollback-1-12-16/`：协议在任何一臂开跑前提交（`556ea67`；
+  ab-suite 1.8.0，aether-deploy 新增 eval-4「部署失败且已自动退回、用户打算照 suggested_action 回滚」）；base = 1.12.15（`91d9340`），
+  post = 候选 `4710461`。两个 skill 分别判定，10 个实例 / 20 臂两波（deploy eval-4 跑三对），每个实例两名 grader 盲评。
+- **deploy PASS**：R1–R4 全过；eval-4 三对 B1 全过；修复目标机械门 D1 过 —— e1 的 post 答复提交命令带 `--check-index`
+  （10 月历次 18 份答复的 17 条提交命令里 0 条带）。本轮 post 的提交命令全部带 `--check-index`，删掉的三项手工核对在 post 答复里只剩 1 处。
+- **本轮没有证明修好**：base 在 eval-4 也没有顺着 suggested_action 回滚（两条 critical 6 次评分全过，D2 = 0）。只记录的差别：
+  「说明为什么不带 `--to` 会退到刚失败的版本」base 6 次评分里 4 次不过、post 0 次，grader 的理由是 base 只把这个机制当假设说。三对样本，方向性证据。
+- **rollback PASS**：四个实例两臂双评满分，R1–R4 全过；winner e1、e3、e4 post 双胜，e2 base 双胜（理由落在两臂相同的「回滚失败处理」一节，R3 不看 e2）。
+  Step 1 与「紧急回滚」新加的说明没有专门的新场景。
+- grader 理由里的定性差别（不进门）：deploy e1 两名 grader 都指出 base 部署后把 Consul service ID 逐个对到 alloc，比 post 只数 passing 更严，
+  仍判 post 胜（plan 针对实际注册的 spec、`--check-index` 由 Nomad 强制、失败分支更准）；deploy e2 / e3 四名 grader 都指出 base 的正文断言
+  `aether deploy` 没有 check-index、健康检查不分新旧版本，与 CLI 1.23 不符。
+- **测的就是发的**：发布树里两个 skill 的 SKILL.md 与 `scripts/cli-functions.sh` 与 post 臂读到的 fixture 逐字节相同；阴性对照 —— 1.12.15 树恰好 2 处不一致。
+- 装置：20 臂 / 20 名 grader 的 prompt 与登记版逐字相同；臂零越界读取，一臂违反指示跑了一条只读 `find`（只列自己 fixture 里的文件，按协议只记录）；
+  两名 grader 回读自己刚写的评分文件做校验，不构成破盲；零残留门禁 10/10；证据目录凭据扫描 0 命中。
+
+### 已知问题
+- deploy 的 Consul 复核只数 passing、不再对到 alloc；没有 deployment 时 CLI 仍按 job 名查 Consul、不区分版本（Aether #509）。
+- #514 修好之后，deploy Step 4 与 rollback「紧急回滚」里针对它的说明可以收回（改 SKILL.md，需 AB）。
+
 ## [1.12.15] - 2026-10-14 — aether-setup：集群发现写明字段取自哪个接口（详情接口没有 `Address`；可用 driver 只算 Detected 且 Healthy 的）(Aether #503)
 
 ### Fixed
