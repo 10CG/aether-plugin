@@ -2,6 +2,16 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.12.18] - 2026-10-19
+
+### Changed — 收回 #514/#493 过时绕开说明 (#517) + cli-guard 文档对齐 (#489 余项)
+
+- **aether-deploy 0.6.1** / **aether-rollback 0.5.1**: 删「不带 --to 退到刚失败版本 / suggested_action 正建议回滚」(#514 绕开说明, cli ≥1.23.2 已修) 与「外层 status ok / 退出码 0」(#493 说明, cli ≥1.23.12 已修), 换版本注记 (1.23.0/1.23.1 旧行为事实保留); rollback --list jq 加 Stable、删单独 versions curl (留 <1.23.2 回退注记); 位置标签警告保留 (标签至今按位置标)
+- **aether-cli-guard**: 文档对齐 v1.12.17 实况 (stdin JSON .tool_input.command / exit 2 / stderr), 「已知问题(待修)」改已修注记 (Tier 3, 不走模型 AB)
+- **AB**: deploy/rollback 双 PASS (10 实例 × 2 grader, 机械聚合; D1 --check-index 1/1; D3 收回条目判别力未流失 —— 版本注记让未声明版本的答复覆盖新旧行为)。装置: 预注册协议 sha256 锚定、盲评自检 10/10+变异 4/4、20 臂 0 void、凭据扫描带阳性对照零命中。证据: Aether 主仓 aether-plugin-benchmarks/ab-results/2026-10-19-517-493-notes-1-12-18/
+- 守门层: 改前 214/303/64 行 → 改后 214/302/63 行, 全 [OK]
+- 勘误: v1.12.17 发版的全局版本替换误把上文 #508 条目的标题 `## [1.12.16]` 改成了 `## [1.12.17]` (本版修复; 已推送的 v1.12.17 tag 里该条目标题失实, 内容不受影响)
+
 ## [1.12.17] - 2026-10-19
 
 ### Fixed — cli-guard-hook 从未生效 (#489)
@@ -12,7 +22,7 @@ All notable changes to aether-plugin will be documented in this file.
 - 行为变化: 仅在 CLI 缺失时开始真正拦截; CLI 在位时行为不变
 - aether-cli-guard SKILL.md 的旧「exit 1 阻止」描述收回属 skill 内容变更 (需 AB), 与 #517 批次合并
 
-## [1.12.17] - 2026-10-15 — aether-deploy / aether-rollback 改用 CLI 1.23 的 plan、`--check-index` 与按版本判定；部署失败且 Nomad 已自动退回时不再回滚 (Aether #508)
+## [1.12.16] - 2026-10-15 — aether-deploy / aether-rollback 改用 CLI 1.23 的 plan、`--check-index` 与按版本判定；部署失败且 Nomad 已自动退回时不再回滚 (Aether #508)
 
 ### Changed
 - **aether-deploy**（0.6.0，CLI ≥ 1.23.0）：
