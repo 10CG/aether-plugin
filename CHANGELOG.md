@@ -2,7 +2,17 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
-## [1.12.16] - 2026-10-15 — aether-deploy / aether-rollback 改用 CLI 1.23 的 plan、`--check-index` 与按版本判定；部署失败且 Nomad 已自动退回时不再回滚 (Aether #508)
+## [1.12.17] - 2026-10-19
+
+### Fixed — cli-guard-hook 从未生效 (#489)
+
+- 输入读法接通: Claude Code 经 stdin JSON 传 hook 载荷 (命令在 `.tool_input.command`), 旧脚本只读从不存在的 `CLAUDE_TOOL_INPUT` env —— 对一切输入 exit 0, 从未拦截。现 env 优先、空则读 stdin (与 ci-watch-hook.sh 同构)
+- 阻断语义修正: `exit 1` → `exit 2` (PreToolUse 只有 exit 2 / JSON deny 才阻止工具调用; 1 是非阻断错误); 引导文字改走 stderr
+- 新增 `scripts/cli-guard-hook-test.sh` 管道契约测试 (五例: 拦截/放行/静默放行/env 兼容/畸形降级)
+- 行为变化: 仅在 CLI 缺失时开始真正拦截; CLI 在位时行为不变
+- aether-cli-guard SKILL.md 的旧「exit 1 阻止」描述收回属 skill 内容变更 (需 AB), 与 #517 批次合并
+
+## [1.12.17] - 2026-10-15 — aether-deploy / aether-rollback 改用 CLI 1.23 的 plan、`--check-index` 与按版本判定；部署失败且 Nomad 已自动退回时不再回滚 (Aether #508)
 
 ### Changed
 - **aether-deploy**（0.6.0，CLI ≥ 1.23.0）：
