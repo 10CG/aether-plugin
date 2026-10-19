@@ -17,7 +17,7 @@ dependencies:
 
 # Aether 生产回滚 (aether-rollback)
 
-> **版本**: 0.5.0 | **更新**: 2026-10-15 | **优先级**: P1
+> **版本**: 0.5.1 | **更新**: 2026-10-19 | **优先级**: P1
 
 ## 前置检查
 
@@ -52,14 +52,12 @@ aether version    # 低于 1.23.0 先升级 (/aether:aether-doctor)
 查询 Nomad Job 版本历史：
 
 ```bash
-# 每个版本对应的镜像
-aether rollback --list my-project --json | jq '.data.Versions[] | {Version, Image, DeployedAt}'
-# 哪些版本真正部署成功过（Nomad 的 Stable 标记）
-curl -s "${NOMAD_ADDR}/v1/job/my-project/versions" | jq '[.Versions[] | {version: .Version, stable: .Stable, submitTime: .SubmitTime}]'
+# 每个版本对应的镜像与 Nomad 的 Stable 标记（cli ≥1.23.2 起 --list 自带 Stable 字段）
+aether rollback --list my-project --json | jq '.data.Versions[] | {Version, Image, Stable, DeployedAt}'
 ```
 
 `--list` 的 `Status` 只按顺序标 current / previous / stable（第 3 个起都叫 stable，Aether #493），不代表那个版本部署成功过；
-推荐回滚目标看 Nomad 的 `Stable` 字段。
+推荐回滚目标看同一输出里的 `Stable` 字段（cli <1.23.2 的 `--list` 不带 Stable，改查 `curl -s "${NOMAD_ADDR}/v1/job/my-project/versions"` 里的 `Stable`）。
 
 刚部署失败、而 job 的 `update` 开了 `auto_revert` 时，Nomad 可能已经自动退回（`aether deploy` 的 message 含 `rolling back to job version N`）：
 最新版本是退回产生的，与 version N 相同；紧邻的上一个版本是刚失败的那个，`Stable` 为 false。退回后的版本健康，就不需要再回滚。
@@ -113,7 +111,7 @@ aether rollback my-project --to <version> --dry-run --json
 aether rollback my-project --to <version> --yes --json [--timeout 5m]
 ```
 
-按 `.data.status` 判定（`--json` 下只要拿到回滚结果，外层 `status` 就是 `ok`、退出码是 0，失败也一样（Aether #493），不能当结论）：
+按 `.data.status` 判定（`--json` 下只要拿到回滚结果，外层 `status` 就是 `ok`，失败也一样，不能当结论；失败的退出码自 cli 1.23.12 起是 1，更早版本是 0（Aether #493））：
 
 | 结果 | 下一步 |
 |------|--------|
@@ -215,8 +213,9 @@ curl -s "${CONSUL_HTTP_ADDR}/v1/health/service/<service>?passing" | jq 'length'
 ```
 
 这将跳过版本列表展示，但仍需执行确认（Step 2.5）后才会执行回滚。
-`aether rollback --to` 接的是 Nomad job 版本号（整数，如 `--to 2`），不是镜像 tag。不带 `--to` 时回滚到紧邻的上一个版本，不看它是否健康过：
-刚 auto_revert 过时，它就是失败的那个（#514）。目标一律按 Step 1 的 `Stable` 选，用 `--to` 指定。
+`aether rollback --to` 接的是 Nomad job 版本号（整数，如 `--to 2`），不是镜像 tag。不带 `--to` 时默认目标按 `Stable` 选：
+当前版本之前最新的 Stable 版本，跳过的不稳定版本写进 `target_reason`（cli ≥1.23.2，#514；更早版本退到紧邻的上一个版本，
+刚 auto_revert 过时那就是失败的那个）。回滚目标仍按 Step 1 的 `Stable` 选，用 `--to` 显式指定。
 
 ## 回滚失败处理
 

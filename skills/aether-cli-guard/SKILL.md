@@ -28,13 +28,12 @@ aether init
 
 ## 脚本行为
 
-1. 从环境变量 `CLAUDE_TOOL_INPUT` 取命令；为空或不含 `aether` 时 `exit 0` 放行。
+1. 取要检测的命令：优先环境变量 `CLAUDE_TOOL_INPUT`，为空时读 stdin JSON 的 `.tool_input.command`（Claude Code 的 hook 载荷，与 `ci-watch-hook.sh` 同构）；取不到或不含 `aether` 时 `exit 0` 放行。
 2. 依次在 PATH、`~/.aether/aether`（且可执行）、`~/.aether/aether.exe` 查找 CLI；找到即 `exit 0`。
-3. 找不到时按平台打印安装引导（推荐 `/aether:aether-doctor`，或从 GitHub releases 手动下载、Forgejo 源备用），然后 `exit 1`。
+3. 找不到时把按平台生成的安装引导（推荐 `/aether:aether-doctor`，或从 GitHub releases 手动下载、Forgejo 源备用）打印到 **stderr**，然后 `exit 2` —— PreToolUse 只有 exit 2（或 JSON deny 决定）才阻断工具调用，exit 2 时 Claude 看到的正是 stderr 上的引导文字。
 
-> **已知问题（[#489](https://forgejo.10cg.pub/10CG/Aether/issues/489)，待修）**：Claude Code 通过 stdin 的 JSON 传入 hook 载荷，
-> 脚本只读 `CLAUDE_TOOL_INPUT`、没有像同插件 `ci-watch-hook.sh` 那样回退到 stdin；且 PreToolUse 只有 exit 2 才会拦截，
-> exit 1 是非阻断错误。两处任一成立，这道守卫都拦不下任何命令。
+> stdin JSON 与 exit 2 阻断语义自插件 v1.12.17 起接通（[#489](https://forgejo.10cg.pub/10CG/Aether/issues/489)）；
+> 更早版本只读 `CLAUDE_TOOL_INPUT` 且以 `exit 1` 结束，两处任一都让守卫拦不下任何命令。
 
 ## Hook 配置
 
@@ -55,10 +54,10 @@ aether init
 ]
 ```
 
-## 行为说明（脚本的设计意图；实际是否拦截见上方已知问题）
+## 行为说明
 
 | 检测结果 | 脚本动作 | 输出 |
 |---------|------|------|
 | CLI 可用 | `exit 0` 放行 | 无 |
-| CLI 未安装 / 不可执行 | 打印安装引导后 `exit 1`，意图是阻止命令 | 平台检测 + 安装命令 + 验证命令 |
+| CLI 未安装 / 不可执行 | 安装引导打到 stderr 后 `exit 2`，阻断命令 | 平台检测 + 安装命令 + 验证命令 |
 | 非 aether 命令 | `exit 0` 跳过检测 | 无 |

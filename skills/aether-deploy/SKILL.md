@@ -17,7 +17,7 @@ dependencies:
 
 # Aether 生产部署 (aether-deploy)
 
-> **版本**: 0.6.0 | **更新**: 2026-10-15 | **优先级**: P1
+> **版本**: 0.6.1 | **更新**: 2026-10-19 | **优先级**: P1
 
 ## 前置检查
 
@@ -69,7 +69,7 @@ aether version    # 低于 1.23.0 先升级 (/aether:aether-doctor)
 aether deploy my-project v1.2.3 --dry-run --json [--job-file deploy/nomad-prod.hcl] [--image-repo 10cg/my-project]
 ```
 
-按 `.data.status` 判定。`--json` 下只要拿到部署结果，外层 `status` 就是 `ok`、退出码是 0，失败也一样（Aether #493），都不能当结论：
+按 `.data.status` 判定。`--json` 下只要拿到部署结果，外层 `status` 就是 `ok`，失败也一样，不能当结论；失败的退出码自 cli 1.23.12 起是 1（更早版本是 0，Aether #493），同样不能代替它：
 
 | 结果 | 含义 | 下一步 |
 |------|------|--------|
@@ -155,7 +155,7 @@ CLI 开头再验证一次镜像，然后解析 job 文件 → 设置镜像 → �
 | `.data.status == "deployed"` 且 `.data.health_check.passed == true` | 成功 → Step 5 |
 | `JOB_MODIFIED_SINCE_PLAN` | 没有提交。回到 Step 2 重新预览，按新的 plan 重新确认；不要去掉 `--check-index` 硬提交 |
 | `DEPLOYMENT_AWAITING_PROMOTION` | 不是故障：canary 已健康，旧版本照常服务，在等人工 promote。问用户：promote（`nomad deployment promote -address="$NOMAD_ADDR" <deployment_id>`），或放弃 canary、保留旧版本（`nomad deployment fail -address="$NOMAD_ADDR" <deployment_id>`）；promote 后用 `nomad deployment status -address="$NOMAD_ADDR" <deployment_id>` 核对它变为 `successful` |
-| `DEPLOYMENT_FAILED`，`.data.message` 含 `rolling back to job version N` | Nomad 已按 `auto_revert` 自动退回：注册了一个与 version N 相同的新版本。**不要再回滚**：不带 `--to` 的 `aether rollback` 退到紧邻的上一个版本，也就是刚失败的这个（CLI 的 `suggested_action` 却正建议这么做，#514）。核对退回后的版本健康（`/aether:aether-status my-project`），再查失败原因 |
+| `DEPLOYMENT_FAILED`，`.data.message` 含 `rolling back to job version N` | Nomad 已按 `auto_revert` 自动退回：注册了一个与 version N 相同的新版本。**不要再回滚**：核对退回后的版本健康（`/aether:aether-status my-project`），再查失败原因（cli ≥1.23.2/#514 起 `suggested_action` 不再建议回滚、不带 `--to` 的默认回滚目标也按 Stable 选；1.23.0/1.23.1 里两者都指向刚失败的版本） |
 | `DEPLOYMENT_FAILED`（没有自动退回）、`HEALTH_CHECK_TIMEOUT` | 报告 `.data.message`（最后一次检查看到的状态）与 `.data.allocations`，提示 `/aether:aether-rollback my-project`。超时时 deployment 可能还在进行（job 的 `progress_deadline` 可能比 `--timeout` 长），先用 `nomad deployment status -address="$NOMAD_ADDR" <deployment_id>` 看它的状态再定 |
 | `DEPLOYMENT_PAUSED` / `DEPLOYMENT_CANCELLED` | 有人暂停了这次部署 / 部署期间又注册了更新的版本：报告，按 `.data.suggested_action` 问用户 |
 | `JOB_MODIFIED_CONCURRENTLY` | 已注册，但紧接着又有别的注册，认不出这次产生的版本：先看 `nomad job history -address="$NOMAD_ADDR" my-project`，不要重试或回滚 |
