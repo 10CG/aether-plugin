@@ -1,16 +1,28 @@
 #!/bin/bash
 #
 # Aether CLI PreToolUse Hook
-# 在执行 aether 命令前自动检测 CLI 是否已安装
+# 在执行 aether 命令前自动检测 CLI 是否已安装 (#489 修复)
 #
-# 环境变量:
-#   CLAUDE_TOOL_INPUT - 工具输入（包含命令）
+# 输入 (两种形态, 与 ci-watch-hook.sh 同构):
+#   - stdin JSON: Claude Code 的 hook 载荷, 命令在 .tool_input.command
+#   - 环境变量 CLAUDE_TOOL_INPUT (旧形态, 兼容保留)
+#
+# 拦截语义: PreToolUse 只有 exit 2 (或 JSON deny 决定) 才阻止工具调用;
+# exit 1 是非阻断错误, 命令照跑 —— 引导文字必须走 stderr (exit 2 时
+# Claude 看到的是 stderr)。
 #
 
 set -e
 
-# 获取要执行的命令
+# 获取要执行的命令: env 优先, 空则读 stdin JSON 的 tool_input.command
 COMMAND="${CLAUDE_TOOL_INPUT:-}"
+
+if [ -z "$COMMAND" ]; then
+    INPUT=$(cat 2>/dev/null || true)
+    if [ -n "$INPUT" ]; then
+        COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null || true)
+    fi
+fi
 
 # 如果不是 Bash 工具调用或没有命令，直接放行
 if [ -z "$COMMAND" ]; then
@@ -51,7 +63,7 @@ if ! detect_cli; then
     case "$_ARCH" in x86_64|amd64) _ARCH="amd64" ;; aarch64|arm64) _ARCH="arm64" ;; esac
     _BIN="aether-${_OS}-${_ARCH}"
 
-    cat << EOF
+    cat >&2 << EOF
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ❌ Aether CLI 未检测到
@@ -80,7 +92,7 @@ if ! detect_cli; then
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 EOF
-    exit 1  # 阻止命令执行
+    exit 2  # PreToolUse 的阻断退出码 (exit 1 不拦截, 命令照跑)
 fi
 
 exit 0  # CLI 已安装，放行
