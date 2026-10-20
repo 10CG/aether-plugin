@@ -2,6 +2,15 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.12.19] - 2026-10-20
+
+### Fixed — ci-watch 轮询窗口与判据对齐 (#467 follow-up 27845-3)
+
+- 窗口 15→30 polls (30×60s, 覆盖 1200s 分片触发线 + 慢 runner 排队余量; recipe-controls 实测最慢 859s 曾贴着旧窗口), state 文件新增 poll_max 契约字段
+- poll 判据从「合并 state」改为 count-based: aether ci status --commit <sha> --expect N 按退出码判 (0/10/11/12/13 分流, 与 aether-ci skill Step 3a 一致), 明确不再读 merged state
+- 新增 scripts/ci-watch-hook-test.sh (17 断言, RED 6 失败→GREEN)
+- 已知耦合留给下批 AB: aether-ci SKILL.md 三处旧窗口文案 (15 次/流程图/判据描述)
+
 ## [1.12.18] - 2026-10-19
 
 ### Changed — 收回 #514/#493 过时绕开说明 (#517) + cli-guard 文档对齐 (#489 余项)
