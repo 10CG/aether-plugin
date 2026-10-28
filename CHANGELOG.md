@@ -2,6 +2,14 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.12.20] - 2026-10-28
+
+### Added — ai-runtime 镜像 build CI 模板 (Aether #543 M1)
+
+- 新增 `references/ai-runtime-image-build.md`: 消费项目可整段拷贝的 Forgejo workflow 模板 —— build + push AI runtime 镜像到内网 registry, 并产出 `.aether/ai-service.yaml` `source:` 所需的 `@sha256:` digest 钉版 (workflow_dispatch 带 DEPLOY_ENV 内网 gate; push 触发含 Dockerfile/src/manifest paths)
+- 非 SKILL.md 变更, 未接线进任何 skill (grep 全仓零引用, 不改变任何决策树/触发条件) → 不触发 AB 强制流程, 不援引豁免
+- `cli.recommended_version` 1.23.10 → 1.23.14: 随主仓 #543 M1 PR 一同落地的 CLI 版本 (aether ai 命令组); plugin 发版时对齐 (#417 方案 B)
+
 ## [1.12.19] - 2026-10-20
 
 ### Fixed — ci-watch 轮询窗口与判据对齐 (#467 follow-up 27845-3)
