@@ -2,6 +2,17 @@
 
 All notable changes to aether-plugin will be documented in this file.
 
+## [1.12.21] - 2026-10-30
+
+### Added — ai-runtime bundle-build CI 模板 (Aether #543 M2-T1b)
+
+- 新增 `references/ai-runtime-bundle-build.md`: 消费项目 exec 路径 bundle 的 CI 模板
+  (`aether ai pack --push` → generic 包 → `generic://` 钉版行直贴 manifest), 折入 #562
+  三日实战全部教训 (owner 大小写 / 内网绕代理 / 版本不可变 / 上传必须二进制
+  Content-Type / 部署侧 var fail-closed 预置 / 参照实现指针)
+- 非 SKILL.md 变更, 未接线进任何 skill, 不触发 AB 强制
+- `cli.recommended_version` 1.23.14 → 1.23.20 (M2-T1/T2/T3/T4 已发版, bundle 通道 live 全绿)
+
 ## [1.12.20] - 2026-10-28
 
 ### Added — ai-runtime 镜像 build CI 模板 (Aether #543 M1)
